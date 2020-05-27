@@ -7,7 +7,7 @@ import (
 	remote "github.com/antonio-alexander/go-bludgeon/bludgeon/remote"
 )
 
-type remoteMock interface{}
+type remoteMock struct{}
 
 func NewRemoteMock() interface {
 	remote.Remote

@@ -2,7 +2,6 @@ package bludgeonclient_test
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	client "github.com/antonio-alexander/go-bludgeon/bludgeon/client"
@@ -13,7 +12,7 @@ import (
 
 func TestMainCli(t *testing.T) {
 	//get actual values
-	aPwd, _ := os.Getwd()
+	// aPwd, _ := os.Getwd()
 	// aArgs := os.Args[1:]
 	// aEnvs := make(map[string]string)
 	// for _, env := range os.Environ() {
@@ -28,14 +27,14 @@ func TestMainCli(t *testing.T) {
 		inEnvs map[string]string
 	}{
 		"read": {
-			inPwd: aPwd,
+			inPwd: "/Users/noobius/source_control/go/src/github.com/antonio-alexander/go-bludgeon/cmd/client_cli",
 			inArgs: []string{
 				"-command",
 				"read",
 				"-type",
 				"timer",
 				"-id",
-				"07052c79-475b-4ccd-86ee-d6871442fdda",
+				"ee87ec7b-8b28-4336-809b-456ba631ce19",
 			},
 		},
 	}

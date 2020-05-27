@@ -8,7 +8,6 @@ import (
 	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	api "github.com/antonio-alexander/go-bludgeon/bludgeon/api"
 	meta "github.com/antonio-alexander/go-bludgeon/bludgeon/meta"
 	remote "github.com/antonio-alexander/go-bludgeon/bludgeon/remote"
 )
@@ -48,6 +47,11 @@ func NewClient(meta interface {
 	Functional
 	API
 } {
+	//REVIEW: should add cases to confirm that meta/remote aren't nil since
+	// basic functionality won't work?
+	if meta == nil {
+		panic("meta is nil")
+	}
 	//create internal maps
 	lookupTimers := make(map[string]string)
 	lookupTimeSlices := make(map[string]string)
@@ -64,13 +68,21 @@ func NewClient(meta interface {
 
 //
 func (c *client) timeSliceCreate(timerID string) (timeSlice bludgeon.TimeSlice, err error) {
-	//use the api to create a time slice
-	if timeSlice.UUID, err = api.TimeSliceCreate(timerID); err != nil {
-		//TODO: cache the operation
+	//use the api to create a time slice if remote is not nil
+	if c.remote != nil {
+		if timeSlice.UUID, err = c.remote.TimeSliceCreate(timerID); err != nil {
+			//TODO: cache the operation
+		}
+	}
+	//REVIEW: what if the first remote call succeeds, but the second one fails? should probably update the api to include
+	//only generate the idea if the remote operations failed
+	if err != nil || c.remote == nil {
 		//generate the time slice id
 		if timeSlice.UUID, err = bludgeon.GenerateID(); err != nil {
 			return
 		}
+		//update the time slice's timer ID
+		timeSlice.TimerUUID = timerID
 	}
 	//cache the timeslice lookup
 	c.lookupTimeSlices[timeSlice.UUID] = timeSlice.UUID
@@ -82,9 +94,19 @@ func (c *client) timeSliceCreate(timerID string) (timeSlice bludgeon.TimeSlice, 
 
 //
 func (c *client) timeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice, err error) {
-	//attempt to use the api to query the timeslice
-	if timeSlice, err = api.TimeSliceRead(timeSliceID); err != nil {
-		//TODO: attempt to use the api to cache the active slice
+	if c.remote != nil {
+		//attempt to use the api to query the timeslice
+		if timeSlice, err = c.remote.TimeSliceRead(timeSliceID); err != nil {
+			//TODO: cache attempt to read time slice?
+		} else {
+			//write time slice to meta
+			if err = c.meta.MetaTimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
+				return
+			}
+		}
+	}
+	//only read from meta if remote is nil or there's an error
+	if c.remote == nil || err != nil {
 		//attempt to read the timeSlice locally
 		if timeSlice, err = c.meta.MetaTimeSliceRead(timeSliceID); err != nil {
 			return
@@ -97,19 +119,55 @@ func (c *client) timeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice
 }
 
 //
+func (c *client) timeSliceUpdate(timeSliceID string, timeSlice bludgeon.TimeSlice) (err error) {
+	//use the api to create a time slice if remote is not nil
+	if c.remote != nil {
+		if err = c.remote.TimeSliceUpdate(timeSliceID, timeSlice); err != nil {
+			//TODO: cache the operation
+		}
+	}
+	//store the timeslice
+	err = c.meta.MetaTimeSliceWrite(timeSliceID, timeSlice)
+
+	return
+}
+
+//
 func (c *client) timerRead(timerID string) (timer bludgeon.Timer, err error) {
-	//attempt to use the api to get the provided timer
-	if timer, err = api.TimerRead(timerID); err != nil {
+	//check if remote is nil
+	if c.remote != nil {
+		//attempt to use the api to get the provided timer
+		if timer, err = c.remote.TimerRead(timerID); err != nil {
+			//TODO: cache the read?
+		} else {
+			//store the timer in the local cache
+			if err = c.meta.MetaTimerWrite(timerID, timer); err != nil {
+				return
+			}
+		}
+	}
+	//read the meta timer if remote is nil or there is no err
+	if err != nil || c.remote == nil {
 		//attempt to read the timer locally
 		if timer, err = c.meta.MetaTimerRead(timerID); err != nil {
 			return
 		}
-	} else {
-		//cache the lookup
-		c.lookupTimers[timer.UUID] = timer.UUID
-		//store the timer in the local cache
-		err = c.meta.MetaTimerWrite(timerID, timer)
 	}
+	//cache the lookup
+	c.lookupTimers[timer.UUID] = timer.UUID
+
+	return
+}
+
+func (c *client) timerUpdate(timerID string, timer bludgeon.Timer) (err error) {
+	//use the api to create a time slice if remote is not nil
+	if c.remote != nil {
+		if err = c.remote.TimerUpdate(timerID, timer); err != nil {
+			//TODO: cache the operation
+		}
+	}
+	//store the timeslice
+	err = c.meta.MetaTimerWrite(timerID, timer)
 
 	return
 }
@@ -239,7 +297,7 @@ type Functional interface {
 	//LaunchCache
 	LaunchCache()
 
-	//
+	//CommandHandler
 	CommandHandler(command bludgeon.CommandClient, dataIn interface{}) (dataOut interface{}, err error)
 }
 
@@ -279,26 +337,42 @@ func (c *client) goCache(started chan struct{}) {
 }
 
 func (c *client) CommandHandler(command bludgeon.CommandClient, dataIn interface{}) (dataOut interface{}, err error) {
+	var id string
+	var ok bool
+
 	//execute the command
 	switch command {
 	case bludgeon.CommandClientTimerCreate:
 		dataOut, err = c.TimerCreate()
+	case bludgeon.CommandClientTimerStart:
+		if id, ok = dataIn.(string); !ok {
+			//TODO: generate error
+			return
+		}
+		//start the timer
+		err = c.TimerStart(id, time.Now())
+	case bludgeon.CommandClientTimerPause, bludgeon.CommandClientTimerStop:
+		if id, ok = dataIn.(string); !ok {
+			//TODO: generate error
+			return
+		}
+		//start the timer
+		err = c.TimerPause(id, time.Now())
 	case bludgeon.CommandClientTimerRead:
-		var id string
-
-		//switch on the data
-		switch v := dataIn.(type) {
-		case bludgeon.Timer:
-			id = v.UUID
-		case string:
-			id = v
-		default:
-			//generate error
+		//cast into string and use
+		if id, ok = dataIn.(string); !ok {
+			//TODO: generate error
+			return
 		}
-		//check
-		if err == nil {
-			dataOut, err = c.TimerRead(id)
+		//read the timer
+		dataOut, err = c.TimerRead(id)
+	case bludgeon.CommandClientTimerSubmit:
+		if id, ok = dataIn.(string); !ok {
+			//TODO: generate error
+			return
 		}
+		//start the timer
+		err = c.TimerSubmit(id, time.Now())
 	default:
 		//TODO: generate error
 	}
@@ -335,25 +409,25 @@ func (c *client) TimerCreate() (timer bludgeon.Timer, err error) {
 	c.Lock()
 	defer c.Unlock()
 
-	//attempt execute the api
-	if timer, err = api.TimerCreate(); err != nil {
-		//cache the operation
-		// attempt to create a timer
-
+	//check if remote is nil
+	if c.remote != nil {
+		//attempt execute the api
+		if timer, err = c.remote.TimerCreate(); err != nil {
+			//TODO: cache the operation
+		}
+	}
+	//generate the uuid if there's a remote error or if there is no remote
+	if err != nil || c.remote == nil {
 		//generate a UUID for the timer locally
 		if timer.UUID, err = bludgeon.GenerateID(); err != nil {
-			//unable to generate the timer, quit and give an error
 			return
 		}
 	}
 	// update the lookup for the timer
 	c.lookupTimers[timer.UUID] = timer.UUID
-	//check if meta is not nil
-	if c.meta != nil {
-		//update the timer in meta
-		if err = c.meta.MetaTimerWrite(timer.UUID, timer); err != nil {
-			return
-		}
+	//update the timer in meta
+	if err = c.meta.MetaTimerWrite(timer.UUID, timer); err != nil {
+		return
 	}
 
 	return
@@ -412,43 +486,46 @@ func (c *client) TimerStart(id string, startTime time.Time) (err error) {
 		//set the start time to now
 		timer.Start = startTime.UnixNano()
 	}
-	//check if there's an active slice, if there is, do nothing
-	// if there isn't, create an active slice
+	//check if there's an active slice
 	if timer.ActiveSliceUUID != "" {
-		if _, err = c.timeSliceRead(timer.ActiveSliceUUID); err != nil {
+		//read the active slice (e.g. resume the timer so you don't lose the slice if it was
+		// stopped ungracefully)
+		if timeSlice, err = c.timeSliceRead(timer.ActiveSliceUUID); err != nil {
 			return
 		}
 	} else {
-		//create the timeSlice
+		//since there is no active slice, create the timeSlice
 		if timeSlice, err = c.timeSliceCreate(timer.UUID); err != nil {
 			return
 		}
 		//set the start time
 		timeSlice.Start = startTime.UnixNano()
-		//update the slice using the API
-		if err = api.TimeSliceUpdate(timeSlice.UUID, timeSlice); err != nil {
-			//cache operation
-
-			//cache the timeSlice
-			c.timeSlices[timeSlice.UUID] = timeSlice
-			//cache the lookup
-			c.lookupTimeSlices[timeSlice.UUID] = timeSlice.UUID
-			//clear the error
-			err = nil
-		}
-		//store the timeSlice
-		timer.ActiveSliceUUID = timeSlice.UUID
-		//update the timer
-		if err = api.TimerUpdate(timer.UUID, timer); err != nil {
-			//cache the operation
-
-			//cache the lookup
-			c.lookupTimers[timer.UUID] = timer.UUID
-			//cache the timer
-			c.timers[timer.UUID] = timer
-			err = nil
+		//update the time slice with its new start time
+		if c.remote != nil {
+			//update the slice using the API
+			if err = c.remote.TimeSliceUpdate(timeSlice.UUID, timeSlice); err != nil {
+				//TODO: cache operation
+			}
 		}
 	}
+	//store the slice
+	if err = c.meta.MetaTimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
+		return
+	}
+	//cache the lookup
+	c.lookupTimeSlices[timeSlice.UUID] = timeSlice.UUID
+	//store the timeSlice
+	timer.ActiveSliceUUID = timeSlice.UUID
+	if c.remote != nil {
+		//update the timer
+		if err = c.remote.TimerUpdate(timer.UUID, timer); err != nil {
+			//TODO: cache the operation
+		}
+	}
+	//cache the lookup
+	c.lookupTimers[timer.UUID] = timer.UUID
+	//cache the timer
+	err = c.meta.MetaTimerWrite(timer.UUID, timer)
 
 	return
 }
@@ -466,13 +543,16 @@ func (c *client) TimerPause(timerID string, pauseTime time.Time) (err error) {
 	var timer bludgeon.Timer
 	var timeSlice bludgeon.TimeSlice
 
-	//attempt to use the api to get the provided timer
+	//attempt to read the timer
 	if timer, err = c.timerRead(timerID); err != nil {
 		return
 	}
 	//check if there's an active slice, if there is, do nothing
-	// if there isn't, create an active slice
-	if timer.ActiveSliceUUID != "" {
+	// if there isn't, generate an error since a paused timer
+	// should be in-progress (noted by an active slice)
+	if timer.ActiveSliceUUID == "" {
+		//REVIEW: would it make more sense to output an error that says
+		// unable to pause a timer that isn't in progress?
 		err = fmt.Errorf(ErrNoActiveTimeSlicef, timer.UUID)
 
 		return
@@ -489,38 +569,33 @@ func (c *client) TimerPause(timerID string, pauseTime time.Time) (err error) {
 	timeSlice.Archived = true
 	//update the slice using the API, there's an understanding that this should
 	// trigger some server side logic to update the timer
-	if err = api.TimeSliceUpdate(timeSlice.UUID, timeSlice); err != nil {
-		//cache the operation
-		// because the service side logic should complete, we don't really have to do anything
-		// since the logic is going to delete the slice anyway
-
-		//update timeslice for completeness
-		c.timeSlices[timeSlice.UUID] = timeSlice
-		//clear error
-		err = nil
-	} else {
-		//remove the time slice since we know the server has the most up to date
-		// copy
-		delete(c.lookupTimeSlices, timeSlice.UUID)
-		delete(c.timeSlices, timeSlice.UUID)
+	if c.remote != nil {
+		//update the time slice
+		if err = c.remote.TimeSliceUpdate(timeSlice.UUID, timeSlice); err != nil {
+			//TODO: cache the operation
+		}
 	}
+	// because the service side logic should complete, we don't really have to do anything
+	// since the logic is going to delete the slice anyway
+	if err = c.meta.MetaTimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
+		return
+	}
+	//remove the time slice since we know the server has the most up to date
+	// copy
+	delete(c.lookupTimeSlices, timeSlice.UUID)
 	//update the timer, remove its time slice and update the elapsed time
 	//set the activeSliceUUID to empty
 	timer.ActiveSliceUUID = ""
+	//calculate elapsed time
+	timer.ElapsedTime = timer.ElapsedTime + timeSlice.ElapsedTime
 	//update the timer
-	if err = api.TimerUpdate(timer.UUID, timer); err != nil {
-		//cache the operation
-
-		//server logic should update the elapsed time
-		//update the timer locally
-		//calculate elapsed time
-		timer.ElapsedTime = timer.ElapsedTime + timeSlice.ElapsedTime
-		//update the timer
-		c.timers[timer.UUID] = timer
-	} else {
-		//re-read the timer
-		_, err = c.timerRead(timer.UUID)
+	if c.remote != nil {
+		if err = c.remote.TimerUpdate(timer.UUID, timer); err != nil {
+			//TODO: cache the operation
+		}
 	}
+	//update the timer
+	err = c.meta.MetaTimerWrite(timer.UUID, timer)
 
 	return
 }
@@ -543,8 +618,7 @@ func (c *client) TimerSubmit(timerID string, submitTime time.Time) (err error) {
 	if timer, err = c.timerRead(timerID); err != nil {
 		return
 	}
-	//check if there's an active slice, if there is, do nothing
-	// if there isn't, create an active slice
+	//check if there's an active slice, if there is,
 	if timer.ActiveSliceUUID != "" {
 		//read the active time slice
 		if timeSlice, err = c.timeSliceRead(timer.ActiveSliceUUID); err != nil {
@@ -557,21 +631,13 @@ func (c *client) TimerSubmit(timerID string, submitTime time.Time) (err error) {
 		//set archived to true
 		timeSlice.Archived = true
 		//update the slice using the API, there's an understanding that this should
-		// trigger some server side logic to update the timer
-		if err = api.TimeSliceUpdate(timeSlice.UUID, timeSlice); err != nil {
-			//cache the operation
-			// because the service side logic should complete, we don't really have to do anything
-			// since the logic is going to delete the slice anyway
-
-			//update timeslice for completeness
-			c.timeSlices[timeSlice.UUID] = timeSlice
-			//clear error
-			err = nil
-		} else {
+		if c.remote != nil {
+			if err = c.remote.TimeSliceUpdate(timeSlice.UUID, timeSlice); err != nil {
+				//TODO: cache the operation
+			}
 			//remove the time slice since we know the server has the most up to date
 			// copy
 			delete(c.lookupTimeSlices, timeSlice.UUID)
-			delete(c.timeSlices, timeSlice.UUID)
 		}
 		//update the timer, remove its time slice and update the elapsed time
 		//set the activeSliceUUID to empty
@@ -579,20 +645,18 @@ func (c *client) TimerSubmit(timerID string, submitTime time.Time) (err error) {
 	}
 	//set finish time
 	timer.Finish = submitTime.UnixNano()
-	//update the timer
-	if err = api.TimerUpdate(timer.UUID, timer); err != nil {
-		//cache the operation
-
-		//server logic should update the elapsed time
-		//update the timer locally
-		//calculate elapsed time
-		timer.ElapsedTime = timer.ElapsedTime + timeSlice.ElapsedTime
+	//calculate elapsed time
+	timer.ElapsedTime = timer.ElapsedTime + timeSlice.ElapsedTime
+	//set completed
+	timer.Completed = true
+	if c.remote != nil {
 		//update the timer
-		c.timers[timer.UUID] = timer
-	} else {
-		//re-read the timer
-		_, err = c.timerRead(timer.UUID)
+		if err = c.remote.TimerUpdate(timer.UUID, timer); err != nil {
+			//TODO: cache the operation
+		}
 	}
+	//update the timer in meta
+	err = c.meta.MetaTimerWrite(timer.UUID, timer)
 
 	return
 }
@@ -614,12 +678,12 @@ func (c *client) TimerDelete(timerID string) (err error) {
 	}
 	timer.Archived = true
 	//update the timer
-	if err = api.TimerUpdate(timer.UUID, timer); err != nil {
-		//cache the operation
-
-		//update the timer
-		c.timers[timer.UUID] = timer
+	if c.remote != nil {
+		if err = c.remote.TimerUpdate(timer.UUID, timer); err != nil {
+			//TODOcache the operation
+		}
 	}
+	err = c.meta.MetaTimerWrite(timerID, timer)
 
 	return
 }

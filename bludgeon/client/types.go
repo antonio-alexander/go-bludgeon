@@ -31,7 +31,5 @@ type Configuration struct {
 const (
 	SQL_DRIVER = "sqlite3"
 	HELP       = "Help Goes Here!"
-	longForm   = "Jan 2, 2006 at 3:04pm (MST)"
-	shortForm  = "2006-Jan-02"
 	// tabwriterFlag = tabwriter.Debug //tabwriter.AlignRight | tabwriter.Debug
 )

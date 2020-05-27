@@ -28,12 +28,16 @@ func ParseClient(pwd string, args []string, envs map[string]string) (o Options, 
 		switch strings.ToLower(o.command) {
 		case "create":
 			o.Command = bludgeon.CommandClientTimerCreate.String()
-		case "delete":
-			o.Command = bludgeon.CommandClientTimerDelete.String()
-		case "update":
-			o.Command = bludgeon.CommandClientTimerUpdate.String()
+		case "start", "resume":
+			o.Command = bludgeon.CommandClientTimerStart.String()
+		case "pause":
+			o.Command = bludgeon.CommandClientTimerPause.String()
 		case "read":
 			o.Command = bludgeon.CommandClientTimerRead.String()
+		case "stop":
+			o.Command = bludgeon.CommandClientTimerStop.String()
+		case "submit":
+			o.Command = bludgeon.CommandClientTimerSubmit.String()
 		default:
 			//TODO: generate error
 		}

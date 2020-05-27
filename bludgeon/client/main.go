@@ -10,10 +10,19 @@ import (
 )
 
 func MainCLI(pwd string, args []string, envs map[string]string) {
-	var options cli.Options
 	var command bludgeon.CommandClient
+	var options cli.Options
 	var data interface{}
 	var err error
+	//TODO: generate code to pull this from a json file
+	var configuration = Configuration{
+		ServerAddress: "127.0.0.1",
+		ServerPort:    "60000",
+		ClientAddress: "127.0.0.1",
+		ClientPort:    "60000",
+		// Task:          0,
+		// Employee:      0,
+	}
 
 	//defer function to print errors
 	defer func() {
@@ -39,18 +48,15 @@ func MainCLI(pwd string, args []string, envs map[string]string) {
 	}
 	//create the client
 	client := NewClient(metaJSON, nil)
+	//defer function to close client
 	defer client.Close()
+	//TODO: de-serialize client information
+	//TODO: defer serialize client information
 	//start the client
-	if err = client.Start(Configuration{
-		ServerAddress: "127.0.0.1",
-		ServerPort:    "60000",
-		ClientAddress: "127.0.0.1",
-		ClientPort:    "60000",
-		Task:          0,
-		Employee:      0,
-	}); err != nil {
+	if err = client.Start(configuration); err != nil {
 		return
 	}
+	//defer function to stop client
 	defer func() {
 		if err := client.Stop(); err != nil {
 			fmt.Printf("%s\n", err)
@@ -60,11 +66,9 @@ func MainCLI(pwd string, args []string, envs map[string]string) {
 	if data, err = client.CommandHandler(command, data); err != nil {
 		return
 	}
-	switch command {
-	case bludgeon.CommandClientTimerRead, bludgeon.CommandClientTimerCreate:
-		if timer, ok := data.(bludgeon.Timer); ok {
-			fmt.Printf("Timer: %#v\n", timer)
-		}
+	//handle response
+	if err = handleClientResponse(command, data); err != nil {
+		return
 	}
 
 	return

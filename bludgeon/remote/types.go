@@ -4,11 +4,6 @@ import (
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
 )
 
-//error constants
-const (
-	ErrNotImplemented string = "Not Implemented"
-)
-
 type Remote interface {
 	//
 	TimerCreate() (timer bludgeon.Timer, err error)

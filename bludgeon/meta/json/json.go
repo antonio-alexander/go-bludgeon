@@ -2,6 +2,7 @@ package bludgeonmetajson
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -191,7 +192,8 @@ func (m *metaJSON) MetaTimerRead(timerID string) (timer bludgeon.Timer, err erro
 
 	//if timer exists output it
 	if timer, ok = m.timers[timerID]; !ok {
-		//TODO: generate an error
+		err = fmt.Errorf(ErrTimerNotFoundf, timerID)
+
 		return
 	}
 
@@ -236,7 +238,8 @@ func (m *metaJSON) MetaTimeSliceRead(timeSliceID string) (timeSlice bludgeon.Tim
 
 	//if timer exists output it
 	if timeSlice, ok = m.timeSlices[timeSliceID]; !ok {
-		//TODO: generate an error
+		err = fmt.Errorf(ErrTimeSliceNotFoundf, timeSliceID)
+
 		return
 	}
 

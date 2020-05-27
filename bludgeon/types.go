@@ -10,6 +10,13 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
+)
+
+//common constants
+const (
+	fmtTimeLong  = "Jan 2, 2006 at 3:04pm (MST)"
+	fmtTimeShort = "2006-Jan-02"
 )
 
 //error constants
@@ -123,13 +130,10 @@ type Timer struct {
 	Archived   bool   `json:"Archived"`
 }
 
-// //Print
-// func (t Timer) Print(w io.Writer) (err error) {
-// 	_, err = fmt.Fprintf(w, "%d\t%d\t%s\t%s\t%s\n",
-// 		t.ID, t.EmployeeID, t.Start, t.Finish, t.Comment)
-
-// 	return
-// }
+func (t Timer) String() string {
+	return fmt.Sprintf(" \"UUID\": %s\n \"Active Slice UUID\": %s\n \"Start\": %s\n \"Finish\": %s\n \"Elapsed Time\": %v\n \"Completed\": %t\n",
+		t.UUID, t.ActiveSliceUUID, time.Unix(0, t.Start).Format(fmtTimeLong), time.Unix(0, t.Finish).Format(fmtTimeLong), time.Duration(t.ElapsedTime)/time.Nanosecond, t.Completed)
+}
 
 type Task struct {
 	ID          int64     `json:"TaskID,omit_empty"`
@@ -166,7 +170,7 @@ type Project struct {
 }
 
 func (p *Project) Print(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%d\t%d\t%d\t%s\n",
+	_, err := fmt.Fprintf(w, "%d\t%d\t%s\n",
 		p.ID, p.ClientID, p.Description)
 
 	return err
@@ -197,9 +201,12 @@ type CommandClient uint8
 const (
 	CommandClientNull        CommandClient = iota
 	CommandClientTimerCreate CommandClient = iota
-	CommandClientTimerDelete CommandClient = iota
-	CommandClientTimerUpdate CommandClient = iota
 	CommandClientTimerRead   CommandClient = iota
+	CommandClientTimerDelete CommandClient = iota
+	CommandClientTimerStart  CommandClient = iota
+	CommandClientTimerStop   CommandClient = iota
+	CommandClientTimerPause  CommandClient = iota
+	CommandClientTimerSubmit CommandClient = iota
 	CommandClientInvalid     CommandClient = iota
 )
 
@@ -207,12 +214,18 @@ func (c CommandClient) String() string {
 	switch c {
 	case CommandClientTimerCreate:
 		return "timercreate"
-	case CommandClientTimerDelete:
-		return "timerdelete"
-	case CommandClientTimerUpdate:
-		return "timerupdate"
 	case CommandClientTimerRead:
 		return "timerread"
+	case CommandClientTimerDelete:
+		return "timerdelete"
+	case CommandClientTimerStart:
+		return "timerstart"
+	case CommandClientTimerStop:
+		return "timerstop"
+	case CommandClientTimerPause:
+		return "timerpause"
+	case CommandClientTimerSubmit:
+		return "timersubmit"
 	default:
 		return ""
 	}
@@ -222,12 +235,18 @@ func AtoCommandClient(s string) CommandClient {
 	switch strings.ToLower(s) {
 	case "timercreate":
 		return CommandClientTimerCreate
-	case "timerdelete":
-		return CommandClientTimerDelete
-	case "timerupdate":
-		return CommandClientTimerUpdate
 	case "timerread":
 		return CommandClientTimerRead
+	case "timerdelete":
+		return CommandClientTimerDelete
+	case "timerstart":
+		return CommandClientTimerStart
+	case "timerstop":
+		return CommandClientTimerStop
+	case "timerpause":
+		return CommandClientTimerPause
+	case "timersubmit":
+		return CommandClientTimerSubmit
 	default:
 		return CommandClientInvalid
 	}
