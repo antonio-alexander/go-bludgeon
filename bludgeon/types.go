@@ -124,10 +124,10 @@ type Timer struct {
 	ElapsedTime     int64  `json:"ElapsedTime"`
 	Completed       bool   `json:"Completed"` //this is set to true once the timer has been submitted
 	//currently unused
-	Billed     bool   `json:"Billed"` //this is set once it has been billed so it "can't" be modified
-	EmployeeID int64  `json:"EmployeeID"`
-	Comment    string `json:"Comment"`
-	Archived   bool   `json:"Archived"`
+	// Comment    string `json:"Comment"`
+	// Billed     bool   `json:"Billed"` //this is set once it has been billed so it "can't" be modified
+	// EmployeeID int64  `json:"EmployeeID"`
+	Archived bool `json:"Archived"`
 }
 
 func (t Timer) String() string {

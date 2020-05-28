@@ -22,7 +22,6 @@ type client struct {
 	started        bool          //whether or not the business logic has starting
 	config         Configuration //configuration
 	meta           interface {   //storage interface
-		meta.Meta
 		meta.MetaTimer
 		meta.MetaTimeSlice
 	}
@@ -36,7 +35,6 @@ type client struct {
 }
 
 func NewClient(meta interface {
-	meta.Meta
 	meta.MetaTimer
 	meta.MetaTimeSlice
 }, remote interface {
