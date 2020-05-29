@@ -1,17 +1,17 @@
+--set
 CREATE DATABASE IF NOT EXISTS bludgeon;
 CREATE USER IF NOT EXISTS 'bludgeon'@'%' identified by 'bludgeon';
 USE bludgeon;
 
 CREATE TABLE IF NOT EXISTS timer (     
     id BIGINT NOT NULL AUTO_INCREMENT,
-    uuid TEXT,
-    activesliceid BIGINT,
-    activesliceuuid TEXT,    
+    uuid TEXT(36),
+    activesliceuuid TEXT(36),    
     start BIGINT,
     finish BIGINT,
     elapsedtime BIGINT,
-    INDEX(id, uuid(36)),
-
+    INDEX(id),
+    UNIQUE(uuid(36)),
     PRIMARY KEY (id)
     -- FOREIGN KEY (employeeid)
         -- REFERENCES employee(id)
@@ -20,18 +20,17 @@ CREATE TABLE IF NOT EXISTS timer (
 
 CREATE TABLE IF NOT EXISTS timeslice (     
     id BIGINT NOT NULL AUTO_INCREMENT,
-    uuid TEXT,
-    timerid BIGINT,
-    timeruuid TEXT,    
+    uuid TEXT(36),
+    timeruuid TEXT(36),    
     start BIGINT,
     finish BIGINT,
     elapsedtime BIGINT,
-    INDEX(id, uuid(36)),
-
+    INDEX(id),
+    UNIQUE(uuid(36)),
     PRIMARY KEY (id)
-    -- FOREIGN KEY (employeeid)
-        -- REFERENCES employee(id)
-        -- ON UPDATE CASCADE ON DELETE RESTRICT
+    -- FOREIGN KEY (timeruuid(36))
+    --     REFERENCES timer(uuid)
+    --     ON DELETE CASCADE
 )ENGINE=InnoDB;
 
 -- CREATE TABLE IF NOT EXISTS client (
@@ -62,4 +61,4 @@ CREATE TABLE IF NOT EXISTS timeslice (
 --         REFERENCES client(id)
 -- )ENGINE=InnoDB;
 
-GRANT ALL ON bludgeon.* to 'bludgeon'@'%'
+GRANT ALL ON bludgeon.* to 'bludgeon'@'%';

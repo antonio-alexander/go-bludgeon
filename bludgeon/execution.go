@@ -11,7 +11,6 @@ func GenerateID() (id string, err error) {
 	if guid, err = uuid.NewRandom(); err != nil {
 		return
 	}
-	//get id in string format
 	id = guid.String()
 
 	return

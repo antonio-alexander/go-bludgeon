@@ -143,7 +143,7 @@ func metaInit(pwd string) (meta interface {
 			Driver:          "mysql",
 			DataSource:      "bludgeon",
 			Hostname:        "127.0.0.1",
-			Port:            "306",
+			Port:            "3306",
 			Username:        "bludgeon",
 			Password:        "bludgeon",
 			Database:        "bludgeon",

@@ -34,7 +34,7 @@ func TestMainCli(t *testing.T) {
 				"-type",
 				"timer",
 				"-id",
-				"ee87ec7b-8b28-4336-809b-456ba631ce19",
+				"768e8c52-23a6-4146-a65c-446d4f340eff",
 			},
 		},
 	}

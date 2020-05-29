@@ -77,42 +77,44 @@ const (
 	TableTimer            string = "timer"
 	QueryTimerCreateTable string = `CREATE TABLE IF NOT EXISTS ` + TableTimer + ` (
 		id BIGINT NOT NULL AUTO_INCREMENT,
-		uuid TEXT,
-		activesliceid BIGINT,
-		activesliceuuid TEXT,    
+		uuid TEXT(36),
+		activesliceuuid TEXT(36),    
 		start BIGINT,
 		finish BIGINT,
 		elapsedtime BIGINT,
-		INDEX(id, uuid(36)),
-	
+		INDEX(id),
+		UNIQUE(uuid(36)),
 		PRIMARY KEY (id)
 		-- FOREIGN KEY (employeeid)
 			-- REFERENCES employee(id)
 			-- ON UPDATE CASCADE ON DELETE RESTRICT
 	)ENGINE=InnoDB;`
-	QueryTimerUpsertf string = "INSERT into %s (activesliceid, uuid, activesliceuuid, start, finish, elapsedtime) VALUES(?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE activesliceid=?, uuid=?, activesliceuuid=?, start=?, finish=?, elapsedtime=?"
-	QueryTimerDeletef string = "DELETE FROM %s where uuid = ?"
-	QueryTimerSelectf string = "SELECT * from %s WHERE uuid = \"%s\""
+	QueryTimerUpsert string = `INSERT into ` + TableTimer + ` (uuid, activesliceuuid, start, finish, elapsedtime) VALUES(?, ?, ?, ?, ?)
+	ON DUPLICATE KEY 
+		UPDATE uuid=?, activesliceuuid=?, start=?, finish=?, elapsedtime=?`
+	QueryTimerDeletef string = `DELETE FROM ` + TableTimer + ` where uuid = ?`
+	QueryTimerSelectf string = `SELECT uuid, activesliceuuid, start, finish, elapsedtime from ` + TableTimer + ` WHERE uuid = ?`
 	//
 	TableTimeSlice            string = "timeslice"
 	QueryTimeSliceCreateTable string = `CREATE TABLE IF NOT EXISTS ` + TableTimeSlice + ` (
 		id BIGINT NOT NULL AUTO_INCREMENT,
-		uuid TEXT,
-		timerid BIGINT,
-		timeruuid TEXT,    
+		uuid TEXT(36),
+		timeruuid TEXT(36),    
 		start BIGINT,
 		finish BIGINT,
 		elapsedtime BIGINT,
-		INDEX(id, uuid(36)),
-	
+		INDEX(id),
+		UNIQUE(uuid(36)),
 		PRIMARY KEY (id)
-		-- FOREIGN KEY (employeeid)
-			-- REFERENCES employee(id)
-			-- ON UPDATE CASCADE ON DELETE RESTRICT
+		-- FOREIGN KEY (timeruuid(36))
+		--     REFERENCES timer(uuid)
+		--     ON DELETE CASCADE
 	)ENGINE=InnoDB;`
-	QueryTimeSliceUpsertf string = "INSERT into %s (timerid, uuid, timeruuid, start, finish, elapsedtime) VALUES(?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE timerid=?, uuid=?, timeruuid=?, start=?, finish=?, elapsedtime=?"
-	QueryTimeSliceDeletef string = "DELETE FROM %s where uuid = ?"
-	QueryTimeSliceSelectf string = "SELECT * from %s WHERE uuid = \"%s\""
+	QueryTimeSliceUpsert string = `INSERT into ` + TableTimeSlice + ` (uuid, timeruuid, start, finish, elapsedtime) VALUES(?, ?, ?, ?, ?)
+	ON DUPLICATE KEY
+		UPDATE uuid=?, start=?, finish=?, elapsedtime=?`
+	QueryTimeSliceDeletef string = `DELETE FROM ` + TableTimeSlice + ` where uuid = ?`
+	QueryTimeSliceSelectf string = `SELECT uuid, timeruuid, start, finish, elapsedtime from ` + TableTimeSlice + ` WHERE uuid = ?`
 )
 
 // //TableProject is the string defining the name of the project table

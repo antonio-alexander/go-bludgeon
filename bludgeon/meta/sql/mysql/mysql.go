@@ -10,7 +10,9 @@ import (
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
 	meta "github.com/antonio-alexander/go-bludgeon/bludgeon/meta"
 
-	"github.com/go-sql-driver/mysql"
+	//shadow import for mysql driver support
+	_ "github.com/go-sql-driver/mysql"
+	// _ "github.com/mattn/go-sqlite3"
 )
 
 type metaMySQL struct {
@@ -180,7 +182,6 @@ func (m *metaMySQL) Connect(config Configuration) (err error) {
 	}
 	//create a connection to the database
 	if m.db, err = sql.Open(m.config.Driver, m.config.DataSource); err != nil {
-		m.db = nil //set pointer to nil
 		return
 	}
 	//attempt to ping the database to verify valid connectivity
@@ -334,24 +335,26 @@ func (m *metaMySQL) MetaTimerRead(timerUUID string) (timer bludgeon.Timer, err e
 	var timers []bludgeon.Timer
 
 	//query rows for timer, this should only return a single element because timerID should be a primary column
-	if rows, err = m.db.Query(fmt.Sprintf(QueryTimerSelectf, TableTimer, timerUUID)); err != nil {
+	if rows, err = m.db.Query(QueryTimerSelectf, timerUUID); err != nil {
 		return
 	}
 	//range over rows and get data
 	for rows.Next() {
 		var timer bludgeon.Timer
-		var start, finish mysql.NullTime
 
 		//TODO: add completed and archived
-		if err = rows.Scan(&timer.ID, &timer.ActiveSliceID, &timer.UUID, &timer.ActiveSliceUUID, &start, &finish, &timer.ElapsedTime); err != nil {
+		if err = rows.Scan(&timer.UUID, &timer.ActiveSliceUUID, &timer.Start, &timer.Finish, &timer.ElapsedTime); err != nil {
 			break
 		}
-		//scan for time values
-		start.Scan(timer.Start)
-		finish.Scan(timer.Finish)
 		//add timer to timers
 		timers = append(timers, timer)
 	}
+	if err != nil {
+		rows.Close()
+
+		return
+	}
+
 	//check for errors
 	err = rows.Err()
 	//check timers
@@ -371,8 +374,9 @@ func (m *metaMySQL) MetaTimerWrite(timerID string, timer bludgeon.Timer) (err er
 
 	var result sql.Result
 
-	if result, err = m.queryResult(fmt.Sprintf(QueryTimerUpsertf, TableTimer), timer.ActiveSliceID, timer.UUID, timer.ActiveSliceUUID, timer.Start, timer.Finish, timer.ElapsedTime,
-		timer.ActiveSliceID, timer.UUID, timer.ActiveSliceUUID, timer.Start, timer.Finish, timer.ElapsedTime); err != nil {
+	//upsert the timer
+	if result, err = m.queryResult(QueryTimerUpsert, timer.UUID, timer.ActiveSliceUUID, timer.Start, timer.Finish, timer.ElapsedTime,
+		timer.UUID, timer.ActiveSliceUUID, timer.Start, timer.Finish, timer.ElapsedTime); err != nil {
 		return
 	}
 	err = rowsAffected(result, ErrUpdateFailed)
@@ -388,7 +392,7 @@ func (m *metaMySQL) MetaTimerDelete(timerUUID string) (err error) {
 	var result sql.Result
 
 	//delete the timer
-	if result, err = m.queryResult(fmt.Sprintf(QueryTimerDeletef, TableTimer), timerUUID); err != nil {
+	if result, err = m.queryResult(QueryTimerDeletef, timerUUID); err != nil {
 		return
 	}
 	//ensure that rows were affected
@@ -409,21 +413,23 @@ func (m *metaMySQL) MetaTimeSliceRead(timeSliceID string) (timeSlice bludgeon.Ti
 	var timeSlices []bludgeon.TimeSlice
 
 	//query rows for timer, this should only return a single element because timerID should be a primary column
-	if rows, err = m.db.Query(fmt.Sprintf(QueryTimeSliceSelectf, TableTimeSlice, timeSliceID)); err == nil {
+	if rows, err = m.db.Query(QueryTimeSliceSelectf, timeSliceID); err == nil {
 		for rows.Next() {
 			var timeSlice bludgeon.TimeSlice
-			var start, finish mysql.NullTime
 
 			//TODO: add completed and archived
-			if err = rows.Scan(&timeSlice.ID, &timeSlice.TimerID, &timeSlice.UUID, &timeSlice.TimerUUID, &start, &finish, &timeSlice.ElapsedTime); err != nil {
+			if err = rows.Scan(&timeSlice.UUID, &timeSlice.TimerUUID, &timeSlice.Start, &timeSlice.Finish, &timeSlice.ElapsedTime); err != nil {
 				break
 			}
-			//scan for time values
-			start.Scan(timeSlice.Start)
-			finish.Scan(timeSlice.Finish)
+
 			//add timer to timers
 			timeSlices = append(timeSlices, timeSlice)
 		}
+	}
+	if err != nil {
+		rows.Close()
+
+		return
 	}
 	err = rows.Err()
 	//check timers
@@ -443,8 +449,9 @@ func (m *metaMySQL) MetaTimeSliceWrite(timeSliceID string, timeSlice bludgeon.Ti
 
 	var result sql.Result
 
-	if result, err = m.queryResult(fmt.Sprintf(QueryTimeSliceUpsertf, TableTimeSlice), timeSlice.TimerID, timeSlice.UUID, timeSlice.TimerUUID, timeSlice.Start, timeSlice.Finish, timeSlice.ElapsedTime,
-		timeSlice.TimerID, timeSlice.UUID, timeSlice.TimerUUID, timeSlice.Start, timeSlice.Finish, timeSlice.ElapsedTime); err != nil {
+	//upsert the tiem slice
+	if result, err = m.queryResult(QueryTimeSliceUpsert, timeSlice.UUID, timeSlice.TimerUUID, timeSlice.Start, timeSlice.Finish, timeSlice.ElapsedTime,
+		timeSlice.UUID, timeSlice.Start, timeSlice.Finish, timeSlice.ElapsedTime); err != nil {
 		return
 	}
 	err = rowsAffected(result, ErrUpdateFailed)
@@ -460,7 +467,7 @@ func (m *metaMySQL) MetaTimeSliceDelete(timeSliceID string) (err error) {
 	var result sql.Result
 
 	//delete the timer
-	if result, err = m.queryResult(fmt.Sprintf(QueryTimeSliceDeletef, TableTimeSlice), timeSliceID); err != nil {
+	if result, err = m.queryResult(QueryTimeSliceDeletef, timeSliceID); err != nil {
 		return
 	}
 	//ensure that rows were affected

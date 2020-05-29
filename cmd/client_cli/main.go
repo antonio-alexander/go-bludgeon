@@ -5,9 +5,6 @@ import (
 	"strings"
 
 	client "github.com/antonio-alexander/go-bludgeon/bludgeon/client"
-
-	_ "github.com/go-sql-driver/mysql"
-	//_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {

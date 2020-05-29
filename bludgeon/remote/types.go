@@ -17,7 +17,7 @@ type Remote interface {
 	TimerDelete(id string) (err error)
 
 	//
-	TimeSliceCreate(timerid string) (id string, err error)
+	TimeSliceCreate(timerid string) (timeSlice bludgeon.TimeSlice, err error)
 
 	//
 	TimeSliceRead(id string) (timer bludgeon.TimeSlice, err error)

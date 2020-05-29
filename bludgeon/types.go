@@ -102,8 +102,8 @@ const (
 // reduce the overall error when you pause and restart timers (not time slices) from multiple locations
 // time slices can be deleted/archived, but not "edited"
 type TimeSlice struct {
-	ID          int64
-	TimerID     int64
+	// ID          int64
+	// TimerID     int64
 	UUID        string `json:"UUID"`
 	TimerUUID   string `json:"TimerUUID"`
 	Start       int64  `json:"Start"`
@@ -115,8 +115,8 @@ type TimeSlice struct {
 
 //Timer
 type Timer struct {
-	ID              int64  //primary key for database, not shared across network
-	ActiveSliceID   int64  //foreign key for active slice, not shared across network
+	// ID              int64  //primary key for database, not shared across network
+	// ActiveSliceID   int64  //foreign key for active slice, not shared across network
 	UUID            string `json:"UUID"`            //unique id to be shared across network
 	ActiveSliceUUID string `json:"ActiveSliceUUID"` //unique id to be shared across network
 	Start           int64  `json:"Start"`

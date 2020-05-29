@@ -44,7 +44,7 @@ func (m *remoteMock) TimerDelete(id string) (err error) {
 }
 
 //
-func (m *remoteMock) TimeSliceCreate(timerid string) (id string, err error) {
+func (m *remoteMock) TimeSliceCreate(timerid string) (timeSlice bludgeon.TimeSlice, err error) {
 	err = errors.New(ErrNotImplemented)
 
 	return

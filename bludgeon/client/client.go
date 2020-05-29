@@ -65,10 +65,10 @@ func NewClient(meta interface {
 }
 
 //
-func (c *client) timeSliceCreate(timerID string) (timeSlice bludgeon.TimeSlice, err error) {
+func (c *client) timeSliceCreate(timerUUID string) (timeSlice bludgeon.TimeSlice, err error) {
 	//use the api to create a time slice if remote is not nil
 	if c.remote != nil {
-		if timeSlice.UUID, err = c.remote.TimeSliceCreate(timerID); err != nil {
+		if timeSlice, err = c.remote.TimeSliceCreate(timerUUID); err != nil {
 			//TODO: cache the operation
 		}
 	}
@@ -80,7 +80,7 @@ func (c *client) timeSliceCreate(timerID string) (timeSlice bludgeon.TimeSlice, 
 			return
 		}
 		//update the time slice's timer ID
-		timeSlice.TimerUUID = timerID
+		timeSlice.TimerUUID = timerUUID
 	}
 	//cache the timeslice lookup
 	c.lookupTimeSlices[timeSlice.UUID] = timeSlice.UUID
