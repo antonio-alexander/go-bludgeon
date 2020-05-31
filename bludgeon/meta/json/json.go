@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	meta "github.com/antonio-alexander/go-bludgeon/bludgeon/meta"
 )
 
 type metaJSON struct {
@@ -21,9 +20,9 @@ type metaJSON struct {
 
 func NewMetaJSON() interface {
 	Owner
-	meta.Meta
-	meta.MetaTimer
-	meta.MetaTimeSlice
+	bludgeon.Meta
+	bludgeon.MetaTimer
+	bludgeon.MetaTimeSlice
 } {
 
 	//create internal pointers
@@ -129,7 +128,7 @@ func (m *metaJSON) Close() {
 }
 
 //ensure that metaJSON implements meta.MetaTimer
-var _ meta.Meta = &metaJSON{}
+var _ bludgeon.Meta = &metaJSON{}
 
 //Serialize will attempt to commit current data
 func (m *metaJSON) Serialize() (err error) {
@@ -155,7 +154,7 @@ func (m *metaJSON) DeSerialize() (err error) {
 }
 
 //ensure that metaJSON implements meta.MetaTimer
-var _ meta.MetaTimer = &metaJSON{}
+var _ bludgeon.MetaTimer = &metaJSON{}
 
 //MetaTimerWrite
 func (m *metaJSON) MetaTimerWrite(timerID string, timer bludgeon.Timer) (err error) {
@@ -201,7 +200,7 @@ func (m *metaJSON) MetaTimerRead(timerID string) (timer bludgeon.Timer, err erro
 }
 
 //ensure that metaJSON implements meta.MetaTimer
-var _ meta.MetaTimeSlice = &metaJSON{}
+var _ bludgeon.MetaTimeSlice = &metaJSON{}
 
 //MetaTimeSliceWrite
 func (m *metaJSON) MetaTimeSliceWrite(timeSliceID string, timeSlice bludgeon.TimeSlice) (err error) {

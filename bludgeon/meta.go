@@ -1,8 +1,4 @@
-package bludgeonmeta
-
-import (
-	common "github.com/antonio-alexander/go-bludgeon/bludgeon"
-)
+package bludgeon
 
 type Meta interface {
 	//Serialize will attempt to commit current data
@@ -15,23 +11,23 @@ type Meta interface {
 //MetaTimer
 type MetaTimer interface {
 	//MetaTimerWrite
-	MetaTimerWrite(timerID string, timer common.Timer) (err error)
+	MetaTimerWrite(timerID string, timer Timer) (err error)
 
 	//MetaTimerDelete
 	MetaTimerDelete(timerID string) (err error)
 
 	//MetaTimerRead
-	MetaTimerRead(timerID string) (timer common.Timer, err error)
+	MetaTimerRead(timerID string) (timer Timer, err error)
 }
 
 //MetaTimer
 type MetaTimeSlice interface {
 	//MetaTimerWrite
-	MetaTimeSliceWrite(timeSliceID string, timeSlice common.TimeSlice) (err error)
+	MetaTimeSliceWrite(timeSliceID string, timeSlice TimeSlice) (err error)
 
 	//MetaTimerDelete
 	MetaTimeSliceDelete(timeSliceID string) (err error)
 
 	//MetaTimerRead
-	MetaTimeSliceRead(timeSliceID string) (timer common.TimeSlice, err error)
+	MetaTimeSliceRead(timeSliceID string) (timer TimeSlice, err error)
 }

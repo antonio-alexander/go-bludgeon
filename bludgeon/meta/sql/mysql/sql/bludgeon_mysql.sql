@@ -1,4 +1,3 @@
---set
 CREATE DATABASE IF NOT EXISTS bludgeon;
 CREATE USER IF NOT EXISTS 'bludgeon'@'%' identified by 'bludgeon';
 USE bludgeon;

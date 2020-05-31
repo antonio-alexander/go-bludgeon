@@ -8,8 +8,6 @@ import (
 	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	meta "github.com/antonio-alexander/go-bludgeon/bludgeon/meta"
-	remote "github.com/antonio-alexander/go-bludgeon/bludgeon/remote"
 )
 
 //REVIEW: the future version of the client, will have a remote and meta pointer provided
@@ -22,11 +20,11 @@ type client struct {
 	started        bool          //whether or not the business logic has starting
 	config         Configuration //configuration
 	meta           interface {   //storage interface
-		meta.MetaTimer
-		meta.MetaTimeSlice
+		bludgeon.MetaTimer
+		bludgeon.MetaTimeSlice
 	}
 	remote interface { //remote interface
-		remote.Remote
+		bludgeon.Remote
 	}
 	lookupTimers     map[string]string //lookup for timers
 	lookupTimeSlices map[string]string //lookup for time slices
@@ -35,15 +33,15 @@ type client struct {
 }
 
 func NewClient(meta interface {
-	meta.MetaTimer
-	meta.MetaTimeSlice
+	bludgeon.MetaTimer
+	bludgeon.MetaTimeSlice
 }, remote interface {
-	remote.Remote
+	bludgeon.Remote
 }) interface {
 	Owner
 	Manage
 	Functional
-	API
+	// API
 } {
 	//REVIEW: should add cases to confirm that meta/remote aren't nil since
 	// basic functionality won't work?
@@ -117,15 +115,15 @@ func (c *client) timeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice
 }
 
 //
-func (c *client) timeSliceUpdate(timeSliceID string, timeSlice bludgeon.TimeSlice) (err error) {
+func (c *client) timeSliceUpdate(timeSlice bludgeon.TimeSlice) (err error) {
 	//use the api to create a time slice if remote is not nil
 	if c.remote != nil {
-		if err = c.remote.TimeSliceUpdate(timeSliceID, timeSlice); err != nil {
+		if err = c.remote.TimeSliceUpdate(timeSlice); err != nil {
 			//TODO: cache the operation
 		}
 	}
 	//store the timeslice
-	err = c.meta.MetaTimeSliceWrite(timeSliceID, timeSlice)
+	err = c.meta.MetaTimeSliceWrite(timeSlice.UUID, timeSlice)
 
 	return
 }
@@ -157,15 +155,15 @@ func (c *client) timerRead(timerID string) (timer bludgeon.Timer, err error) {
 	return
 }
 
-func (c *client) timerUpdate(timerID string, timer bludgeon.Timer) (err error) {
+func (c *client) timerUpdate(timer bludgeon.Timer) (err error) {
 	//use the api to create a time slice if remote is not nil
 	if c.remote != nil {
-		if err = c.remote.TimerUpdate(timerID, timer); err != nil {
+		if err = c.remote.TimerUpdate(timer); err != nil {
 			//TODO: cache the operation
 		}
 	}
 	//store the timeslice
-	err = c.meta.MetaTimerWrite(timerID, timer)
+	err = c.meta.MetaTimerWrite(timer.UUID, timer)
 
 	return
 }
@@ -219,7 +217,7 @@ func (c *client) Deserialize(bytes []byte) (err error) {
 
 	var serializedData SerializedData
 
-	//check to see if started, otherwise, don't deserialzie the bytes
+	//check to see if started, otherwise, don't de-serialize the bytes
 	if c.started {
 		err = errors.New(ErrStarted)
 
@@ -229,7 +227,7 @@ func (c *client) Deserialize(bytes []byte) (err error) {
 	if err = json.Unmarshal(bytes, &serializedData); err != nil {
 		return
 	}
-	//store de-serialzied time slices
+	//store de-serialized time slices
 	//range over timers and populate lookup
 	for key, value := range serializedData.LookupTimeSlices {
 		c.lookupTimers[key] = value
@@ -378,29 +376,29 @@ func (c *client) CommandHandler(command bludgeon.CommandClient, dataIn interface
 	return
 }
 
-//API
-type API interface {
-	//add a timer
-	TimerCreate() (timer bludgeon.Timer, err error)
+// //API
+// type API interface {
+// 	//add a timer
+// 	TimerCreate() (timer bludgeon.Timer, err error)
 
-	//get a timer
-	TimerRead(timerID string) (timer bludgeon.Timer, err error)
+// 	//get a timer
+// 	TimerRead(timerID string) (timer bludgeon.Timer, err error)
 
-	//delete a timer
-	TimerDelete(timerID string) (err error)
+// 	//delete a timer
+// 	TimerDelete(timerID string) (err error)
 
-	//start a timer
-	TimerStart(timerID string, startTime time.Time) (err error)
+// 	//start a timer
+// 	TimerStart(timerID string, startTime time.Time) (err error)
 
-	//pause a timer
-	TimerPause(timerID string, pauseTime time.Time) (err error)
+// 	//pause a timer
+// 	TimerPause(timerID string, pauseTime time.Time) (err error)
 
-	//submit a timer
-	TimerSubmit(timerID string, submitTime time.Time) (err error)
-}
+// 	//submit a timer
+// 	TimerSubmit(timerID string, submitTime time.Time) (err error)
+// }
 
-//ensure that cache implements API
-var _ API = &client{}
+// //ensure that cache implements API
+// var _ API = &client{}
 
 //add a timer
 func (c *client) TimerCreate() (timer bludgeon.Timer, err error) {
@@ -449,7 +447,7 @@ func (c *client) TimerRead(id string) (timer bludgeon.Timer, err error) {
 
 		return
 	}
-	//REVIEW: how doe sthis work with meta?
+	//REVIEW: how does this work with meta?
 	//attempt to get the activeSlice if it exists
 	if timer.ActiveSliceUUID != "" {
 		//attempt to read the slice
@@ -501,7 +499,7 @@ func (c *client) TimerStart(id string, startTime time.Time) (err error) {
 		//update the time slice with its new start time
 		if c.remote != nil {
 			//update the slice using the API
-			if err = c.remote.TimeSliceUpdate(timeSlice.UUID, timeSlice); err != nil {
+			if err = c.remote.TimeSliceUpdate(timeSlice); err != nil {
 				//TODO: cache operation
 			}
 		}
@@ -516,7 +514,7 @@ func (c *client) TimerStart(id string, startTime time.Time) (err error) {
 	timer.ActiveSliceUUID = timeSlice.UUID
 	if c.remote != nil {
 		//update the timer
-		if err = c.remote.TimerUpdate(timer.UUID, timer); err != nil {
+		if err = c.remote.TimerUpdate(timer); err != nil {
 			//TODO: cache the operation
 		}
 	}
@@ -569,7 +567,7 @@ func (c *client) TimerPause(timerID string, pauseTime time.Time) (err error) {
 	// trigger some server side logic to update the timer
 	if c.remote != nil {
 		//update the time slice
-		if err = c.remote.TimeSliceUpdate(timeSlice.UUID, timeSlice); err != nil {
+		if err = c.remote.TimeSliceUpdate(timeSlice); err != nil {
 			//TODO: cache the operation
 		}
 	}
@@ -588,7 +586,7 @@ func (c *client) TimerPause(timerID string, pauseTime time.Time) (err error) {
 	timer.ElapsedTime = timer.ElapsedTime + timeSlice.ElapsedTime
 	//update the timer
 	if c.remote != nil {
-		if err = c.remote.TimerUpdate(timer.UUID, timer); err != nil {
+		if err = c.remote.TimerUpdate(timer); err != nil {
 			//TODO: cache the operation
 		}
 	}
@@ -605,7 +603,7 @@ func (c *client) TimerSubmit(timerID string, submitTime time.Time) (err error) {
 
 	//when the timer is submitted, the stop time is updated, the active
 	// time slice is completed with the current time and the timer is
-	// set to "submittd" so any changes to it after the fact are known as
+	// set to "submitted" so any changes to it after the fact are known as
 	// changes that shouldn't involve the time slices (and that they're now
 	// invalid)
 
@@ -630,7 +628,7 @@ func (c *client) TimerSubmit(timerID string, submitTime time.Time) (err error) {
 		timeSlice.Archived = true
 		//update the slice using the API, there's an understanding that this should
 		if c.remote != nil {
-			if err = c.remote.TimeSliceUpdate(timeSlice.UUID, timeSlice); err != nil {
+			if err = c.remote.TimeSliceUpdate(timeSlice); err != nil {
 				//TODO: cache the operation
 			}
 			//remove the time slice since we know the server has the most up to date
@@ -649,7 +647,7 @@ func (c *client) TimerSubmit(timerID string, submitTime time.Time) (err error) {
 	timer.Completed = true
 	if c.remote != nil {
 		//update the timer
-		if err = c.remote.TimerUpdate(timer.UUID, timer); err != nil {
+		if err = c.remote.TimerUpdate(timer); err != nil {
 			//TODO: cache the operation
 		}
 	}
@@ -677,7 +675,7 @@ func (c *client) TimerDelete(timerID string) (err error) {
 	timer.Archived = true
 	//update the timer
 	if c.remote != nil {
-		if err = c.remote.TimerUpdate(timer.UUID, timer); err != nil {
+		if err = c.remote.TimerUpdate(timer); err != nil {
 			//TODOcache the operation
 		}
 	}

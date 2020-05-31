@@ -4,15 +4,16 @@ import (
 	"errors"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	remote "github.com/antonio-alexander/go-bludgeon/bludgeon/remote"
 )
 
 type remoteMock struct{}
 
 func NewRemoteMock() interface {
-	remote.Remote
+	bludgeon.Remote
 } {
-	return &remoteMock{}
+	return &remoteMock{
+		//
+	}
 }
 
 //
@@ -30,7 +31,7 @@ func (m *remoteMock) TimerRead(id string) (timer bludgeon.Timer, err error) {
 }
 
 //
-func (m *remoteMock) TimerUpdate(id string, timer bludgeon.Timer) (err error) {
+func (m *remoteMock) TimerUpdate(timer bludgeon.Timer) (err error) {
 	err = errors.New(ErrNotImplemented)
 
 	return
@@ -58,7 +59,7 @@ func (m *remoteMock) TimeSliceRead(id string) (timer bludgeon.TimeSlice, err err
 }
 
 //
-func (m *remoteMock) TimeSliceUpdate(id string, timer bludgeon.TimeSlice) (err error) {
+func (m *remoteMock) TimeSliceUpdate(timeSlice bludgeon.TimeSlice) (err error) {
 	err = errors.New(ErrNotImplemented)
 
 	return

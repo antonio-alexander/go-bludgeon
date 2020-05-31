@@ -4,8 +4,8 @@ package bludgeonclient
 
 //error constants
 const (
-	ErrStarted            string = "cache started"
-	ErrNotStarted         string = "cache not started"
+	ErrStarted            string = "client started"
+	ErrNotStarted         string = "client not started"
 	ErrTimerNotFoundf     string = "Timer with id, \"%s\", not found locally"
 	ErrTimeSliceNotFoundf string = "TimeSlice with id, \"%s\", not found locally"
 	ErrTimerIsArchivedf   string = "Timer with id, \"%s\", is archived"

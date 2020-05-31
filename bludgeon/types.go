@@ -15,8 +15,9 @@ import (
 
 //common constants
 const (
-	fmtTimeLong  = "Jan 2, 2006 at 3:04pm (MST)"
-	fmtTimeShort = "2006-Jan-02"
+	fmtTimeLong              = "Jan 2, 2006 at 3:04pm (MST)"
+	fmtTimeShort             = "2006-Jan-02"
+	DefaultConfigurationFile = "bludgeon_config.json"
 )
 
 //error constants
@@ -29,48 +30,6 @@ const (
 	ErrBadUnitID           string = "UnitID is invalid or missing"
 	ErrBadEmployeeIDTaskID string = "EmployeeID and/or TaskID is invalid or mising"
 	ErrBadClientIDUnitID   string = "ClientID and/or UnitID is invalid or missing"
-)
-
-//route constants
-const (
-	RouteTimerCreate        = "/api/timer/create" //RouteTimerCreate is a route used to create a timer
-	RouteTimerRead          = "/api/timer/read"
-	RouteTimerUpdate        = "/api/timer/update"
-	RouteTimerDelete        = "/api/timer/delete"
-	RouteTimersRead         = "/api/timers/read"
-	RouteTaskCreate         = "/api/task/create"
-	RouteTaskRead           = "/api/task/read"
-	RouteTaskUpdate         = "/api/task/update"
-	RouteTaskDelete         = "/api/task/delete"
-	RouteTasksRead          = "/api/tasks/read"
-	RouteProjectCreate      = "/api/project/create"
-	RouteProjectRead        = "/api/project/read"
-	RouteProjectUpdate      = "/api/project/update"
-	RouteProjectDelete      = "/api/project/delete"
-	RouteProjectsRead       = "/api/projects/read"
-	RouteEmployeeCreate     = "/api/employee/create"
-	RouteEmployeeRead       = "/api/employee/read"
-	RouteEmployeeUpdate     = "/api/employee/update"
-	RouteEmployeeDelete     = "/api/employee/delete"
-	RouteEmployeesRead      = "/api/employees/read"
-	RouteClientCreate       = "/api/client/create"
-	RouteClientRead         = "/api/client/read"
-	RouteClientUpdate       = "/api/client/update"
-	RouteClientDelete       = "/api/client/delete"
-	RouteClientsRead        = "/api/clients/read"
-	RouteServerStop         = "/api/server/stop"
-	RouteTokenAcquire       = "/api/token/acquire"
-	RoutetokenRelease       = "/api/token/release"
-	RouteTokenVerify        = "/api/token/verify"
-	RouteDebugEnable        = "/api/debug/enable"
-	RouteDebugDisable       = "/api/debug/disable"
-	RouteServerStart        = "/api/server/start"
-	RouteAdminConfig        = "/api/admin/config"
-	RouteAdminStatus        = "/api/admin/status"
-	RouteSyncTimersProject  = "/api/sync/timers_project"
-	RouteSyncTimersEmployee = "/api/sync/timers_employee"
-	RouteSyncTasksProject   = "/api/sync/tasks_project"
-	RouteSyncTasksEmployee  = "/api/sync/tasks_employee"
 )
 
 //header constants
@@ -266,6 +225,33 @@ type CommandServer uint8
 
 //command constants
 const (
-	CommandServerNull    CommandServer = iota
+	CommandServerNull            CommandServer = iota
+	CommandServerStop            CommandServer = iota
+	CommandServerTimerCreate     CommandServer = iota
+	CommandServerTimerRead       CommandServer = iota
+	CommandServerTimerUpdate     CommandServer = iota
+	CommandServerTimerDelete     CommandServer = iota
+	CommandServerTimeSliceCreate CommandServer = iota
+	CommandServerTimeSliceRead   CommandServer = iota
+	CommandServerTimeSliceUpdate CommandServer = iota
+	CommandServerTimeSliceDelete CommandServer = iota
+	CommandServerTokenAcquire    CommandServer = iota
+	CommandServerTokenRelease    CommandServer = iota
+	CommandServerTokenVerify     CommandServer = iota
+	// CommandServerProjectCreate   CommandServer = iota
+	// CommandServerProjectRead     CommandServer = iota
+	// CommandServerProjectsRead    CommandServer = iota
+	// CommandServerProjectUpdate   CommandServer = iota
+	// CommandServerProjectDelete   CommandServer = iota
+	// CommandServerEmployeeCreate  CommandServer = iota
+	// CommandServerEmployeeRead    CommandServer = iota
+	// CommandServerEmployeesRead   CommandServer = iota
+	// CommandServerEmployeeUpdate  CommandServer = iota
+	// CommandServerEmployeeDelete  CommandServer = iota
+	// CommandServerClientCreate    CommandServer = iota
+	// CommandServerClientRead      CommandServer = iota
+	// CommandServerClientsRead     CommandServer = iota
+	// CommandServerClientUpdate    CommandServer = iota
+	// CommandServerClientDelete    CommandServer = iota
 	CommandServerInvalid CommandServer = iota
 )

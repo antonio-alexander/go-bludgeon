@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	meta "github.com/antonio-alexander/go-bludgeon/bludgeon/meta"
 
 	//shadow import for mysql driver support
 	_ "github.com/go-sql-driver/mysql"
@@ -29,8 +28,8 @@ type metaMySQL struct {
 func NewMetaMySQL() interface {
 	Owner
 	// Manage
-	meta.MetaTimer
-	meta.MetaTimeSlice
+	bludgeon.MetaTimer
+	bludgeon.MetaTimeSlice
 } {
 	//create internal pointers
 	//create metaMySQL pointer
@@ -324,7 +323,7 @@ func (m *metaMySQL) Disconnect() (err error) {
 // }
 
 //ensure that metaMySQL implements meta.MetaTimer
-var _ meta.MetaTimer = &metaMySQL{}
+var _ bludgeon.MetaTimer = &metaMySQL{}
 
 //MetaTimerRead
 func (m *metaMySQL) MetaTimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
@@ -402,7 +401,7 @@ func (m *metaMySQL) MetaTimerDelete(timerUUID string) (err error) {
 }
 
 //ensure that metaMySQL implements meta.MetaTimer
-var _ meta.MetaTimeSlice = &metaMySQL{}
+var _ bludgeon.MetaTimeSlice = &metaMySQL{}
 
 //MetaTimeSliceRead
 func (m *metaMySQL) MetaTimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice, err error) {
