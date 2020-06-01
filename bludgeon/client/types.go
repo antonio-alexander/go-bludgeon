@@ -4,18 +4,13 @@ package bludgeonclient
 
 //error constants
 const (
-	ErrStarted            string = "client started"
-	ErrNotStarted         string = "client not started"
-	ErrTimerNotFoundf     string = "Timer with id, \"%s\", not found locally"
-	ErrTimeSliceNotFoundf string = "TimeSlice with id, \"%s\", not found locally"
-	ErrTimerIsArchivedf   string = "Timer with id, \"%s\", is archived"
-	ErrNoActiveTimeSlicef string = "Timer with id, \"%s\", has no active slice"
+	ErrStarted    string = "client started"
+	ErrNotStarted string = "client not started"
 )
 
 //SerializedData
 type SerializedData struct {
-	LookupTimers     map[string]string `json:"LookupTimers,omit_empty"`
-	LookupTimeSlices map[string]string `json:"LookupTimeSlices,omit_empty"`
+	//
 }
 
 type Configuration struct {

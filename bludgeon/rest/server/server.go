@@ -2,6 +2,7 @@ package bludgeonrestserver
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -66,7 +67,7 @@ func (r *restServer) BuildRoutes(i interface{}) (err error) {
 	case server.Functional:
 		r.buildRoutesServer(v)
 	default:
-		//TODO: generate error
+		err = fmt.Errorf("Type %t unsupported", v)
 	}
 
 	return
@@ -136,11 +137,14 @@ func (r *restServer) buildRoutesServer(server server.Functional) {
 	r.router.HandleFunc(rest.RouteTimerRead, serverTimerRead(server)).Methods(POST)
 	r.router.HandleFunc(rest.RouteTimerUpdate, serverTimerUpdate(server)).Methods(POST)
 	r.router.HandleFunc(rest.RouteTimerDelete, serverTimerDelete(server)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimerStart, serverTimerStart(server)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimerPause, serverTimerPause(server)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimerSubmit, serverTimerSubmit(server)).Methods(POST)
 	//time slice
-	r.router.HandleFunc(rest.RouteTimeSliceCreate, serverTimeSliceCreate(server)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimeSliceRead, serverTimeSliceRead(server)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimeSliceUpdate, serverTimeSliceUpdate(server)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimeSliceDelete, serverTimeSliceDelete(server)).Methods(POST)
+	// r.router.HandleFunc(rest.RouteTimeSliceCreate, serverTimeSliceCreate(server)).Methods(POST)
+	// r.router.HandleFunc(rest.RouteTimeSliceRead, serverTimeSliceRead(server)).Methods(POST)
+	// r.router.HandleFunc(rest.RouteTimeSliceUpdate, serverTimeSliceUpdate(server)).Methods(POST)
+	// r.router.HandleFunc(rest.RouteTimeSliceDelete, serverTimeSliceDelete(server)).Methods(POST)
 
 	return
 }

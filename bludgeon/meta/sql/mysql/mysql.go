@@ -342,7 +342,7 @@ func (m *metaMySQL) MetaTimerRead(timerUUID string) (timer bludgeon.Timer, err e
 		var timer bludgeon.Timer
 
 		//TODO: add completed and archived
-		if err = rows.Scan(&timer.UUID, &timer.ActiveSliceUUID, &timer.Start, &timer.Finish, &timer.ElapsedTime); err != nil {
+		if err = rows.Scan(&timer.UUID, &timer.ActiveSliceUUID, &timer.Start, &timer.Finish, &timer.ElapsedTime, &timer.Comment); err != nil {
 			break
 		}
 		//add timer to timers
@@ -360,7 +360,7 @@ func (m *metaMySQL) MetaTimerRead(timerUUID string) (timer bludgeon.Timer, err e
 	if len(timers) > 0 {
 		timer = timers[0]
 	} else {
-		//TODO: generate error??
+		err = fmt.Errorf(bludgeon.ErrTimerNotFoundf, timerUUID)
 	}
 
 	return
@@ -374,8 +374,8 @@ func (m *metaMySQL) MetaTimerWrite(timerID string, timer bludgeon.Timer) (err er
 	var result sql.Result
 
 	//upsert the timer
-	if result, err = m.queryResult(QueryTimerUpsert, timer.UUID, timer.ActiveSliceUUID, timer.Start, timer.Finish, timer.ElapsedTime,
-		timer.UUID, timer.ActiveSliceUUID, timer.Start, timer.Finish, timer.ElapsedTime); err != nil {
+	if result, err = m.queryResult(QueryTimerUpsert, timer.UUID, timer.ActiveSliceUUID, timer.Start, timer.Finish, timer.ElapsedTime, timer.Comment,
+		timer.UUID, timer.ActiveSliceUUID, timer.Start, timer.Finish, timer.ElapsedTime, timer.Comment); err != nil {
 		return
 	}
 	err = rowsAffected(result, ErrUpdateFailed)
@@ -430,12 +430,14 @@ func (m *metaMySQL) MetaTimeSliceRead(timeSliceID string) (timeSlice bludgeon.Ti
 
 		return
 	}
-	err = rows.Err()
+	if err = rows.Err(); err != nil {
+		return
+	}
 	//check timers
 	if len(timeSlices) > 0 {
 		timeSlice = timeSlices[0]
 	} else {
-		//TODO: generate error??
+		err = fmt.Errorf(bludgeon.ErrTimeSliceNotFoundf, timeSliceID)
 	}
 
 	return

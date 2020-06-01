@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
 	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest"
@@ -39,7 +40,7 @@ func TimerRead(address, port, id string) (timer bludgeon.Timer, err error) {
 	var contract rest.ContractServerIn
 
 	//store id in contract
-	contract.Timer.UUID = id
+	contract.ID = id
 	//marshal contract
 	if bytes, err = json.Marshal(&contract); err != nil {
 		return
@@ -91,7 +92,7 @@ func TimerDelete(address, port, id string) (err error) {
 	var contract rest.ContractServerIn
 
 	//store id in contract
-	contract.Timer.UUID = id
+	contract.ID = id
 	//marshal contract
 	if bytes, err = json.Marshal(&contract); err != nil {
 		return
@@ -105,13 +106,81 @@ func TimerDelete(address, port, id string) (err error) {
 }
 
 //
+func TimerStart(address, port string, timerID string, startTime time.Time) (err error) {
+	var bytes []byte
+	var contract rest.ContractServerIn
+
+	//store id in contract
+	contract.ID = timerID
+	contract.StartTime = startTime
+	//marshal contract
+	if bytes, err = json.Marshal(&contract); err != nil {
+		return
+	}
+	//marshal contract
+	if bytes, err = json.Marshal(&contract); err != nil {
+		return
+	}
+	//create uri
+	uri := fmt.Sprintf(URIf, address, port, rest.RouteTimerStart)
+	//execute request and get response
+	_, err = doRequest(uri, POST, bytes)
+
+	return
+}
+
+//
+func TimerPause(address, port, timerID string, pauseTime time.Time) (err error) {
+	var bytes []byte
+	var contract rest.ContractServerIn
+
+	//store id in contract
+	contract.ID = timerID
+	contract.PauseTime = pauseTime
+	//marshal contract
+	if bytes, err = json.Marshal(&contract); err != nil {
+		return
+	}
+	//create uri
+	uri := fmt.Sprintf(URIf, address, port, rest.RouteTimerPause)
+	//execute request and get response
+	_, err = doRequest(uri, POST, bytes)
+
+	return
+}
+
+//
+func TimerSubmit(address, port, timerID string, finishTime time.Time) (err error) {
+	var bytes []byte
+	var contract rest.ContractServerIn
+
+	//store id in contract
+	contract.ID = timerID
+	contract.FinishTime = finishTime
+	//marshal contract
+	if bytes, err = json.Marshal(&contract); err != nil {
+		return
+	}
+	//marshal contract
+	if bytes, err = json.Marshal(&contract); err != nil {
+		return
+	}
+	//create uri
+	uri := fmt.Sprintf(URIf, address, port, rest.RouteTimerSubmit)
+	//execute request and get response
+	_, err = doRequest(uri, POST, bytes)
+
+	return
+}
+
+//
 func TimeSliceCreate(address, port, id string) (timeSlice bludgeon.TimeSlice, err error) {
 	var response *http.Response
 	var bytes []byte
 	var contract rest.ContractServerIn
 
 	//store id in contract
-	contract.TimeSlice.TimerUUID = id
+	contract.ID = id
 	//marshal contract
 	if bytes, err = json.Marshal(&contract); err != nil {
 		return
@@ -141,7 +210,7 @@ func TimeSliceRead(address, port, id string) (timeSlice bludgeon.TimeSlice, err 
 	var contract rest.ContractServerIn
 
 	//set timeslice id
-	contract.TimeSlice.UUID = id
+	contract.ID = id
 	//marshal contract
 	if bytes, err = json.Marshal(&contract); err != nil {
 		return
@@ -176,7 +245,7 @@ func TimeSliceUpdate(address, port string, timeSlice bludgeon.TimeSlice) (err er
 		return
 	}
 	//create uri
-	uri := fmt.Sprintf(URIf, address, port, rest.RouteTimerCreate)
+	uri := fmt.Sprintf(URIf, address, port, rest.RouteTimerUpdate)
 	//execute request and get response
 	_, err = doRequest(uri, POST, bytes)
 
@@ -189,13 +258,13 @@ func TimeSliceDelete(address, port, id string) (err error) {
 	var contract rest.ContractServerIn
 
 	//set timeslice id
-	contract.TimeSlice.UUID = id
+	contract.ID = id
 	//marshal contract
 	if bytes, err = json.Marshal(&contract); err != nil {
 		return
 	}
 	//create uri
-	uri := fmt.Sprintf(URIf, address, port, rest.RouteTimerCreate)
+	uri := fmt.Sprintf(URIf, address, port, rest.RouteTimerDelete)
 	//execute request and get response
 	_, err = doRequest(uri, POST, bytes)
 

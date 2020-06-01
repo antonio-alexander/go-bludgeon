@@ -19,5 +19,5 @@ cmd/client_cli/client_cli
 cmd/server_rest/server_rest
 
 #configuration
-cmd/**/bludgeon.json
-cmd/**/bludgeon_config.json
+cmd/**/data/*
+cmd/**/config/*

@@ -2,6 +2,7 @@ package bludgeonserver
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -142,14 +143,11 @@ func (s *server) Stop() (err error) {
 }
 
 type Functional interface {
-	//
+	//LaunchPurge
 	LaunchPurge()
 
 	//CommandHandler
-	CommandHandler(command bludgeon.CommandServer, dataIn interface{}) (dataOut interface{}, err error)
-
-	//CommandHandler
-	CommandHandlerToken(command bludgeon.CommandServer, dataIn interface{}, token bludgeon.Token) (dataOut interface{}, err error)
+	CommandHandler(command bludgeon.CommandServer, dataIn interface{}, token bludgeon.Token) (dataOut interface{}, err error)
 }
 
 //ensure that cache implements Functional
@@ -158,88 +156,92 @@ var _ Functional = &server{}
 func (s *server) LaunchPurge() {
 	started := make(chan struct{})
 	s.Add(1)
-	go s.goPurge(started)
+	go func() {
+		defer s.Done()
+
+		tPurge := time.NewTicker(30 * time.Second)
+		close(started)
+		for {
+			select {
+			case <-tPurge.C:
+				// if err := s.TokenPurge(); err != nil {
+				// 	fmt.Printf(err)
+				// }
+			case <-s.stopper:
+				return
+			}
+		}
+	}()
 	<-started
 }
 
-func (s *server) goPurge(started chan struct{}) {
-	defer s.Done()
-
-	tPurge := time.NewTicker(30 * time.Second)
-	close(started)
-	for {
-		select {
-		case <-tPurge.C:
-			// if err := s.TokenPurge(); err != nil {
-			// 	fmt.Printf(err)
-			// }
-		case <-s.stopper:
-			return
-		}
-	}
-}
-
-func (s *server) CommandHandler(command bludgeon.CommandServer, dataIn interface{}) (dataOut interface{}, err error) {
-	//execute the command
+func (s *server) CommandHandler(command bludgeon.CommandServer, dataIn interface{}, token bludgeon.Token) (dataOut interface{}, err error) {
 	switch command {
 	case bludgeon.CommandServerTimerCreate:
 		dataOut, err = s.TimerCreate()
 	case bludgeon.CommandServerTimerRead:
-		if id, ok := dataIn.(string); !ok {
-			//TODO: generate error
+		if d, ok := dataIn.(CommandData); !ok {
+			err = errors.New("Unable to cast into command data")
 		} else {
-			//read time slice
-			dataOut, err = s.TimerRead(id)
+			dataOut, err = s.TimerRead(d.ID)
 		}
 	case bludgeon.CommandServerTimerUpdate:
 		if timer, ok := dataIn.(bludgeon.Timer); !ok {
-			//TODO: generate error
+			err = errors.New("Unable to cast into timer")
 		} else {
 			err = s.TimerUpdate(timer)
 		}
 	case bludgeon.CommandServerTimerDelete:
-		if id, ok := dataIn.(string); !ok {
-			//TODO: generate error
+		if d, ok := dataIn.(CommandData); !ok {
+			err = errors.New("Unable to cast into command data")
 		} else {
-			//read time slice
-			err = s.TimerDelete(id)
+			err = s.TimerDelete(d.ID)
+		}
+	case bludgeon.CommandServerTimerStart:
+		if d, ok := dataIn.(CommandData); !ok {
+			err = errors.New("Unable to cast into command data")
+		} else {
+			err = s.TimerStart(d.ID, d.StartTime)
+		}
+	case bludgeon.CommandServerTimerPause:
+		if d, ok := dataIn.(CommandData); !ok {
+			err = errors.New("Unable to cast into command data")
+		} else {
+			err = s.TimerPause(d.ID, d.PauseTime)
+		}
+	case bludgeon.CommandServerTimerSubmit:
+		if d, ok := dataIn.(CommandData); !ok {
+			err = errors.New("Unable to cast into command data")
+		} else {
+			err = s.TimerSubmit(d.ID, d.FinishTime)
 		}
 	case bludgeon.CommandServerTimeSliceCreate:
-		if id, ok := dataIn.(string); !ok {
-			//TODO: generate error
+		if d, ok := dataIn.(CommandData); !ok {
+			err = errors.New("Unable to cast into command data")
 		} else {
-			dataOut, err = s.TimeSliceCreate(id)
+			dataOut, err = s.TimeSliceCreate(d.ID)
 		}
 	case bludgeon.CommandServerTimeSliceRead:
-		if id, ok := dataIn.(string); !ok {
-			//TODO: generate error
+		if d, ok := dataIn.(CommandData); !ok {
+			err = errors.New("Unable to cast into command data")
 		} else {
-			//read time slice
-			dataOut, err = s.TimeSliceRead(id)
+			dataOut, err = s.TimeSliceRead(d.ID)
 		}
 	case bludgeon.CommandServerTimeSliceUpdate:
 		if timeSlice, ok := dataIn.(bludgeon.TimeSlice); !ok {
-			//TODO: generate error
+			err = errors.New("Unable to cast into command data")
 		} else {
 			err = s.TimeSliceUpdate(timeSlice)
 		}
 	case bludgeon.CommandServerTimeSliceDelete:
-		if id, ok := dataIn.(string); !ok {
-			//TODO: generate error
+		if d, ok := dataIn.(CommandData); !ok {
+			err = errors.New("Unable to cast into command data")
 		} else {
-			err = s.TimeSliceDelete(id)
+			err = s.TimeSliceDelete(d.ID)
 		}
 	default:
-		//TODO: generate error
+		err = fmt.Errorf("command not supported: %s", command)
 	}
-
-	return
-}
-
-func (s *server) CommandHandlerToken(command bludgeon.CommandServer, dataIn interface{}, token bludgeon.Token) (dataOut interface{}, err error) {
-	//TODO: check token
-	//execute command
-	dataOut, err = s.CommandHandler(command, dataIn)
 
 	return
 }
@@ -249,12 +251,8 @@ func (s *server) TimerCreate() (timer bludgeon.Timer, err error) {
 	s.Lock()
 	defer s.Unlock()
 
-	//generate timer uuid
-	if timer.UUID, err = bludgeon.GenerateID(); err != nil {
-		return
-	}
-	//write timer
-	err = s.meta.MetaTimerWrite(timer.UUID, timer)
+	//create the timer
+	timer, err = bludgeon.TimerCreate(s.meta)
 
 	return
 }
@@ -265,7 +263,7 @@ func (s *server) TimerRead(id string) (timer bludgeon.Timer, err error) {
 	defer s.Unlock()
 
 	//read the timer
-	timer, err = s.meta.MetaTimerRead(id)
+	timer, err = bludgeon.TimerRead(id, s.meta)
 
 	return
 }
@@ -276,7 +274,7 @@ func (s *server) TimerUpdate(timer bludgeon.Timer) (err error) {
 	defer s.Unlock()
 
 	//update the timer
-	err = s.meta.MetaTimerWrite(timer.UUID, timer)
+	err = bludgeon.TimerUpdate(timer, s.meta)
 
 	return
 }
@@ -287,90 +285,111 @@ func (s *server) TimerDelete(id string) (err error) {
 	defer s.Unlock()
 
 	//delete the timer
-	err = s.meta.MetaTimerDelete(id)
+	err = bludgeon.TimerDelete(id, s.meta)
 
 	return
 }
 
-//
+func (s *server) TimerStart(id string, startTime time.Time) (err error) {
+	s.Lock()
+	defer s.Unlock()
+
+	//start the timer
+	err = bludgeon.TimerStart(id, startTime, s.meta)
+
+	return
+}
+
+func (s *server) TimerPause(id string, pauseTime time.Time) (err error) {
+	s.Lock()
+	defer s.Unlock()
+
+	//pause the time
+	err = bludgeon.TimerPause(id, pauseTime, s.meta)
+
+	return
+}
+
+func (s *server) TimerSubmit(id string, submitTime time.Time) (err error) {
+	s.Lock()
+	defer s.Unlock()
+
+	//submit timer
+	err = bludgeon.TimerSubmit(id, submitTime, s.meta)
+
+	return
+}
+
 func (s *server) TimeSliceCreate(timerID string) (timeSlice bludgeon.TimeSlice, err error) {
 	s.Lock()
 	defer s.Unlock()
 
-	//generate time slice uuid
-	if timeSlice.UUID, err = bludgeon.GenerateID(); err != nil {
-		return
-	}
-	timeSlice.TimerUUID = timerID
-	//write timer
-	err = s.meta.MetaTimeSliceWrite(timeSlice.UUID, timeSlice)
+	//create time slice
+	timeSlice, err = bludgeon.TimeSliceCreate(timerID, s.meta)
 
 	return
 }
 
-//
-func (s *server) TimeSliceRead(id string) (timeSlice bludgeon.TimeSlice, err error) {
+func (s *server) TimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice, err error) {
 	s.Lock()
 	defer s.Unlock()
 
 	//read the time slice
-	timeSlice, err = s.meta.MetaTimeSliceRead(id)
+	timeSlice, err = bludgeon.TimeSliceRead(timeSliceID, s.meta)
 
 	return
 }
 
-//
 func (s *server) TimeSliceUpdate(timeSlice bludgeon.TimeSlice) (err error) {
 	s.Lock()
 	defer s.Unlock()
 
-	//update the timeslice
-	err = s.meta.MetaTimeSliceWrite(timeSlice.UUID, timeSlice)
+	//update the time slice
+	err = bludgeon.TimeSliceUpdate(timeSlice, s.meta)
 
 	return
 }
 
-//
-func (s *server) TimeSliceDelete(id string) (err error) {
+func (s *server) TimeSliceDelete(timeSliceID string) (err error) {
 	s.Lock()
 	defer s.Unlock()
 
-	//delete the time slice
-	err = s.meta.MetaTimeSliceDelete((id))
+	//delete the timeslice
+	err = bludgeon.TimeSliceDelete(timeSliceID)
 
 	return
 }
 
-type Token interface {
-	//Generate creates a token, outputs a token
-	Generate() string
+// type Token interface {
+// 	//Generate creates a token, outputs a token
+// 	Generate() string
 
-	//Verify will check if a token exists
-	Verify(tokenID string) bool
+// 	//Verify will check if a token exists
+// 	Verify(tokenID string) bool
 
-	//Purge deletes tokens that are as old as wait
-	Purge()
+// 	//Purge deletes tokens that are as old as wait
+// 	Purge()
 
-	//Delete will remove a token
-	Delete(token string) (deleted bool)
-}
+// 	//Delete will remove a token
+// 	Delete(token string) (deleted bool)
+// }
 
 // //Generate creates a token, outputs a token
-// func (t *token) Generate() string {
-// 	d.Lock()
-// 	defer d.Unlock()
+// func (s *server) TokenGenerate() string {
+// 	s.Lock()
+// 	defer s.Unlock()
 
 // 	b := make([]byte, 8)
-// 	var t Token
+// 	var t bludgeon.Token
 
 // 	for {
 // 		rand.Read(b) //generate token
 // 		token := fmt.Sprintf("%x-%x-%x-%x", b[0:2], b[2:4], b[4:6], b[6:8])
 
-// 		if _, ok := d.Tokens[token]; !ok {
+// 		if _, ok := s.tokens[token]; !ok {
 // 			t.Token = token
 // 			t.Time = time.Now().UnixNano()
-// 			d.Tokens[token] = t
+// 			s.tokens[token] = t
 
 // 			return t.Token
 // 		}
@@ -378,42 +397,40 @@ type Token interface {
 // }
 
 // //Verify will check if a token exists
-// func (d *DataToken) Verify(tokenID string) bool {
-// 	d.RLock()
-// 	defer d.RUnlock()
+// func (s *server) TokenVerify(tokenID string) (valid bool) {
+// 	s.RLock()
+// 	defer s.RUnlock()
 
-// 	var valid bool
-
-// 	if token, ok := d.Tokens[tokenID]; ok {
-// 		if (time.Now().UnixNano() - token.Time) > int64(d.Wait/time.Nanosecond) {
-// 			delete(d.Tokens, tokenID)
+// 	if token, ok := s.tokens[tokenID]; ok {
+// 		if (time.Now().UnixNano() - token.Time) > s.config.TokenWait/int64(time.Nanosecond) {
+// 			delete(s.tokens, tokenID)
 // 		} else {
 // 			valid = true
 // 		}
 // 	}
-// 	return valid
+
+// 	return
 // }
 
 // //Purge deletes tokens that are as old as wait
-// func (d *DataToken) Purge() {
-// 	d.Lock()
-// 	defer d.Unlock()
+// func (s *server) TokenPurge() {
+// 	s.Lock()
+// 	defer s.Unlock()
 
-// 	time :=
-// 	for key, value := range d.Tokens {
-// 		if time.Now().UnixNano()  - token.Time > d.Wait {
-// 			delete(d.Tokens, key)
+// 	for key, token := range s.tokens {
+// 		if time.Now().UnixNano()-token.Time > s.config.TokenWait {
+// 			delete(s.tokens, key)
 // 		}
 // 	}
 // }
 
 // //Delete will remove a token
-// func (d *DataToken) Delete(token string) (deleted bool) {
-// 	d.Lock()
-// 	defer d.Unlock()
+// func (s *server) TokenDelete(token string) (deleted bool) {
+// 	s.Lock()
+// 	defer s.Unlock()
 
-// 	if _, ok := d.Tokens[token]; ok {
-// 		delete(d.Tokens, token)
+// 	if _, ok := s.tokens[token]; ok {
+// 		delete(s.tokens, token)
 // 		deleted = true
 // 	}
 

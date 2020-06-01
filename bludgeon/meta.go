@@ -1,6 +1,11 @@
 package bludgeon
 
 type Meta interface {
+	MetaTimer
+	MetaTimeSlice
+}
+
+type MetaSerialize interface {
 	//Serialize will attempt to commit current data
 	Serialize() (err error)
 

@@ -81,7 +81,6 @@ func initClient(config Configuration, m interface {
 	//create the client
 	c := client.NewClient(m, r)
 	//TODO: de-serialize client information
-	//TODO: defer serialize client information
 	//start the client
 	if err := c.Start(config.Client); err != nil {
 		return nil, nil, err
@@ -92,6 +91,7 @@ func initClient(config Configuration, m interface {
 		if err := c.Stop(); err != nil {
 			fmt.Println(err)
 		}
+		//TODO: defer serialize client information
 		//close the client
 		c.Close()
 	}

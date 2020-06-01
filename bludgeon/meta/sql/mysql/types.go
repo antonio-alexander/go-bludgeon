@@ -82,6 +82,7 @@ const (
 		start BIGINT,
 		finish BIGINT,
 		elapsedtime BIGINT,
+		comment TEXT,
 		INDEX(id),
 		UNIQUE(uuid(36)),
 		PRIMARY KEY (id)
@@ -89,9 +90,9 @@ const (
 			-- REFERENCES employee(id)
 			-- ON UPDATE CASCADE ON DELETE RESTRICT
 	)ENGINE=InnoDB;`
-	QueryTimerUpsert string = `INSERT into ` + TableTimer + ` (uuid, activesliceuuid, start, finish, elapsedtime) VALUES(?, ?, ?, ?, ?)
+	QueryTimerUpsert string = `INSERT into ` + TableTimer + ` (uuid, activesliceuuid, start, finish, elapsedtime, comment) VALUES(?, ?, ?, ?, ?, ?)
 	ON DUPLICATE KEY 
-		UPDATE uuid=?, activesliceuuid=?, start=?, finish=?, elapsedtime=?`
+		UPDATE uuid=?, activesliceuuid=?, start=?, finish=?, elapsedtime=?, comment=?`
 	QueryTimerDeletef string = `DELETE FROM ` + TableTimer + ` where uuid = ?`
 	QueryTimerSelectf string = `SELECT uuid, activesliceuuid, start, finish, elapsedtime from ` + TableTimer + ` WHERE uuid = ?`
 	//

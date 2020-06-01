@@ -1,7 +1,6 @@
 package bludgeonrest
 
 import (
-	"sync"
 	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
@@ -9,7 +8,6 @@ import (
 )
 
 type remote struct {
-	sync.Mutex
 	address string
 	port    string
 	timeout time.Duration
@@ -37,9 +35,6 @@ var _ bludgeon.Remote = &remote{}
 
 //
 func (r *remote) TimerCreate() (timer bludgeon.Timer, err error) {
-	r.Lock()
-	defer r.Unlock()
-
 	timer, err = api.TimerCreate(r.address, r.port)
 
 	return
@@ -47,9 +42,6 @@ func (r *remote) TimerCreate() (timer bludgeon.Timer, err error) {
 
 //
 func (r *remote) TimerRead(id string) (timer bludgeon.Timer, err error) {
-	r.Lock()
-	defer r.Unlock()
-
 	timer, err = api.TimerRead(r.address, r.port, id)
 
 	return
@@ -57,9 +49,6 @@ func (r *remote) TimerRead(id string) (timer bludgeon.Timer, err error) {
 
 //
 func (r *remote) TimerUpdate(timer bludgeon.Timer) (err error) {
-	r.Lock()
-	defer r.Unlock()
-
 	err = api.TimerUpdate(r.address, r.port, timer)
 
 	return
@@ -67,19 +56,34 @@ func (r *remote) TimerUpdate(timer bludgeon.Timer) (err error) {
 
 //
 func (r *remote) TimerDelete(id string) (err error) {
-	r.Lock()
-	defer r.Unlock()
-
 	err = api.TimerDelete(r.address, r.port, id)
+
+	return
+}
+
+//TimerStart
+func (r *remote) TimerStart(timerID string, startTime time.Time) (err error) {
+	err = api.TimerStart(r.address, r.port, timerID, startTime)
+
+	return
+}
+
+//TimerPause
+func (r *remote) TimerPause(timerID string, pauseTime time.Time) (err error) {
+	err = api.TimerPause(r.address, r.port, timerID, pauseTime)
+
+	return
+}
+
+//TimerSubmit
+func (r *remote) TimerSubmit(timerID string, finishTime time.Time) (err error) {
+	err = api.TimerSubmit(r.address, r.port, timerID, finishTime)
 
 	return
 }
 
 //
 func (r *remote) TimeSliceCreate(id string) (timeSlice bludgeon.TimeSlice, err error) {
-	r.Lock()
-	defer r.Unlock()
-
 	timeSlice, err = api.TimeSliceCreate(r.address, r.port, id)
 
 	return
@@ -87,9 +91,6 @@ func (r *remote) TimeSliceCreate(id string) (timeSlice bludgeon.TimeSlice, err e
 
 //
 func (r *remote) TimeSliceRead(id string) (timeSlice bludgeon.TimeSlice, err error) {
-	r.Lock()
-	defer r.Unlock()
-
 	timeSlice, err = api.TimeSliceRead(r.address, r.port, id)
 
 	return
@@ -97,9 +98,6 @@ func (r *remote) TimeSliceRead(id string) (timeSlice bludgeon.TimeSlice, err err
 
 //
 func (r *remote) TimeSliceUpdate(timeSlice bludgeon.TimeSlice) (err error) {
-	r.Lock()
-	defer r.Unlock()
-
 	err = api.TimeSliceUpdate(r.address, r.port, timeSlice)
 
 	return
@@ -107,9 +105,6 @@ func (r *remote) TimeSliceUpdate(timeSlice bludgeon.TimeSlice) (err error) {
 
 //
 func (r *remote) TimeSliceDelete(id string) (err error) {
-	r.Lock()
-	defer r.Unlock()
-
 	err = api.TimeSliceDelete(r.address, r.port, id)
 
 	return

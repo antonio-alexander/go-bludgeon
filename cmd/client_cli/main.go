@@ -80,7 +80,8 @@ func Main(pwd string, args []string, envs map[string]string) {
 func optionsToCommand(options cli.Options) (command bludgeon.CommandClient, data interface{}, err error) {
 	//convert command string
 	if command = bludgeon.AtoCommandClient(options.Command); command == bludgeon.CommandClientInvalid {
-		//TODO: generate error
+		err = fmt.Errorf("Invalid command: %s", options.Command)
+
 		return
 	}
 	//swtich on command and populate data
@@ -92,7 +93,7 @@ func optionsToCommand(options cli.Options) (command bludgeon.CommandClient, data
 		//inject timer id
 		data = options.Timer.UUID
 	default:
-		//TODO: generate error
+		err = fmt.Errorf("Unsupported command: %s", command.String())
 	}
 
 	return
@@ -105,12 +106,8 @@ func handleClientResponse(command bludgeon.CommandClient, data interface{}) (err
 		if timer, ok := data.(bludgeon.Timer); ok {
 			fmt.Printf("Timer:\n%s\n", timer)
 		}
-	case bludgeon.CommandClientTimerStart:
-	case bludgeon.CommandClientTimerSubmit:
-	case bludgeon.CommandClientTimerPause:
-	case bludgeon.CommandClientTimerStop:
 	default:
-		//TODO: generate error
+		//REVIEW: should we provide positive feedback?
 	}
 
 	return

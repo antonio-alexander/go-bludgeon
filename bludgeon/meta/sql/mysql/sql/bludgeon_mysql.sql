@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS timer (
     start BIGINT,
     finish BIGINT,
     elapsedtime BIGINT,
+    comment TEXT,
     INDEX(id),
     UNIQUE(uuid(36)),
     PRIMARY KEY (id)

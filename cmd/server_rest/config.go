@@ -70,7 +70,7 @@ func ConfigDefault() (c Configuration) {
 	//meta
 	c.Meta.Type = "json"
 	// json
-	c.Meta.JSON.File = ""
+	c.Meta.JSON.File = "./data/bludgeon.json"
 	// mysql
 	c.Meta.MySQL.Driver = "mysql"
 	// c.Meta.MySQL.DataSource = ""

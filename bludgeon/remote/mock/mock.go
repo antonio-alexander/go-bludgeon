@@ -2,6 +2,7 @@ package bludgeonremotemock
 
 import (
 	"errors"
+	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
 )
@@ -39,6 +40,27 @@ func (m *remoteMock) TimerUpdate(timer bludgeon.Timer) (err error) {
 
 //
 func (m *remoteMock) TimerDelete(id string) (err error) {
+	err = errors.New(ErrNotImplemented)
+
+	return
+}
+
+//TimerStart
+func (m *remoteMock) TimerStart(timerID string, startTime time.Time) (err error) {
+	err = errors.New(ErrNotImplemented)
+
+	return
+}
+
+//TimerPause
+func (m *remoteMock) TimerPause(timerID string, pauseTime time.Time) (err error) {
+	err = errors.New(ErrNotImplemented)
+
+	return
+}
+
+//TimerSubmit
+func (m *remoteMock) TimerSubmit(timerID string, finishTime time.Time) (err error) {
 	err = errors.New(ErrNotImplemented)
 
 	return
