@@ -62,50 +62,28 @@ func (r *remote) TimerDelete(id string) (err error) {
 }
 
 //TimerStart
-func (r *remote) TimerStart(timerID string, startTime time.Time) (err error) {
-	err = api.TimerStart(r.address, r.port, timerID, startTime)
+func (r *remote) TimerStart(timerID string, startTime time.Time) (timer bludgeon.Timer, err error) {
+	timer, err = api.TimerStart(r.address, r.port, timerID, startTime)
 
 	return
 }
 
 //TimerPause
-func (r *remote) TimerPause(timerID string, pauseTime time.Time) (err error) {
-	err = api.TimerPause(r.address, r.port, timerID, pauseTime)
+func (r *remote) TimerPause(timerID string, pauseTime time.Time) (timer bludgeon.Timer, err error) {
+	timer, err = api.TimerPause(r.address, r.port, timerID, pauseTime)
 
 	return
 }
 
 //TimerSubmit
-func (r *remote) TimerSubmit(timerID string, finishTime time.Time) (err error) {
-	err = api.TimerSubmit(r.address, r.port, timerID, finishTime)
+func (r *remote) TimerSubmit(timerID string, finishTime time.Time) (timer bludgeon.Timer, err error) {
+	timer, err = api.TimerSubmit(r.address, r.port, timerID, finishTime)
 
 	return
 }
 
-//
-func (r *remote) TimeSliceCreate(id string) (timeSlice bludgeon.TimeSlice, err error) {
-	timeSlice, err = api.TimeSliceCreate(r.address, r.port, id)
-
-	return
-}
-
-//
 func (r *remote) TimeSliceRead(id string) (timeSlice bludgeon.TimeSlice, err error) {
 	timeSlice, err = api.TimeSliceRead(r.address, r.port, id)
-
-	return
-}
-
-//
-func (r *remote) TimeSliceUpdate(timeSlice bludgeon.TimeSlice) (err error) {
-	err = api.TimeSliceUpdate(r.address, r.port, timeSlice)
-
-	return
-}
-
-//
-func (r *remote) TimeSliceDelete(id string) (err error) {
-	err = api.TimeSliceDelete(r.address, r.port, id)
 
 	return
 }

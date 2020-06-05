@@ -7,35 +7,28 @@ import (
 )
 
 func TestMainCli(t *testing.T) {
-	//get actual values
-	// aPwd, _ := os.Getwd()
-	// aArgs := os.Args[1:]
-	// aEnvs := make(map[string]string)
-	// for _, env := range os.Environ() {
-	// 	if s := strings.Split(env, "="); len(s) > 1 {
-	// 		aEnvs[s[0]] = s[1]
-	// 	}
-	// }
 	//create cases
 	cases := map[string]struct {
-		inPwd  string
-		inArgs []string
-		inEnvs map[string]string
+		pwd  string
+		args []string
+		envs map[string]string
 	}{
-		"read": {
-			inPwd: "/Users/noobius/source_control/go/src/github.com/antonio-alexander/go-bludgeon/cmd/client_cli",
-			inArgs: []string{
+		"": {
+			pwd: "/Users/noobius/source_control/go/src/github.com/antonio-alexander/go-bludgeon/cmd/client_cli",
+			args: []string{
 				"-command",
-				"create",
+				"start",
 				"-type",
 				"timer",
 				"-id",
-				"768e8c52-23a6-4146-a65c-446d4f340eff",
+				"59c20b2d-e1a5-42a0-bb98-628d6000d47c",
 			},
 		},
 	}
 	//range over cases
 	for _, c := range cases {
-		client.Main(c.inPwd, c.inArgs, c.inEnvs)
+		if err := client.Main(c.pwd, c.args, c.envs); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

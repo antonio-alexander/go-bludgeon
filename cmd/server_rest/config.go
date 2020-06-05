@@ -10,6 +10,18 @@ import (
 	server "github.com/antonio-alexander/go-bludgeon/bludgeon/server"
 )
 
+//
+
+//can we create a database
+
+//database address
+//database port
+//mysql driver
+//database database
+//database user
+//database password
+//meta type (name)
+
 //Configuration
 type Configuration struct {
 	Meta struct {
@@ -70,7 +82,7 @@ func ConfigDefault() (c Configuration) {
 	//meta
 	c.Meta.Type = "json"
 	// json
-	c.Meta.JSON.File = "./data/bludgeon.json"
+	c.Meta.JSON.File = ""
 	// mysql
 	c.Meta.MySQL.Driver = "mysql"
 	// c.Meta.MySQL.DataSource = ""

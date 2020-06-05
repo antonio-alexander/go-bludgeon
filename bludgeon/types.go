@@ -78,8 +78,8 @@ type Timer struct {
 }
 
 func (t Timer) String() string {
-	return fmt.Sprintf(" \"UUID\": %s \"Active Slice UUID\": %s\n \"Start\": %s\n \"Finish\": %s\n \"Elapsed Time\": %v\n \"Completed\": %t\n \"Comment\": %s",
-		t.UUID, t.ActiveSliceUUID, time.Unix(0, t.Start).Format(fmtTimeLong), time.Unix(0, t.Finish).Format(fmtTimeLong), time.Duration(t.ElapsedTime)/time.Nanosecond, t.Completed, t.Comment)
+	return fmt.Sprintf(" \"ID\": %s\n \"Active Slice UUID\": %s\n \"Start\": %s\n \"Finish\": %s\n \"Elapsed Time\": %v\n \"Completed\": %t\n \"Comment\": %s",
+		t.UUID, t.ActiveSliceUUID, time.Unix(0, t.Start).Format(fmtTimeLong), time.Unix(0, t.Finish).Format(fmtTimeLong), time.Duration(t.ElapsedTime)*time.Nanosecond, t.Completed, t.Comment)
 }
 
 //Token provides a way to store token information
@@ -160,7 +160,7 @@ type CommandServer uint8
 //command constants
 const (
 	CommandServerNull CommandServer = iota
-	//
+	//server/admin
 	CommandServerStop CommandServer = iota
 	//timer
 	CommandServerTimerCreate CommandServer = iota
@@ -170,11 +170,8 @@ const (
 	CommandServerTimerStart  CommandServer = iota
 	CommandServerTimerPause  CommandServer = iota
 	CommandServerTimerSubmit CommandServer = iota
-	//time slice
-	CommandServerTimeSliceCreate CommandServer = iota
-	CommandServerTimeSliceRead   CommandServer = iota
-	CommandServerTimeSliceUpdate CommandServer = iota
-	CommandServerTimeSliceDelete CommandServer = iota
+	//timeSlice
+	CommandServerTimeSliceRead CommandServer = iota
 	//token
 	CommandServerTokenAcquire CommandServer = iota
 	CommandServerTokenRelease CommandServer = iota
@@ -284,4 +281,80 @@ type CacheData struct {
 	// memory (e.g. like REST and not CLI)
 	//command
 	//interface
+}
+
+//Remote
+type Remote interface {
+	//RemoteTimer
+	RemoteTimer
+
+	//RemoteTimeSlice
+	RemoteTimeSlice
+}
+
+//RemoteTimer
+type RemoteTimer interface {
+	//TimerCreate
+	TimerCreate() (timer Timer, err error)
+
+	//TimerRead
+	TimerRead(id string) (timer Timer, err error)
+
+	//TimerUpdate
+	TimerUpdate(timer Timer) (err error)
+
+	//TimerDelete
+	TimerDelete(id string) (err error)
+
+	//TimerStart
+	TimerStart(timerID string, startTime time.Time) (timer Timer, err error)
+
+	//TimerPause
+	TimerPause(timerID string, pauseTime time.Time) (timer Timer, err error)
+
+	//TimerSubmit
+	TimerSubmit(timerID string, finishTime time.Time) (timer Timer, err error)
+}
+
+//RemoteTimeSlice
+type RemoteTimeSlice interface {
+	//TimeSliceRead
+	TimeSliceRead(id string) (timeSlice TimeSlice, err error)
+}
+
+type Meta interface {
+	MetaTimer
+	MetaTimeSlice
+}
+
+type MetaSerialize interface {
+	//Serialize will attempt to commit current data
+	Serialize() (err error)
+
+	//Deserialize will attempt to read current data in-memory
+	DeSerialize() (err error)
+}
+
+//MetaTimer
+type MetaTimer interface {
+	//MetaTimerWrite
+	MetaTimerWrite(timerID string, timer Timer) (err error)
+
+	//MetaTimerDelete
+	MetaTimerDelete(timerID string) (err error)
+
+	//MetaTimerRead
+	MetaTimerRead(timerID string) (timer Timer, err error)
+}
+
+//MetaTimer
+type MetaTimeSlice interface {
+	//MetaTimerWrite
+	MetaTimeSliceWrite(timeSliceID string, timeSlice TimeSlice) (err error)
+
+	//MetaTimerDelete
+	MetaTimeSliceDelete(timeSliceID string) (err error)
+
+	//MetaTimerRead
+	MetaTimeSliceRead(timeSliceID string) (timer TimeSlice, err error)
 }

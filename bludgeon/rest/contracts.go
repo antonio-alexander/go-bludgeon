@@ -1,8 +1,6 @@
 package bludgeonrest
 
 import (
-	"time"
-
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
 )
 
@@ -28,10 +26,10 @@ const (
 	RouteTimerSubmit = RouteTimer + "/submit"
 	//
 	RouteTimeSlice       = "/api/timeslice"
-	RouteTimeSliceCreate = RouteTimer + "/create"
-	RouteTimeSliceRead   = RouteTimer + "/read"
-	RouteTimeSliceUpdate = RouteTimer + "/update"
-	RouteTimeSliceDelete = RouteTimer + "/delete"
+	RouteTimeSliceCreate = RouteTimeSlice + "/create"
+	RouteTimeSliceRead   = RouteTimeSlice + "/read"
+	RouteTimeSliceUpdate = RouteTimeSlice + "/update"
+	RouteTimeSliceDelete = RouteTimeSlice + "/delete"
 	// //
 	// RouteTaskCreate = "/api/task/create"
 	// RouteTaskRead   = "/api/task/read"
@@ -72,9 +70,9 @@ const (
 
 type ContractServerIn struct {
 	ID         string             `json:"ID,omit_empty"`
-	StartTime  time.Time          `json:"StartTime,omit_empty"`
-	PauseTime  time.Time          `json:"PauseTime,omit_empty"`
-	FinishTime time.Time          `json:"FinishTime,omit_empty"`
+	StartTime  int64              `json:"StartTime,omit_empty"`
+	PauseTime  int64              `json:"PauseTime,omit_empty"`
+	FinishTime int64              `json:"FinishTime,omit_empty"`
 	Timer      bludgeon.Timer     `json:"Timer,omit_empty"`
 	TimeSlice  bludgeon.TimeSlice `json:"TimeSlice,omit_empty"`
 }

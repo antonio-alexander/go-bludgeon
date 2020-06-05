@@ -21,6 +21,7 @@ type restServer struct {
 	sync.WaitGroup              //waitgroup to manage goRoutines
 	router         *mux.Router  //mux router
 	server         *http.Server //rest Server
+	log            *log.Logger  //logger
 }
 
 type Server interface {
@@ -29,6 +30,9 @@ type Server interface {
 
 	//
 	BuildRoutes(i interface{}) (err error)
+
+	//
+	UpdateLog(log *log.Logger)
 
 	//
 	Start(address, port string) (err error)
@@ -55,6 +59,14 @@ func (r *restServer) Close() {
 	//close internal pointers
 	//set internal pointers to nil
 	r.router, r.server = nil, nil
+}
+
+func (r *restServer) UpdateLog(log *log.Logger) {
+	r.Lock()
+	defer r.Unlock()
+
+	//update the log
+	r.log = log
 }
 
 func (r *restServer) BuildRoutes(i interface{}) (err error) {
@@ -131,20 +143,16 @@ func (r *restServer) buildRoutesClient(client client.Functional) {
 //buildRoutes will create all the routes and their functions to execute when received
 func (r *restServer) buildRoutesServer(server server.Functional) {
 	//admin
-	//server
 	//timer
-	r.router.HandleFunc(rest.RouteTimerCreate, serverTimerCreate(server)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerRead, serverTimerRead(server)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerUpdate, serverTimerUpdate(server)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerDelete, serverTimerDelete(server)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerStart, serverTimerStart(server)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerPause, serverTimerPause(server)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerSubmit, serverTimerSubmit(server)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimerCreate, serverTimerCreate(server, r.log)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimerRead, serverTimerRead(server, r.log)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimerUpdate, serverTimerUpdate(server, r.log)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimerDelete, serverTimerDelete(server, r.log)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimerStart, serverTimerStart(server, r.log)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimerPause, serverTimerPause(server, r.log)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimerSubmit, serverTimerSubmit(server, r.log)).Methods(POST)
 	//time slice
-	// r.router.HandleFunc(rest.RouteTimeSliceCreate, serverTimeSliceCreate(server)).Methods(POST)
-	// r.router.HandleFunc(rest.RouteTimeSliceRead, serverTimeSliceRead(server)).Methods(POST)
-	// r.router.HandleFunc(rest.RouteTimeSliceUpdate, serverTimeSliceUpdate(server)).Methods(POST)
-	// r.router.HandleFunc(rest.RouteTimeSliceDelete, serverTimeSliceDelete(server)).Methods(POST)
+	r.router.HandleFunc(rest.RouteTimeSliceRead, serverTimeSliceRead(server, r.log)).Methods(POST)
 
 	return
 }

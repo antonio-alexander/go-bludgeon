@@ -7,6 +7,7 @@ import (
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
 	cli "github.com/antonio-alexander/go-bludgeon/bludgeon/cli"
+	bludgeonclient "github.com/antonio-alexander/go-bludgeon/bludgeon/client"
 )
 
 func main() {
@@ -23,56 +24,61 @@ func main() {
 	Main(pwd, args, envs)
 }
 
-func Main(pwd string, args []string, envs map[string]string) {
+func Main(pwd string, args []string, envs map[string]string) (err error) {
+	var options cli.Options
+	var config Configuration
+	var command bludgeon.CommandClient
+	var data interface{}
+	var meta bludgeon.Meta
+	var remote bludgeon.Remote
+	var metaFx, remoteFx, clientFx func()
+	var client bludgeonclient.Functional
+	// var cache Cache
+
 	//parse the arguments
-	options, err := cli.ParseClient(pwd, args, envs)
-	if err != nil {
-		fmt.Println(err)
+	if options, err = cli.ParseClient(pwd, args, envs); err != nil {
 		return
 	}
+	// //read cache
+	// if cache, err = CacheRead(filepath.Join(pwd, "data/bludgeon_cache.json")); err != nil {
+	// 	return
+	// }
+	// //if timer is empty, replace with data from cache
+	// if options.Timer.UUID == "" {
+	// 	options.Timer.UUID = cache.TimerID
+	// }
 	//read configuration
-	config, err := ConfigRead(options.Configuration)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	//convert options to command/data
-	command, data, err := optionsToCommand(options)
-	if err != nil {
-		fmt.Println(err)
+	if config, err = ConfigRead(options.Configuration); err != nil {
 		return
 	}
 	//initialize meta
-	meta, metaFx, err := initMeta(config)
-	if err != nil {
-		fmt.Println(err)
+	if meta, metaFx, err = initMeta(config); err != nil {
 		return
 	}
 	defer metaFx()
 	//initialize remote
-	remote, remoteFx, err := initRemote(config)
-	if err != nil {
-		fmt.Println(err)
+	if remote, remoteFx, err = initRemote(config); err != nil {
 		return
 	}
 	defer remoteFx()
 	//initialize client
-	client, clientFx, err := initClient(config, meta, remote)
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		defer clientFx()
-		//call command handler
-		data, err := client.CommandHandler(command, data)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			//handle response
-			if err = handleClientResponse(command, data); err != nil {
-				fmt.Println(err)
-			}
-		}
+	if client, clientFx, err = initClient(config, meta, remote); err != nil {
+		return
 	}
+	defer clientFx()
+	//convert options to command/data
+	if command, data, err = optionsToCommand(options); err != nil {
+		return
+	}
+	//call command handler
+	if data, err = client.CommandHandler(command, data); err != nil {
+		return
+	}
+	//handle response
+	if err = handleClientResponse(command, data); err != nil {
+		return
+	}
+	//TODO: update cache
 
 	return
 }
@@ -102,7 +108,9 @@ func optionsToCommand(options cli.Options) (command bludgeon.CommandClient, data
 func handleClientResponse(command bludgeon.CommandClient, data interface{}) (err error) {
 	//swtich on command and populate data
 	switch command {
-	case bludgeon.CommandClientTimerRead, bludgeon.CommandClientTimerCreate:
+	case bludgeon.CommandClientTimerCreate, bludgeon.CommandClientTimerRead,
+		bludgeon.CommandClientTimerStart, bludgeon.CommandClientTimerStop,
+		bludgeon.CommandClientTimerPause, bludgeon.CommandClientTimerSubmit:
 		if timer, ok := data.(bludgeon.Timer); ok {
 			fmt.Printf("Timer:\n%s\n", timer)
 		}

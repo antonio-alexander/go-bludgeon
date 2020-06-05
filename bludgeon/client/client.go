@@ -179,14 +179,14 @@ func (c *client) CommandHandler(command bludgeon.CommandClient, dataIn interface
 			err = errors.New("Unable to cast into string")
 		} else {
 			//start the timer
-			err = c.TimerStart(id, time.Now())
+			dataOut, err = c.TimerStart(id, time.Now())
 		}
 	case bludgeon.CommandClientTimerPause, bludgeon.CommandClientTimerStop:
 		if id, ok = dataIn.(string); !ok {
 			err = errors.New("Unable to cast into string")
 		} else {
 			//start the timer
-			err = c.TimerPause(id, time.Now())
+			dataOut, err = c.TimerPause(id, time.Now())
 		}
 	case bludgeon.CommandClientTimerRead:
 		//cast into string and use
@@ -201,7 +201,7 @@ func (c *client) CommandHandler(command bludgeon.CommandClient, dataIn interface
 			err = errors.New("Unable to cast into string")
 		} else {
 			//start the timer
-			err = c.TimerSubmit(id, time.Now())
+			dataOut, err = c.TimerSubmit(id, time.Now())
 		}
 	default:
 		err = fmt.Errorf("Unsupported command: %s", command)
@@ -233,34 +233,34 @@ func (c *client) TimerRead(id string) (timer bludgeon.Timer, err error) {
 }
 
 //start a timer
-func (c *client) TimerStart(id string, startTime time.Time) (err error) {
+func (c *client) TimerStart(id string, startTime time.Time) (timer bludgeon.Timer, err error) {
 	c.Lock()
 	defer c.Unlock()
 
 	//start the timer
-	err = bludgeon.TimerStart(id, startTime, c.meta, c.remote)
+	timer, err = bludgeon.TimerStart(id, startTime, c.meta, c.remote)
 
 	return
 }
 
 //pause a timer
-func (c *client) TimerPause(timerID string, pauseTime time.Time) (err error) {
+func (c *client) TimerPause(timerID string, pauseTime time.Time) (timer bludgeon.Timer, err error) {
 	c.Lock()
 	defer c.Unlock()
 
 	//pause the timer
-	err = bludgeon.TimerPause(timerID, pauseTime, c.meta, c.remote)
+	timer, err = bludgeon.TimerPause(timerID, pauseTime, c.meta, c.remote)
 
 	return
 }
 
 //submit a timer
-func (c *client) TimerSubmit(timerID string, submitTime time.Time) (err error) {
+func (c *client) TimerSubmit(timerID string, submitTime time.Time) (timer bludgeon.Timer, err error) {
 	c.Lock()
 	defer c.Unlock()
 
 	//submit the timer
-	err = bludgeon.TimerSubmit(timerID, submitTime, c.meta, c.remote)
+	timer, err = bludgeon.TimerSubmit(timerID, submitTime, c.meta, c.remote)
 
 	return
 }

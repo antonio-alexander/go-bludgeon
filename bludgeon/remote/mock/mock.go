@@ -46,21 +46,21 @@ func (m *remoteMock) TimerDelete(id string) (err error) {
 }
 
 //TimerStart
-func (m *remoteMock) TimerStart(timerID string, startTime time.Time) (err error) {
+func (m *remoteMock) TimerStart(timerID string, startTime time.Time) (timer bludgeon.Timer, err error) {
 	err = errors.New(ErrNotImplemented)
 
 	return
 }
 
 //TimerPause
-func (m *remoteMock) TimerPause(timerID string, pauseTime time.Time) (err error) {
+func (m *remoteMock) TimerPause(timerID string, pauseTime time.Time) (timer bludgeon.Timer, err error) {
 	err = errors.New(ErrNotImplemented)
 
 	return
 }
 
 //TimerSubmit
-func (m *remoteMock) TimerSubmit(timerID string, finishTime time.Time) (err error) {
+func (m *remoteMock) TimerSubmit(timerID string, finishTime time.Time) (timer bludgeon.Timer, err error) {
 	err = errors.New(ErrNotImplemented)
 
 	return

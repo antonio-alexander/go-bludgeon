@@ -201,43 +201,25 @@ func (s *server) CommandHandler(command bludgeon.CommandServer, dataIn interface
 		if d, ok := dataIn.(CommandData); !ok {
 			err = errors.New("Unable to cast into command data")
 		} else {
-			err = s.TimerStart(d.ID, d.StartTime)
+			dataOut, err = s.TimerStart(d.ID, d.StartTime)
 		}
 	case bludgeon.CommandServerTimerPause:
 		if d, ok := dataIn.(CommandData); !ok {
 			err = errors.New("Unable to cast into command data")
 		} else {
-			err = s.TimerPause(d.ID, d.PauseTime)
+			dataOut, err = s.TimerPause(d.ID, d.PauseTime)
 		}
 	case bludgeon.CommandServerTimerSubmit:
 		if d, ok := dataIn.(CommandData); !ok {
 			err = errors.New("Unable to cast into command data")
 		} else {
-			err = s.TimerSubmit(d.ID, d.FinishTime)
-		}
-	case bludgeon.CommandServerTimeSliceCreate:
-		if d, ok := dataIn.(CommandData); !ok {
-			err = errors.New("Unable to cast into command data")
-		} else {
-			dataOut, err = s.TimeSliceCreate(d.ID)
+			dataOut, err = s.TimerSubmit(d.ID, d.FinishTime)
 		}
 	case bludgeon.CommandServerTimeSliceRead:
 		if d, ok := dataIn.(CommandData); !ok {
 			err = errors.New("Unable to cast into command data")
 		} else {
 			dataOut, err = s.TimeSliceRead(d.ID)
-		}
-	case bludgeon.CommandServerTimeSliceUpdate:
-		if timeSlice, ok := dataIn.(bludgeon.TimeSlice); !ok {
-			err = errors.New("Unable to cast into command data")
-		} else {
-			err = s.TimeSliceUpdate(timeSlice)
-		}
-	case bludgeon.CommandServerTimeSliceDelete:
-		if d, ok := dataIn.(CommandData); !ok {
-			err = errors.New("Unable to cast into command data")
-		} else {
-			err = s.TimeSliceDelete(d.ID)
 		}
 	default:
 		err = fmt.Errorf("command not supported: %s", command)
@@ -290,42 +272,32 @@ func (s *server) TimerDelete(id string) (err error) {
 	return
 }
 
-func (s *server) TimerStart(id string, startTime time.Time) (err error) {
+func (s *server) TimerStart(id string, startTime time.Time) (timer bludgeon.Timer, err error) {
 	s.Lock()
 	defer s.Unlock()
 
 	//start the timer
-	err = bludgeon.TimerStart(id, startTime, s.meta)
+	timer, err = bludgeon.TimerStart(id, startTime, s.meta)
 
 	return
 }
 
-func (s *server) TimerPause(id string, pauseTime time.Time) (err error) {
+func (s *server) TimerPause(id string, pauseTime time.Time) (timer bludgeon.Timer, err error) {
 	s.Lock()
 	defer s.Unlock()
 
 	//pause the time
-	err = bludgeon.TimerPause(id, pauseTime, s.meta)
+	timer, err = bludgeon.TimerPause(id, pauseTime, s.meta)
 
 	return
 }
 
-func (s *server) TimerSubmit(id string, submitTime time.Time) (err error) {
+func (s *server) TimerSubmit(id string, submitTime time.Time) (timer bludgeon.Timer, err error) {
 	s.Lock()
 	defer s.Unlock()
 
 	//submit timer
-	err = bludgeon.TimerSubmit(id, submitTime, s.meta)
-
-	return
-}
-
-func (s *server) TimeSliceCreate(timerID string) (timeSlice bludgeon.TimeSlice, err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//create time slice
-	timeSlice, err = bludgeon.TimeSliceCreate(timerID, s.meta)
+	timer, err = bludgeon.TimerSubmit(id, submitTime, s.meta)
 
 	return
 }
@@ -336,26 +308,6 @@ func (s *server) TimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice
 
 	//read the time slice
 	timeSlice, err = bludgeon.TimeSliceRead(timeSliceID, s.meta)
-
-	return
-}
-
-func (s *server) TimeSliceUpdate(timeSlice bludgeon.TimeSlice) (err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//update the time slice
-	err = bludgeon.TimeSliceUpdate(timeSlice, s.meta)
-
-	return
-}
-
-func (s *server) TimeSliceDelete(timeSliceID string) (err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//delete the timeslice
-	err = bludgeon.TimeSliceDelete(timeSliceID)
 
 	return
 }
