@@ -92,15 +92,16 @@ type CommandClient uint8
 
 //command constants
 const (
-	CommandClientNull        CommandClient = iota
-	CommandClientTimerCreate CommandClient = iota
-	CommandClientTimerRead   CommandClient = iota
-	CommandClientTimerDelete CommandClient = iota
-	CommandClientTimerStart  CommandClient = iota
-	CommandClientTimerStop   CommandClient = iota
-	CommandClientTimerPause  CommandClient = iota
-	CommandClientTimerSubmit CommandClient = iota
-	CommandClientInvalid     CommandClient = iota
+	CommandClientNull                 CommandClient = iota
+	CommandClientTimerCreate          CommandClient = iota
+	CommandClientTimerRead            CommandClient = iota
+	CommandClientTimerDelete          CommandClient = iota
+	CommandClientTimerStart           CommandClient = iota
+	CommandClientTimerStop            CommandClient = iota
+	CommandClientTimerPause           CommandClient = iota
+	CommandClientTimerSubmit          CommandClient = iota
+	CommandClientTimerUpdateAuxiliary CommandClient = iota
+	CommandClientInvalid              CommandClient = iota
 )
 
 func (c CommandClient) String() string {
@@ -119,6 +120,8 @@ func (c CommandClient) String() string {
 		return "timerpause"
 	case CommandClientTimerSubmit:
 		return "timersubmit"
+	case CommandClientTimerUpdateAuxiliary:
+		return "timerupdateauxiliary"
 	default:
 		return ""
 	}

@@ -259,6 +259,7 @@ func TimerCreate(i ...interface{}) (timer Timer, err error) {
 func TimerRead(id string, i ...interface{}) (timer Timer, err error) {
 	var remote Remote
 	var meta Meta
+	var timeSlice TimeSlice
 
 	//sort the varadics into meta/remote
 	if meta, remote, err = sortMetaRemote(i); err != nil {
@@ -271,9 +272,11 @@ func TimerRead(id string, i ...interface{}) (timer Timer, err error) {
 	//attempt to get the activeSlice if it exists
 	if timer.ActiveSliceUUID != "" {
 		//read the time slice to store in meta if remote
-		if _, err = TimeSliceRead(timer.ActiveSliceUUID, meta, remote); err != nil {
+		if timeSlice, err = TimeSliceRead(timer.ActiveSliceUUID, meta, remote); err != nil {
 			return
 		}
+		//update elapsed time in realtime if there is an active timeslice
+		timer.ElapsedTime += (time.Now().UnixNano() - timeSlice.Start)
 	}
 
 	return

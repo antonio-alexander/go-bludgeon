@@ -41,6 +41,8 @@ func ParseClient(pwd string, args []string, envs map[string]string) (o Options, 
 			o.Command = bludgeon.CommandClientTimerStop.String()
 		case "submit":
 			o.Command = bludgeon.CommandClientTimerSubmit.String()
+		case "update":
+			o.Command = bludgeon.CommandClientTimerUpdate.String()
 		default:
 			err = fmt.Errorf("Command %s, not supported for object %s", o.command, o.objectType)
 		}
