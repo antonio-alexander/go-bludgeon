@@ -283,7 +283,7 @@ func TimerRead(id string, i ...interface{}) (timer Timer, err error) {
 }
 
 //TimerUpdate
-func TimerUpdate(timer Timer, i ...interface{}) (err error) {
+func TimerUpdate(t Timer, i ...interface{}) (timer Timer, err error) {
 	var remote Remote
 	var meta Meta
 
@@ -293,12 +293,31 @@ func TimerUpdate(timer Timer, i ...interface{}) (err error) {
 	}
 	//use the api to create a time slice if remote is not nil
 	if remote != nil {
-		if err = remote.TimerUpdate(timer); err != nil {
+		if timer, err = remote.TimerUpdate(t); err != nil {
 			//TODO: store remote error
 			//TODO: cache the operation
+		} else {
+			if meta != nil {
+				if err = meta.MetaTimerWrite(timer.UUID, timer); err != nil {
+					//TODO: store meta error
+
+					return
+				}
+			}
+
+			return
 		}
 	}
 	if meta != nil {
+		//get the current timer
+		if timer, err = timerRead(t.UUID, meta, remote); err != nil {
+			return
+		}
+		//update only the items that have changed
+		// update the comment
+		if t.Comment != "" {
+			timer.Comment = t.Comment
+		}
 		//store the timeslice
 		err = meta.MetaTimerWrite(timer.UUID, timer)
 	}
@@ -482,7 +501,7 @@ func TimerPause(timerID string, pauseTime time.Time, i ...interface{}) (timer Ti
 			return
 		}
 		//update the timer
-		if err = TimerUpdate(timer, meta); err != nil {
+		if _, err = TimerUpdate(timer, meta); err != nil {
 			return
 		}
 	}
@@ -558,7 +577,7 @@ func TimerSubmit(timerID string, submitTime time.Time, i ...interface{}) (timer 
 			return
 		}
 		//update the timer
-		if err = TimerUpdate(timer, meta); err != nil {
+		if _, err = TimerUpdate(timer, meta); err != nil {
 			return
 		}
 	}

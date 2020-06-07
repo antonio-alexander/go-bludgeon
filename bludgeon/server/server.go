@@ -7,6 +7,7 @@ import (
 	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
+	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest/server"
 )
 
 //REVIEW: the future version of the client, will have a remote and meta pointer provided
@@ -146,6 +147,9 @@ type Functional interface {
 	//LaunchPurge
 	LaunchPurge()
 
+	//BuildRoutes
+	BuildRoutes() []rest.HandleFuncConfig
+
 	//CommandHandler
 	CommandHandler(command bludgeon.CommandServer, dataIn interface{}, token bludgeon.Token) (dataOut interface{}, err error)
 }
@@ -175,6 +179,24 @@ func (s *server) LaunchPurge() {
 	<-started
 }
 
+//BuildRoutes will create all the routes and their functions to execute when received
+func (s *server) BuildRoutes() []rest.HandleFuncConfig {
+	//TODO: replace nil with actual logger
+	return []rest.HandleFuncConfig{
+		//admin
+		//timer
+		{Route: RouteTimerCreate, Method: POST, HandleFx: ServerTimerCreate(s, nil)},
+		{Route: RouteTimerRead, Method: POST, HandleFx: ServerTimerRead(s, nil)},
+		{Route: RouteTimerUpdate, Method: POST, HandleFx: ServerTimerUpdate(s, nil)},
+		{Route: RouteTimerDelete, Method: POST, HandleFx: ServerTimerDelete(s, nil)},
+		{Route: RouteTimerStart, Method: POST, HandleFx: ServerTimerStart(s, nil)},
+		{Route: RouteTimerPause, Method: POST, HandleFx: ServerTimerPause(s, nil)},
+		{Route: RouteTimerSubmit, Method: POST, HandleFx: ServerTimerSubmit(s, nil)},
+		//time slice
+		{Route: RouteTimeSliceRead, Method: POST, HandleFx: ServerTimeSliceRead(s, nil)},
+	}
+}
+
 func (s *server) CommandHandler(command bludgeon.CommandServer, dataIn interface{}, token bludgeon.Token) (dataOut interface{}, err error) {
 	switch command {
 	case bludgeon.CommandServerTimerCreate:
@@ -189,7 +211,7 @@ func (s *server) CommandHandler(command bludgeon.CommandServer, dataIn interface
 		if timer, ok := dataIn.(bludgeon.Timer); !ok {
 			err = errors.New("Unable to cast into timer")
 		} else {
-			err = s.TimerUpdate(timer)
+			dataOut, err = s.TimerUpdate(timer)
 		}
 	case bludgeon.CommandServerTimerDelete:
 		if d, ok := dataIn.(CommandData); !ok {
@@ -251,12 +273,12 @@ func (s *server) TimerRead(id string) (timer bludgeon.Timer, err error) {
 }
 
 //
-func (s *server) TimerUpdate(timer bludgeon.Timer) (err error) {
+func (s *server) TimerUpdate(t bludgeon.Timer) (timer bludgeon.Timer, err error) {
 	s.Lock()
 	defer s.Unlock()
 
 	//update the timer
-	err = bludgeon.TimerUpdate(timer, s.meta)
+	timer, err = bludgeon.TimerUpdate(t, s.meta)
 
 	return
 }

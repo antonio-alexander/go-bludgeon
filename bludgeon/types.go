@@ -92,16 +92,16 @@ type CommandClient uint8
 
 //command constants
 const (
-	CommandClientNull                 CommandClient = iota
-	CommandClientTimerCreate          CommandClient = iota
-	CommandClientTimerRead            CommandClient = iota
-	CommandClientTimerDelete          CommandClient = iota
-	CommandClientTimerStart           CommandClient = iota
-	CommandClientTimerStop            CommandClient = iota
-	CommandClientTimerPause           CommandClient = iota
-	CommandClientTimerSubmit          CommandClient = iota
-	CommandClientTimerUpdateAuxiliary CommandClient = iota
-	CommandClientInvalid              CommandClient = iota
+	CommandClientNull        CommandClient = iota
+	CommandClientTimerCreate CommandClient = iota
+	CommandClientTimerRead   CommandClient = iota
+	CommandClientTimerDelete CommandClient = iota
+	CommandClientTimerStart  CommandClient = iota
+	CommandClientTimerStop   CommandClient = iota
+	CommandClientTimerPause  CommandClient = iota
+	CommandClientTimerSubmit CommandClient = iota
+	CommandClientTimerUpdate CommandClient = iota
+	CommandClientInvalid     CommandClient = iota
 )
 
 func (c CommandClient) String() string {
@@ -120,8 +120,8 @@ func (c CommandClient) String() string {
 		return "timerpause"
 	case CommandClientTimerSubmit:
 		return "timersubmit"
-	case CommandClientTimerUpdateAuxiliary:
-		return "timerupdateauxiliary"
+	case CommandClientTimerUpdate:
+		return "timerupdate"
 	default:
 		return ""
 	}
@@ -143,6 +143,8 @@ func AtoCommandClient(s string) CommandClient {
 		return CommandClientTimerPause
 	case "timersubmit":
 		return CommandClientTimerSubmit
+	case "timerupdate":
+		return CommandClientTimerUpdate
 	default:
 		return CommandClientInvalid
 	}
@@ -304,7 +306,7 @@ type RemoteTimer interface {
 	TimerRead(id string) (timer Timer, err error)
 
 	//TimerUpdate
-	TimerUpdate(timer Timer) (err error)
+	TimerUpdate(t Timer) (timer Timer, err error)
 
 	//TimerDelete
 	TimerDelete(id string) (err error)

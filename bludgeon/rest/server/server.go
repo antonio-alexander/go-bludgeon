@@ -2,14 +2,9 @@ package bludgeonrestserver
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
-
-	client "github.com/antonio-alexander/go-bludgeon/bludgeon/client"
-	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest"
-	server "github.com/antonio-alexander/go-bludgeon/bludgeon/server"
 
 	"github.com/gorilla/mux"
 )
@@ -29,7 +24,7 @@ type Server interface {
 	Close()
 
 	//
-	BuildRoutes(i interface{}) (err error)
+	BuildRoutes(routes []HandleFuncConfig) (err error)
 
 	//
 	UpdateLog(log *log.Logger)
@@ -67,22 +62,6 @@ func (r *restServer) UpdateLog(log *log.Logger) {
 
 	//update the log
 	r.log = log
-}
-
-func (r *restServer) BuildRoutes(i interface{}) (err error) {
-	r.Lock()
-	defer r.Unlock()
-
-	switch v := i.(type) {
-	case client.Functional:
-		r.buildRoutesClient(v)
-	case server.Functional:
-		r.buildRoutesServer(v)
-	default:
-		err = fmt.Errorf("Type %t unsupported", v)
-	}
-
-	return
 }
 
 //Start uses the configured mux/router to start listening to responses via REST
@@ -128,31 +107,14 @@ func (r *restServer) Stop() (err error) {
 	return
 }
 
-//buildRoutes will create all the routes and their functions to execute when received
-func (r *restServer) buildRoutesClient(client client.Functional) {
-	// //Timer
-	// r.router.HandleFunc(bludgeon.RouteTimerCreate, r.TimerCreate).Methods(RestPost)
-	// r.router.HandleFunc(bludgeon.RouteTimerRead, r.TimerRead).Methods(RestPost)
-	// r.router.HandleFunc(bludgeon.RouteTimersRead, r.TimersRead).Methods(RestPost)
-	// r.router.HandleFunc(bludgeon.RouteTimerUpdate, r.TimerUpdate).Methods(RestPost)
-	// r.router.HandleFunc(bludgeon.RouteTimerDelete, r.TimerDelete).Methods(RestPost)
+func (r *restServer) BuildRoutes(routes []HandleFuncConfig) (err error) {
+	r.Lock()
+	defer r.Unlock()
 
-	return
-}
-
-//buildRoutes will create all the routes and their functions to execute when received
-func (r *restServer) buildRoutesServer(server server.Functional) {
-	//admin
-	//timer
-	r.router.HandleFunc(rest.RouteTimerCreate, serverTimerCreate(server, r.log)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerRead, serverTimerRead(server, r.log)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerUpdate, serverTimerUpdate(server, r.log)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerDelete, serverTimerDelete(server, r.log)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerStart, serverTimerStart(server, r.log)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerPause, serverTimerPause(server, r.log)).Methods(POST)
-	r.router.HandleFunc(rest.RouteTimerSubmit, serverTimerSubmit(server, r.log)).Methods(POST)
-	//time slice
-	r.router.HandleFunc(rest.RouteTimeSliceRead, serverTimeSliceRead(server, r.log)).Methods(POST)
+	//
+	for _, route := range routes {
+		r.router.HandleFunc(route.Route, route.HandleFx).Methods(route.Method)
+	}
 
 	return
 }

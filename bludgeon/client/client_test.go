@@ -2,6 +2,8 @@ package bludgeonclient_test
 
 import (
 	"testing"
+
+	client "github.com/antonio-alexander/go-bludgeon/bludgeon/client"
 )
 
 //test serialization
@@ -54,4 +56,29 @@ func TestTimerPause(t *testing.T) {
 
 func TestTimerSubmit(t *testing.T) {
 	//
+}
+
+func TestMainCli(t *testing.T) {
+	//create cases
+	cases := map[string]struct {
+		pwd  string
+		args []string
+		envs map[string]string
+	}{
+		"": {
+			pwd: "/Users/noobius/source_control/go/src/github.com/antonio-alexander/go-bludgeon/cmd/client_cli",
+			args: []string{
+				"--command", "create",
+				"--type", "timer",
+				"--id", "51db329b-9ab1-4636-840f-da06eb4acaea",
+				"--comment=\"This is a better test\"",
+			},
+		},
+	}
+	//range over cases
+	for _, c := range cases {
+		if err := client.MainCli(c.pwd, c.args, c.envs); err != nil {
+			t.Fatal(err)
+		}
+	}
 }

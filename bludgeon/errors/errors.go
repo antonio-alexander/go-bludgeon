@@ -1,4 +1,4 @@
-package bludgeonerrors
+package bludgeon
 
 import (
 	"fmt"

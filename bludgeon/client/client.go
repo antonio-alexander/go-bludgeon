@@ -167,22 +167,19 @@ type Functional interface {
 var _ Functional = &client{}
 
 func (c *client) CommandHandler(command bludgeon.CommandClient, dataIn interface{}) (dataOut interface{}, err error) {
-	var id string
-	var ok bool
-
 	//execute the command
 	switch command {
 	case bludgeon.CommandClientTimerCreate:
 		dataOut, err = c.TimerCreate()
 	case bludgeon.CommandClientTimerStart:
-		if id, ok = dataIn.(string); !ok {
+		if id, ok := dataIn.(string); !ok {
 			err = errors.New("Unable to cast into string")
 		} else {
 			//start the timer
 			dataOut, err = c.TimerStart(id, time.Now())
 		}
 	case bludgeon.CommandClientTimerPause, bludgeon.CommandClientTimerStop:
-		if id, ok = dataIn.(string); !ok {
+		if id, ok := dataIn.(string); !ok {
 			err = errors.New("Unable to cast into string")
 		} else {
 			//start the timer
@@ -190,18 +187,25 @@ func (c *client) CommandHandler(command bludgeon.CommandClient, dataIn interface
 		}
 	case bludgeon.CommandClientTimerRead:
 		//cast into string and use
-		if id, ok = dataIn.(string); !ok {
+		if id, ok := dataIn.(string); !ok {
 			err = errors.New("Unable to cast into string")
 		} else {
 			//read the timer
 			dataOut, err = c.TimerRead(id)
 		}
 	case bludgeon.CommandClientTimerSubmit:
-		if id, ok = dataIn.(string); !ok {
+		if id, ok := dataIn.(string); !ok {
 			err = errors.New("Unable to cast into string")
 		} else {
 			//start the timer
 			dataOut, err = c.TimerSubmit(id, time.Now())
+		}
+	case bludgeon.CommandClientTimerUpdate:
+		if timer, ok := dataIn.(bludgeon.Timer); !ok {
+			err = errors.New("Unable to cast into string")
+		} else {
+			//update the timer
+			dataOut, err = c.TimerUpdate(timer)
 		}
 	default:
 		err = fmt.Errorf("Unsupported command: %s", command)
@@ -228,6 +232,17 @@ func (c *client) TimerRead(id string) (timer bludgeon.Timer, err error) {
 
 	//read the timer
 	timer, err = bludgeon.TimerRead(id, c.meta, c.remote)
+
+	return
+}
+
+//add a timer
+func (c *client) TimerUpdate(t bludgeon.Timer) (timer bludgeon.Timer, err error) {
+	c.Lock()
+	defer c.Unlock()
+
+	//create a timer
+	timer, err = bludgeon.TimerUpdate(t, c.meta, c.remote)
 
 	return
 }

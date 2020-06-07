@@ -29,8 +29,8 @@ import (
 //--------------------------------------------------------------------------------------------------
 
 const (
-	TestDatabaseFile   string = "/Users/noobius/.bludgeon/bludgeon.db"
-	TestBlackBoxScript string = "/Users/noobius/source_control/bludgeon/source/go/bludgeon/database/database_test.sh"
+	TestDatabaseFile   string = "./.bludgeon/bludgeon.db"
+	TestBlackBoxScript string = "./source_control/bludgeon/source/go/bludgeon/database/database_test.sh"
 	TestDatabaseName   string = "bludgeon"
 	rootUsername       string = "root"
 	bludgeonUsername   string = "bludgeon"
