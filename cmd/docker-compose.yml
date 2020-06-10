@@ -1,13 +1,21 @@
 version: '3'
 services:
-  server:
-      container_name: "database"
-      image: mariadb:latest
+  bludgeon_database:
+      container_name: "bludgeon_database"
+      image: bludgeon_db:latest
       restart: "always"
+      build:
+        context: ./db_mysql
+        dockerfile: ./Dockerfile
       ports:
         - "3306:3306"
-  server:
-    container_name: "bludgeon-server"
+      volumes:
+        - bludgeon_database:/var/lib/mysql
+      environment:
+        - MYSQL_ALLOW_EMPTY_PASSWORD=true
+        # - MYSQL_ROOT_PASSWORD=""
+  bludgeon_server:
+    container_name: "bludgeon_server"
     restart: "always"
     build:
       context: ../
@@ -15,11 +23,34 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - server-data: /app/data
-      - server-config: /app/config
-#  client:
+      - bludgeon_server-data:/app/data
+    environment:
+      - BLUDGEON_REST_ADDRESS="" 
+      - BLUDGEON_REST_PORT="8080" 
+      - BLUDGEON_META_TYPE="json" 
+      - BLUDGEON_META_JSON_FILE="/data/blugeon.json" 
+      - DATABASE_ADDRESS="bludgeon_database"
+      - DATABASE_PORT="3306" 
+# bludgeon_client:
+#     container_name: "bludgeon_client"
+#     restart: "always"
+#     build:
+#       context: ../
+#       dockerfile: ./client_rest/Dockerfile
+#     ports:
+#       - "8081:8081"
+#     volumes:
+#       - client-data: /app/data
+#       - client-config: /app/config
+#     environment:
+#       - BLUDGEON_REST_ADDRESS="" 
+#       - BLUDGEON_REST_PORT="8080" 
+#       - BLUDGEON_META_TYPE="json" 
+#       - BLUDGEON_META_JSON_FILE="/data/blugeon.json" 
+#       - DATABASE_ADDRESS="bludgeon_database"
+#       - DATABASE_PORT="3306" 
 volumes:
-  - server-data
-  - server-config
-  - client-data
-  - client-config
+  bludgeon_server-data:
+  bludgeon_database:
+  # - bludgeon_client-data
+  # - bludgeon_client-config
