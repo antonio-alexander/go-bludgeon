@@ -1,37 +1,37 @@
-package bludgeonserver
+package bludgeonserverfunctional
 
 import (
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest/server"
+	common "github.com/antonio-alexander/go-bludgeon/bludgeon/server/common"
 )
 
-//REVIEW: the future version of the client, will have a remote and meta pointer provided
-// at new, at least one must not be nil, but if only remote, it'll use the server for all
-// operations, if remote is nil but meta is not, it'll use meta instead for local persistence
-
 type server struct {
-	sync.RWMutex                 //mutex for threadsafe operations
-	sync.WaitGroup               //waitgroup to track go routines
-	started        bool          //whether or not the business logic has starting
-	config         Configuration //configuration
-	meta           interface {   //storage interface
+	sync.RWMutex                        //mutex for threadsafe operations
+	sync.WaitGroup                      //waitgroup to track go routines
+	started        bool                 //whether or not the business logic has starting
+	config         common.Configuration //configuration
+	stopper        chan struct{}        //stopper to stop goRoutines
+	chExternal     chan struct{}
+	tokens         map[string]bludgeon.Token //map of tokens
+	logError       *log.Logger
+	log            *log.Logger
+	meta           interface { //storage interface
 		bludgeon.MetaTimer
 		bludgeon.MetaTimeSlice
 	}
-	stopper chan struct{} //stopper to stop goRoutines
-	//some set of flags or method to know what to update
-	tokens map[string]bludgeon.Token //map of tokens
 }
 
-func NewServer(meta interface {
+func NewServer(log, logError *log.Logger, meta interface {
 	bludgeon.MetaTimer
 	bludgeon.MetaTimeSlice
 }) interface {
+	bludgeon.Logger
 	Owner
 	Manage
 	Functional
@@ -41,14 +41,65 @@ func NewServer(meta interface {
 	if meta == nil {
 		panic("meta is nil")
 	}
-	//create internal maps
-	//TODO: need a way to prepopulate or generate the
-	// lookups from scratch? will need to have the full data some how
 	//populate client pointer
 	return &server{
-		meta:   meta,
-		tokens: make(map[string]bludgeon.Token),
+		meta:     meta,
+		log:      log,
+		logError: logError,
+		tokens:   make(map[string]bludgeon.Token),
 	}
+}
+
+func (s *server) Println(v ...interface{}) {
+	if s.log != nil {
+		s.log.Println(v...)
+	}
+}
+
+func (s *server) Printf(format string, v ...interface{}) {
+	if s.log != nil {
+		s.log.Printf(format, v...)
+	}
+}
+
+func (s *server) Print(v ...interface{}) {
+	if s.log != nil {
+		s.log.Print(v...)
+	}
+}
+
+func (s *server) Error(err error) {
+	if s.logError != nil {
+		s.logError.Println(err)
+	}
+}
+
+func (s *server) Errorf(format string, v ...interface{}) {
+	if s.logError != nil {
+		s.logError.Printf(format, v...)
+	}
+}
+
+func (s *server) launchPurge() {
+	started := make(chan struct{})
+	s.Add(1)
+	go func() {
+		defer s.Done()
+
+		tPurge := time.NewTicker(30 * time.Second)
+		close(started)
+		for {
+			select {
+			case <-tPurge.C:
+				// if err := s.TokenPurge(); err != nil {
+				// 	fmt.Printf(err)
+				// }
+			case <-s.stopper:
+				return
+			}
+		}
+	}()
+	<-started
 }
 
 type Owner interface {
@@ -71,7 +122,7 @@ func (s *server) Close() {
 	// attempt to serialize what's remaining
 
 	//set internal configuration to default
-	s.config = Configuration{}
+	s.config = common.Configuration{}
 	//set internal pointers to nil
 	s.meta = nil
 
@@ -96,13 +147,13 @@ func (s *server) Deserialize(bytes []byte) (err error) {
 
 type Manage interface {
 	//
-	Start(config Configuration) (err error)
+	Start(config common.Configuration) (chExternal <-chan struct{}, err error)
 
 	//
 	Stop() (err error)
 }
 
-func (s *server) Start(config Configuration) (err error) {
+func (s *server) Start(config common.Configuration) (chExternal <-chan struct{}, err error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -116,8 +167,10 @@ func (s *server) Start(config Configuration) (err error) {
 	s.config = config
 	//create stopper
 	s.stopper = make(chan struct{})
+	s.chExternal = make(chan struct{})
+	chExternal = s.chExternal
 	//launch go routines
-	s.LaunchPurge()
+	s.launchPurge()
 	//set started to true
 	s.started = true
 
@@ -137,6 +190,7 @@ func (s *server) Stop() (err error) {
 	//close the stopper
 	close(s.stopper)
 	s.Wait()
+	close(s.chExternal)
 	//set started flag to false
 	s.started = false
 
@@ -144,12 +198,6 @@ func (s *server) Stop() (err error) {
 }
 
 type Functional interface {
-	//LaunchPurge
-	LaunchPurge()
-
-	//BuildRoutes
-	BuildRoutes() []rest.HandleFuncConfig
-
 	//CommandHandler
 	CommandHandler(command bludgeon.CommandServer, dataIn interface{}, token bludgeon.Token) (dataOut interface{}, err error)
 }
@@ -157,52 +205,12 @@ type Functional interface {
 //ensure that cache implements Functional
 var _ Functional = &server{}
 
-func (s *server) LaunchPurge() {
-	started := make(chan struct{})
-	s.Add(1)
-	go func() {
-		defer s.Done()
-
-		tPurge := time.NewTicker(30 * time.Second)
-		close(started)
-		for {
-			select {
-			case <-tPurge.C:
-				// if err := s.TokenPurge(); err != nil {
-				// 	fmt.Printf(err)
-				// }
-			case <-s.stopper:
-				return
-			}
-		}
-	}()
-	<-started
-}
-
-//BuildRoutes will create all the routes and their functions to execute when received
-func (s *server) BuildRoutes() []rest.HandleFuncConfig {
-	//TODO: replace nil with actual logger
-	return []rest.HandleFuncConfig{
-		//admin
-		//timer
-		{Route: RouteTimerCreate, Method: POST, HandleFx: ServerTimerCreate(s, nil)},
-		{Route: RouteTimerRead, Method: POST, HandleFx: ServerTimerRead(s, nil)},
-		{Route: RouteTimerUpdate, Method: POST, HandleFx: ServerTimerUpdate(s, nil)},
-		{Route: RouteTimerDelete, Method: POST, HandleFx: ServerTimerDelete(s, nil)},
-		{Route: RouteTimerStart, Method: POST, HandleFx: ServerTimerStart(s, nil)},
-		{Route: RouteTimerPause, Method: POST, HandleFx: ServerTimerPause(s, nil)},
-		{Route: RouteTimerSubmit, Method: POST, HandleFx: ServerTimerSubmit(s, nil)},
-		//time slice
-		{Route: RouteTimeSliceRead, Method: POST, HandleFx: ServerTimeSliceRead(s, nil)},
-	}
-}
-
 func (s *server) CommandHandler(command bludgeon.CommandServer, dataIn interface{}, token bludgeon.Token) (dataOut interface{}, err error) {
 	switch command {
 	case bludgeon.CommandServerTimerCreate:
 		dataOut, err = s.TimerCreate()
 	case bludgeon.CommandServerTimerRead:
-		if d, ok := dataIn.(CommandData); !ok {
+		if d, ok := dataIn.(common.CommandData); !ok {
 			err = errors.New("Unable to cast into command data")
 		} else {
 			dataOut, err = s.TimerRead(d.ID)
@@ -214,31 +222,31 @@ func (s *server) CommandHandler(command bludgeon.CommandServer, dataIn interface
 			dataOut, err = s.TimerUpdate(timer)
 		}
 	case bludgeon.CommandServerTimerDelete:
-		if d, ok := dataIn.(CommandData); !ok {
+		if d, ok := dataIn.(common.CommandData); !ok {
 			err = errors.New("Unable to cast into command data")
 		} else {
 			err = s.TimerDelete(d.ID)
 		}
 	case bludgeon.CommandServerTimerStart:
-		if d, ok := dataIn.(CommandData); !ok {
+		if d, ok := dataIn.(common.CommandData); !ok {
 			err = errors.New("Unable to cast into command data")
 		} else {
 			dataOut, err = s.TimerStart(d.ID, d.StartTime)
 		}
 	case bludgeon.CommandServerTimerPause:
-		if d, ok := dataIn.(CommandData); !ok {
+		if d, ok := dataIn.(common.CommandData); !ok {
 			err = errors.New("Unable to cast into command data")
 		} else {
 			dataOut, err = s.TimerPause(d.ID, d.PauseTime)
 		}
 	case bludgeon.CommandServerTimerSubmit:
-		if d, ok := dataIn.(CommandData); !ok {
+		if d, ok := dataIn.(common.CommandData); !ok {
 			err = errors.New("Unable to cast into command data")
 		} else {
 			dataOut, err = s.TimerSubmit(d.ID, d.FinishTime)
 		}
 	case bludgeon.CommandServerTimeSliceRead:
-		if d, ok := dataIn.(CommandData); !ok {
+		if d, ok := dataIn.(common.CommandData); !ok {
 			err = errors.New("Unable to cast into command data")
 		} else {
 			dataOut, err = s.TimeSliceRead(d.ID)

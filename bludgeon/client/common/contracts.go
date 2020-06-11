@@ -1,4 +1,4 @@
-package bludgeonserver
+package bludgeonclient
 
 import (
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
@@ -7,9 +7,9 @@ import (
 //route constants
 const (
 	//
-	RouteServer      = "/api/server"
-	RouteServerStop  = RouteServer + "/stop"
-	RouteServerStart = RouteServer + "/start"
+	RouteClient      = "/api/client"
+	RouteClientStop  = RouteClient + "/stop"
+	RouteClientStart = RouteClient + "/start"
 	//
 	RouteAdmin       = "/api/admin"
 	RouteAdminConfig = RouteAdmin + "/config"
@@ -24,9 +24,6 @@ const (
 	RouteTimerStart  = RouteTimer + "/start"
 	RouteTimerPause  = RouteTimer + "/pause"
 	RouteTimerSubmit = RouteTimer + "/submit"
-	//
-	RouteTimeSlice     = "/api/timeslice"
-	RouteTimeSliceRead = RouteTimeSlice + "/read"
 	// //
 	// RouteTaskCreate = "/api/task/create"
 	// RouteTaskRead   = "/api/task/read"
@@ -65,7 +62,7 @@ const (
 	// RouteSyncTasksEmployee  = "/api/sync/tasks_employee"
 )
 
-type ContractServerIn struct {
+type ContractClientIn struct {
 	ID         string             `json:"ID,omit_empty"`
 	StartTime  int64              `json:"StartTime,omit_empty"`
 	PauseTime  int64              `json:"PauseTime,omit_empty"`

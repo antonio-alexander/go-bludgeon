@@ -26,9 +26,3 @@ const (
 var (
 	ConfigTimeout = DefaultTimeout
 )
-
-type Configuration struct {
-	Address string
-	Port    string
-	Timeout time.Duration
-}

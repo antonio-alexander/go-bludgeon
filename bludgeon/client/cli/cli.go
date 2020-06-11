@@ -1,4 +1,4 @@
-package bludgeonclient
+package bludgeonclientcli
 
 import (
 	"flag"

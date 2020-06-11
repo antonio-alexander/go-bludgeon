@@ -23,7 +23,7 @@ func main() {
 	signal.Notify(chSignalInt, os.Interrupt)
 	//execute the client main for cli
 	if err := server.MainRest(pwd, args, envs, chSignalInt); err != nil {
-		os.Stderr.WriteString(err.Error())
+		os.Stderr.WriteString(err.Error() + "\n")
 		os.Exit(1)
 	}
 	//close signal

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	common "github.com/antonio-alexander/go-bludgeon/bludgeon/server/common"
+	server "github.com/antonio-alexander/go-bludgeon/bludgeon/server"
 )
 
 func TimerCreate(address, port string) (timer bludgeon.Timer, err error) {
@@ -16,7 +16,7 @@ func TimerCreate(address, port string) (timer bludgeon.Timer, err error) {
 	var bytes []byte
 
 	//create uri
-	uri := fmt.Sprintf(URIf, address, port, common.RouteTimerCreate)
+	uri := fmt.Sprintf(URIf, address, port, server.RouteTimerCreate)
 	//execute request and get response
 	if response, err = doRequest(uri, POST, nil); err != nil {
 		return
@@ -37,7 +37,7 @@ func TimerCreate(address, port string) (timer bludgeon.Timer, err error) {
 func TimerRead(address, port, id string) (timer bludgeon.Timer, err error) {
 	var response *http.Response
 	var bytes []byte
-	var contract common.ContractServerIn
+	var contract server.ContractServerIn
 
 	//store id in contract
 	contract.ID = id
@@ -46,7 +46,7 @@ func TimerRead(address, port, id string) (timer bludgeon.Timer, err error) {
 		return
 	}
 	//create uri
-	uri := fmt.Sprintf(URIf, address, port, common.RouteTimerRead)
+	uri := fmt.Sprintf(URIf, address, port, server.RouteTimerRead)
 	//execute request and get response
 	if response, err = doRequest(uri, POST, bytes); err != nil {
 		return
@@ -66,7 +66,7 @@ func TimerRead(address, port, id string) (timer bludgeon.Timer, err error) {
 //
 func TimerUpdate(address, port string, t bludgeon.Timer) (timer bludgeon.Timer, err error) {
 	var bytes []byte
-	var contract common.ContractServerIn
+	var contract server.ContractServerIn
 	var response *http.Response
 
 	//store id in contract
@@ -76,7 +76,7 @@ func TimerUpdate(address, port string, t bludgeon.Timer) (timer bludgeon.Timer, 
 		return
 	}
 	//create uri
-	uri := fmt.Sprintf(URIf, address, port, common.RouteTimerUpdate)
+	uri := fmt.Sprintf(URIf, address, port, server.RouteTimerUpdate)
 	//execute request and get response
 	if response, err = doRequest(uri, POST, bytes); err != nil {
 		return
@@ -96,7 +96,7 @@ func TimerUpdate(address, port string, t bludgeon.Timer) (timer bludgeon.Timer, 
 //
 func TimerDelete(address, port, id string) (err error) {
 	var bytes []byte
-	var contract common.ContractServerIn
+	var contract server.ContractServerIn
 
 	//store id in contract
 	contract.ID = id
@@ -105,7 +105,7 @@ func TimerDelete(address, port, id string) (err error) {
 		return
 	}
 	//create uri
-	uri := fmt.Sprintf(URIf, address, port, common.RouteTimerDelete)
+	uri := fmt.Sprintf(URIf, address, port, server.RouteTimerDelete)
 	//execute request and get response
 	_, err = doRequest(uri, POST, bytes)
 
@@ -114,7 +114,7 @@ func TimerDelete(address, port, id string) (err error) {
 
 //
 func TimerStart(address, port string, timerID string, startTime time.Time) (timer bludgeon.Timer, err error) {
-	var contract common.ContractServerIn
+	var contract server.ContractServerIn
 	var response *http.Response
 	var bytes []byte
 
@@ -130,7 +130,7 @@ func TimerStart(address, port string, timerID string, startTime time.Time) (time
 		return
 	}
 	//create uri
-	uri := fmt.Sprintf(URIf, address, port, common.RouteTimerStart)
+	uri := fmt.Sprintf(URIf, address, port, server.RouteTimerStart)
 	//execute request and get response
 	if response, err = doRequest(uri, POST, bytes); err != nil {
 		return
@@ -149,7 +149,7 @@ func TimerStart(address, port string, timerID string, startTime time.Time) (time
 
 //
 func TimerPause(address, port, timerID string, pauseTime time.Time) (timer bludgeon.Timer, err error) {
-	var contract common.ContractServerIn
+	var contract server.ContractServerIn
 	var response *http.Response
 	var bytes []byte
 
@@ -161,7 +161,7 @@ func TimerPause(address, port, timerID string, pauseTime time.Time) (timer bludg
 		return
 	}
 	//create uri
-	uri := fmt.Sprintf(URIf, address, port, common.RouteTimerPause)
+	uri := fmt.Sprintf(URIf, address, port, server.RouteTimerPause)
 	//execute request and get response
 	if response, err = doRequest(uri, POST, bytes); err != nil {
 		return
@@ -180,7 +180,7 @@ func TimerPause(address, port, timerID string, pauseTime time.Time) (timer bludg
 
 //
 func TimerSubmit(address, port, timerID string, finishTime time.Time) (timer bludgeon.Timer, err error) {
-	var contract common.ContractServerIn
+	var contract server.ContractServerIn
 	var response *http.Response
 	var bytes []byte
 
@@ -196,7 +196,7 @@ func TimerSubmit(address, port, timerID string, finishTime time.Time) (timer blu
 		return
 	}
 	//create uri
-	uri := fmt.Sprintf(URIf, address, port, common.RouteTimerSubmit)
+	uri := fmt.Sprintf(URIf, address, port, server.RouteTimerSubmit)
 	//execute request and get response
 	if response, err = doRequest(uri, POST, bytes); err != nil {
 		return
@@ -216,7 +216,7 @@ func TimerSubmit(address, port, timerID string, finishTime time.Time) (timer blu
 func TimeSliceRead(address, port, id string) (timeSlice bludgeon.TimeSlice, err error) {
 	var response *http.Response
 	var bytes []byte
-	var contract common.ContractServerIn
+	var contract server.ContractServerIn
 
 	//set timeslice id
 	contract.ID = id
@@ -225,7 +225,7 @@ func TimeSliceRead(address, port, id string) (timeSlice bludgeon.TimeSlice, err 
 		return
 	}
 	//create uri
-	uri := fmt.Sprintf(URIf, address, port, common.RouteTimeSliceRead)
+	uri := fmt.Sprintf(URIf, address, port, server.RouteTimeSliceRead)
 	//execute request and get response
 	if response, err = doRequest(uri, POST, bytes); err != nil {
 		return

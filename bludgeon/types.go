@@ -93,6 +93,7 @@ type CommandClient uint8
 //command constants
 const (
 	CommandClientNull        CommandClient = iota
+	CommandClientShutdown    CommandClient = iota
 	CommandClientTimerCreate CommandClient = iota
 	CommandClientTimerRead   CommandClient = iota
 	CommandClientTimerDelete CommandClient = iota
@@ -288,13 +289,12 @@ type CacheData struct {
 	//interface
 }
 
-//Remote
-type Remote interface {
-	//RemoteTimer
-	RemoteTimer
+type RemoteOwner interface {
+	//Initialize
+	Initialize(config interface{}) (err error)
 
-	//RemoteTimeSlice
-	RemoteTimeSlice
+	//Shutdown
+	Shutdown() (err error)
 }
 
 //RemoteTimer
@@ -327,17 +327,37 @@ type RemoteTimeSlice interface {
 	TimeSliceRead(id string) (timeSlice TimeSlice, err error)
 }
 
-type Meta interface {
-	MetaTimer
-	MetaTimeSlice
+type Logger interface {
+	//Println
+	Println(v ...interface{})
+
+	//Printf
+	Printf(format string, v ...interface{})
+
+	//Print
+	Print(v ...interface{})
+
+	//Error
+	Error(err error)
+
+	//Errorf
+	Errorf(format string, v ...interface{})
+}
+
+type MetaOwner interface {
+	//
+	Initialize(config interface{}) (err error)
+
+	//
+	Shutdown() (err error)
 }
 
 type MetaSerialize interface {
 	//Serialize will attempt to commit current data
-	Serialize() (err error)
+	MetaSerialize() (err error)
 
 	//Deserialize will attempt to read current data in-memory
-	DeSerialize() (err error)
+	MetaDeSerialize() (err error)
 }
 
 //MetaTimer
@@ -352,7 +372,7 @@ type MetaTimer interface {
 	MetaTimerRead(timerID string) (timer Timer, err error)
 }
 
-//MetaTimer
+//MetaTimeSlice
 type MetaTimeSlice interface {
 	//MetaTimerWrite
 	MetaTimeSliceWrite(timeSliceID string, timeSlice TimeSlice) (err error)
@@ -361,5 +381,5 @@ type MetaTimeSlice interface {
 	MetaTimeSliceDelete(timeSliceID string) (err error)
 
 	//MetaTimerRead
-	MetaTimeSliceRead(timeSliceID string) (timer TimeSlice, err error)
+	MetaTimeSliceRead(timeSliceID string) (timeSlice TimeSlice, err error)
 }

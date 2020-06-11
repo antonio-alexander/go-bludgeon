@@ -2,6 +2,7 @@ package bludgeonrestserver
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -73,7 +74,7 @@ func (r *restServer) Start(address, port string) (err error) {
 	// r.buildRoutes()
 	//create server pointer for REST
 	r.server = &http.Server{
-		Addr:    address + ":" + port,
+		Addr:    fmt.Sprintf("%s:%s", address, port),
 		Handler: r.router,
 	}
 	//start the goRoutine to run the server (listen and serve blocks)

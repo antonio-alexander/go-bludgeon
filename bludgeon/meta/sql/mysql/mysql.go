@@ -8,13 +8,11 @@ import (
 	"sync"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-
 	//shadow import for mysql driver support
 	_ "github.com/go-sql-driver/mysql"
-	// _ "github.com/mattn/go-sqlite3"
 )
 
-type metaMySQL struct {
+type mysql struct {
 	sync.RWMutex                   //mutex for threadsafe functionality
 	sync.WaitGroup                 //waitgroup to manage goroutines
 	started        bool            //whether or not started
@@ -26,19 +24,54 @@ type metaMySQL struct {
 }
 
 func NewMetaMySQL() interface {
-	Owner
-	// Manage
+	bludgeon.MetaOwner
 	bludgeon.MetaTimer
 	bludgeon.MetaTimeSlice
 } {
 	//create internal pointers
-	//create metaMySQL pointer
-	return &metaMySQL{
+	//create mysql pointer
+	return &mysql{
 		chDisconnect: make(chan struct{}),
 	}
 }
 
-func (m *metaMySQL) createTables() (err error) {
+//Connect will attempt to connect to the databse with the given driver and dataSourceName. If the
+// connection is successful, it will attempt to ping the server
+func (m *mysql) connect(config Configuration) (err error) {
+
+	//
+	if m.config, err = validateConfiguration(config); err != nil {
+		return
+	}
+	if m.config.Driver, m.config.DataSource, err = convertConfiguration(m.config); err != nil {
+		return
+	}
+	//create a connection to the database
+	if m.db, err = sql.Open(m.config.Driver, m.config.DataSource); err != nil {
+		return
+	}
+	//attempt to ping the database to verify valid connectivity
+	if err = m.db.Ping(); err != nil {
+		return
+	}
+	//create the tables
+	err = m.createTables()
+
+	return
+}
+
+//Disconnect will close the connection to the database
+func (m *mysql) disconnect() (err error) {
+	//only close if it's nil
+	if m.db != nil {
+		//cancel the context??
+		err = m.db.Close()
+	}
+
+	return
+}
+
+func (m *mysql) createTables() (err error) {
 	// CreateTableTimer will create a table using a query for the configured driver
 
 	//create timer table
@@ -57,7 +90,7 @@ func (m *metaMySQL) createTables() (err error) {
 // it's used in the API to allow "how" queries are run be located in one place and if
 // necessary, this code can use a switch case to run differently depending on the type of
 // database configured, this will not return a result
-func (m *metaMySQL) queryNoResult(query string, v ...interface{}) (err error) {
+func (m *mysql) queryNoResult(query string, v ...interface{}) (err error) {
 	//check to see if the pointer is nil, if so, exit immediately
 	if m.db == nil {
 		err = errors.New(ErrDatabaseNil)
@@ -95,7 +128,7 @@ func (m *metaMySQL) queryNoResult(query string, v ...interface{}) (err error) {
 // it's used in the API to allow "how" queries are run be located in one place and if
 // necessary, this code can use a switch case to run differently depending on the type of
 // database configured, this will return a result
-func (m *metaMySQL) queryResult(query string, v ...interface{}) (result sql.Result, err error) {
+func (m *mysql) queryResult(query string, v ...interface{}) (result sql.Result, err error) {
 	//check to see if the pointer is nil, if so, exit immediately
 	if m.db == nil {
 		err = errors.New(ErrDatabaseNil)
@@ -133,26 +166,35 @@ func (m *metaMySQL) queryResult(query string, v ...interface{}) (result sql.Resu
 	return
 }
 
-//Owner
-type Owner interface {
-	//Close
-	Close()
+//ensure that mysql implements Owner
+var _ bludgeon.MetaOwner = &mysql{}
 
-	//
-	Connect(config Configuration) (err error)
-
-	//
-	Disconnect() (err error)
-}
-
-//ensure that metaMySQL implements Owner
-var _ Owner = &metaMySQL{}
-
-//Close
-func (m *metaMySQL) Close() {
+func (m *mysql) Initialize(element interface{}) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
+	var ok bool
+	var config Configuration
+
+	//cast configuration
+	if config, ok = element.(Configuration); !ok {
+		err = errors.New("Unable to cast into configuration")
+
+		return
+	}
+	//connect
+	err = m.connect(config)
+
+	return
+}
+
+//Close
+func (m *mysql) Shutdown() (err error) {
+	m.Lock()
+	defer m.Unlock()
+
+	//attempt to disconnect
+	err = m.disconnect()
 	//only close if it's nil
 	if m.db != nil {
 		m.db.Close()
@@ -166,44 +208,6 @@ func (m *metaMySQL) Close() {
 	return
 }
 
-//Connect will attempt to connect to the databse with the given driver and dataSourceName. If the
-// connection is successful, it will attempt to ping the server
-func (m *metaMySQL) Connect(config Configuration) (err error) {
-	m.Lock()
-	defer m.Unlock()
-
-	//
-	if m.config, err = validateConfiguration(config); err != nil {
-		return
-	}
-	if m.config.Driver, m.config.DataSource, err = convertConfiguration(m.config); err != nil {
-		return
-	}
-	//create a connection to the database
-	if m.db, err = sql.Open(m.config.Driver, m.config.DataSource); err != nil {
-		return
-	}
-	//attempt to ping the database to verify valid connectivity
-	if err = m.db.Ping(); err != nil {
-		return
-	}
-	//create the tables
-	err = m.createTables()
-
-	return
-}
-
-//Disconnect will close the connection to the database
-func (m *metaMySQL) Disconnect() (err error) {
-	//only close if it's nil
-	if m.db != nil {
-		//cancel the context??
-		err = m.db.Close()
-	}
-
-	return
-}
-
 // type Manage interface {
 // 	//
 // 	Start(config Configuration) (err error)
@@ -212,7 +216,7 @@ func (m *metaMySQL) Disconnect() (err error) {
 // 	Stop() (err error)
 // }
 
-// func (m *metaMySQL) Start(config Configuration) (err error) {
+// func (m *mysql) Start(config Configuration) (err error) {
 // 	m.Lock()
 // 	defer m.Unlock()
 
@@ -232,7 +236,7 @@ func (m *metaMySQL) Disconnect() (err error) {
 // 	return
 // }
 
-// func (m *metaMySQL) Stop() (err error) {
+// func (m *mysql) Stop() (err error) {
 // 	m.Lock()
 // 	defer m.Unlock()
 
@@ -253,22 +257,22 @@ func (m *metaMySQL) Disconnect() (err error) {
 
 // }
 
-// //ensure that metaMySQL implements meta.Functional
-// var _ meta.Functional = &metaMySQL{}
+// //ensure that mysql implements meta.Functional
+// var _ meta.Functional = &mysql{}
 
 // type Functional interface {
 // 	//LaunchManage
 // 	LaunchManage()
 // }
 
-// func (m *metaMySQL) LaunchManage() {
+// func (m *mysql) LaunchManage() {
 // 	started := make(chan struct{})
 // 	m.Add(1)
 // 	go m.goManage(started)
 // 	<-started
 // }
 
-// func (m *metaMySQL) goManage(started chan<- struct{}) {
+// func (m *mysql) goManage(started chan<- struct{}) {
 // 	defer m.Done()
 
 // 	var connected, tablesCreated bool
@@ -292,7 +296,7 @@ func (m *metaMySQL) Disconnect() (err error) {
 // 	}
 // }
 
-// func (m *metaMySQL) manageLogic(connectedIn, tablesCreatedIn, firstCall bool) (connectedOut, tablesCreatedOut bool) {
+// func (m *mysql) manageLogic(connectedIn, tablesCreatedIn, firstCall bool) (connectedOut, tablesCreatedOut bool) {
 // 	m.Lock()
 // 	defer m.Unlock()
 
@@ -322,11 +326,11 @@ func (m *metaMySQL) Disconnect() (err error) {
 // 	return
 // }
 
-//ensure that metaMySQL implements meta.MetaTimer
-var _ bludgeon.MetaTimer = &metaMySQL{}
+//ensure that mysql implements meta.MetaTimer
+var _ bludgeon.MetaTimer = &mysql{}
 
 //MetaTimerRead
-func (m *metaMySQL) MetaTimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
+func (m *mysql) MetaTimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -367,7 +371,7 @@ func (m *metaMySQL) MetaTimerRead(timerUUID string) (timer bludgeon.Timer, err e
 }
 
 //MetaTimerWrite
-func (m *metaMySQL) MetaTimerWrite(timerID string, timer bludgeon.Timer) (err error) {
+func (m *mysql) MetaTimerWrite(timerID string, timer bludgeon.Timer) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -384,7 +388,7 @@ func (m *metaMySQL) MetaTimerWrite(timerID string, timer bludgeon.Timer) (err er
 }
 
 //MetaTimerDelete
-func (m *metaMySQL) MetaTimerDelete(timerUUID string) (err error) {
+func (m *mysql) MetaTimerDelete(timerUUID string) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -400,11 +404,11 @@ func (m *metaMySQL) MetaTimerDelete(timerUUID string) (err error) {
 	return
 }
 
-//ensure that metaMySQL implements meta.MetaTimer
-var _ bludgeon.MetaTimeSlice = &metaMySQL{}
+//ensure that mysql implements meta.MetaTimer
+var _ bludgeon.MetaTimeSlice = &mysql{}
 
 //MetaTimeSliceRead
-func (m *metaMySQL) MetaTimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice, err error) {
+func (m *mysql) MetaTimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice, err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -444,7 +448,7 @@ func (m *metaMySQL) MetaTimeSliceRead(timeSliceID string) (timeSlice bludgeon.Ti
 }
 
 //MetaTimeSliceWrite
-func (m *metaMySQL) MetaTimeSliceWrite(timeSliceID string, timeSlice bludgeon.TimeSlice) (err error) {
+func (m *mysql) MetaTimeSliceWrite(timeSliceID string, timeSlice bludgeon.TimeSlice) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -461,7 +465,7 @@ func (m *metaMySQL) MetaTimeSliceWrite(timeSliceID string, timeSlice bludgeon.Ti
 }
 
 //MetaTimeSliceDelete
-func (m *metaMySQL) MetaTimeSliceDelete(timeSliceID string) (err error) {
+func (m *mysql) MetaTimeSliceDelete(timeSliceID string) (err error) {
 	m.Lock()
 	defer m.Unlock()
 

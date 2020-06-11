@@ -5,6 +5,10 @@ import (
 	"io/ioutil"
 	"os"
 	"time"
+
+	mjson "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/json"
+	mysql "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/sql/mysql"
+	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/server/api"
 )
 
 func ConfigRead(file string) (config Configuration, err error) {
@@ -42,25 +46,31 @@ func ConfigWrite(file string, config Configuration) (err error) {
 func ConfigDefault() (c Configuration) {
 	//meta
 	c.Meta.Type = "json"
-	// json
-	c.Meta.JSON.File = "./data/bludgeon.json"
-	// mysql
-	c.Meta.MySQL.Driver = "mysql"
-	// c.Meta.MySQL.DataSource = ""
-	// c.Meta.MySQL.FilePath = ""
-	c.Meta.MySQL.Hostname = "127.0.0.1"
-	c.Meta.MySQL.Port = "3306"
-	c.Meta.MySQL.Username = "bludgeon"
-	c.Meta.MySQL.Password = "bludgeon"
-	c.Meta.MySQL.Database = "bludgeon"
-	c.Meta.MySQL.ParseTime = false
-	c.Meta.MySQL.UseTransactions = true
-	c.Meta.MySQL.Timeout = 10 * time.Second
-	// remote
+	c.Meta.Config = map[string]interface{}{
+		"json": mjson.Configuration{
+			File: "./data/bludgeon.json",
+		},
+		"mysql": mysql.Configuration{
+			Hostname:        "127.0.0.1",
+			Port:            "3306",
+			Username:        "bludgeon",
+			Password:        "bludgeon",
+			Database:        "bludgeon",
+			ParseTime:       false,
+			UseTransactions: true,
+			Timeout:         10 * time.Second,
+			DataSource:      "",
+			FilePath:        "",
+		},
+	}
 	c.Remote.Type = "rest"
-	c.Remote.RestClient.Address = "127.0.0.1"
-	c.Remote.RestClient.Port = "8080"
-	c.Remote.RestClient.Timeout = 10 * time.Second
+	c.Remote.Config = map[string]interface{}{
+		"rest": rest.Configuration{
+			Address: "127.0.0.1",
+			Port:    "8080",
+			Timeout: 10 * time.Second,
+		},
+	}
 
 	return
 }

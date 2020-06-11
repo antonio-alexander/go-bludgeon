@@ -1,36 +1,43 @@
-package bludgeonclient
+package bludgeonclientfunctional
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
+	common "github.com/antonio-alexander/go-bludgeon/bludgeon/client/common"
 )
 
 type client struct {
-	sync.RWMutex                 //mutex for threadsafe operations
-	sync.WaitGroup               //waitgroup to track go routines
-	started        bool          //whether or not the business logic has starting
-	config         Configuration //configuration
-	meta           interface {   //storage interface
+	sync.RWMutex                           //mutex for threadsafe operations
+	sync.WaitGroup                         //waitgroup to track go routines
+	started        bool                    //whether or not the business logic has starting
+	config         common.Configuration    //configuration
+	stopper        chan struct{}           //stopper to stop goRoutines
+	chExternal     chan struct{}           //channel for owners to block on
+	chCache        chan bludgeon.CacheData //channel for cache data
+	log            *log.Logger             //logger for non error messages
+	logError       *log.Logger             //logger for errors
+	meta           interface {             //storage interface
 		bludgeon.MetaTimer
 		bludgeon.MetaTimeSlice
 	}
 	remote interface { //remote interface
-		bludgeon.Remote
+		bludgeon.RemoteTimer
+		bludgeon.RemoteTimeSlice
 	}
-	stopper chan struct{} //stopper to stop goRoutines
-	chCache chan bludgeon.CacheData
 }
 
-func NewClient(meta interface {
+func NewClient(log, logError *log.Logger, meta interface {
 	bludgeon.MetaTimer
 	bludgeon.MetaTimeSlice
 }, remote interface {
-	bludgeon.Remote
+	bludgeon.RemoteTimer
+	bludgeon.RemoteTimeSlice
 }) interface {
 	Owner
 	Manage
@@ -42,8 +49,40 @@ func NewClient(meta interface {
 	}
 	//populate client pointer
 	return &client{
-		meta:   meta,
-		remote: remote,
+		meta:     meta,
+		remote:   remote,
+		log:      log,
+		logError: logError,
+	}
+}
+
+func (c *client) Println(v ...interface{}) {
+	if c.log != nil {
+		c.log.Println(v...)
+	}
+}
+
+func (c *client) Printf(format string, v ...interface{}) {
+	if c.log != nil {
+		c.log.Printf(format, v...)
+	}
+}
+
+func (c *client) Print(v ...interface{}) {
+	if c.log != nil {
+		c.log.Print(v...)
+	}
+}
+
+func (c *client) Error(err error) {
+	if c.logError != nil {
+		c.logError.Println(err)
+	}
+}
+
+func (c *client) Errorf(format string, v ...interface{}) {
+	if c.logError != nil {
+		c.logError.Printf(format, v...)
 	}
 }
 
@@ -67,7 +106,7 @@ func (c *client) Close() {
 	// attempt to serialize what's remaining
 
 	//set internal configuration to default
-	c.config = Configuration{}
+	c.config = common.Configuration{}
 	//set internal pointers to nil
 	c.meta, c.remote = nil, nil
 
@@ -111,13 +150,13 @@ func (c *client) Deserialize(bytes []byte) (err error) {
 
 type Manage interface {
 	//
-	Start(config Configuration) (err error)
+	Start(config common.Configuration) (chExternal <-chan struct{}, err error)
 
 	//
 	Stop() (err error)
 }
 
-func (c *client) Start(config Configuration) (err error) {
+func (c *client) Start(config common.Configuration) (chExternal <-chan struct{}, err error) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -131,6 +170,9 @@ func (c *client) Start(config Configuration) (err error) {
 	c.config = config
 	//create stopper
 	c.stopper = make(chan struct{})
+	//create channel external
+	c.chExternal = make(chan struct{})
+	chExternal = chExternal
 	//launch cache goRoutine
 	bludgeon.LaunchCache(c.stopper, c, c.chCache)
 	//set started to true
@@ -152,6 +194,7 @@ func (c *client) Stop() (err error) {
 	//close the stopper
 	close(c.stopper)
 	c.Wait()
+	close(c.chExternal)
 	//set started flag to false
 	c.started = false
 
@@ -169,6 +212,12 @@ var _ Functional = &client{}
 func (c *client) CommandHandler(command bludgeon.CommandClient, dataIn interface{}) (dataOut interface{}, err error) {
 	//execute the command
 	switch command {
+	case bludgeon.CommandClientShutdown:
+		go func() {
+			if err := c.Stop(); err != nil {
+				c.Errorf("Error occured while attempting to stop: %s", err)
+			}
+		}()
 	case bludgeon.CommandClientTimerCreate:
 		dataOut, err = c.TimerCreate()
 	case bludgeon.CommandClientTimerStart:

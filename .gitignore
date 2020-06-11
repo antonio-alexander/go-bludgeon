@@ -21,3 +21,7 @@ cmd/server_rest/server_rest
 #configuration
 cmd/**/data/*
 cmd/**/config/*
+
+#vs_code stuff
+__debug_bin
+.vscode/*

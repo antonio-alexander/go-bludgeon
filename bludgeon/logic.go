@@ -17,9 +17,22 @@ import (
 // than remotely, if we cache right after the failure, we'd need to ensure its guid matched what
 // was present locally
 
+type lazyMeta interface {
+	MetaTimer
+	MetaTimeSlice
+}
+
+type lazyRemote interface {
+	//RemoteTimer
+	RemoteTimer
+
+	//RemoteTimeSlice
+	RemoteTimeSlice
+}
+
 //sortMetaRemote the goal of this function is to sort varadics and output
 // meta and remote (to simplify the api)
-func sortMetaRemote(i []interface{}) (meta Meta, remote Remote, err error) {
+func sortMetaRemote(i []interface{}) (meta lazyMeta, remote lazyRemote, err error) {
 	//check if an appropriate number of varadics
 	if len(i) <= 0 || len(i) > 2 {
 		err = errors.New("Too few or too many varadics")
@@ -31,9 +44,9 @@ func sortMetaRemote(i []interface{}) (meta Meta, remote Remote, err error) {
 		if i != nil {
 			//switch on the interface type
 			switch v := i.(type) {
-			case Remote:
+			case lazyRemote:
 				remote = v
-			case Meta:
+			case lazyMeta:
 				meta = v
 			default:
 				err = fmt.Errorf("unsupported varatic: %t", v)
@@ -48,7 +61,7 @@ func sortMetaRemote(i []interface{}) (meta Meta, remote Remote, err error) {
 
 //timerRead will use meta and remote to read a single timer from remote/meta while
 // prioritizing meta and falling back to remote if meta fails or in addition to
-func timerRead(timerID string, meta Meta, remote Remote) (timer Timer, err error) {
+func timerRead(timerID string, meta lazyMeta, remote lazyRemote) (timer Timer, err error) {
 	//check if remote is nil
 	if remote != nil {
 		//attempt to use the api to get the provided timer
@@ -116,7 +129,7 @@ func LaunchCache(stopper <-chan struct{}, wg interface {
 
 //TimeSliceCreate
 func timeSliceCreate(timerUUID string, i ...interface{}) (timeSlice TimeSlice, err error) {
-	var meta Meta
+	var meta lazyMeta
 
 	//sort the varadics into meta/remote
 	if meta, _, err = sortMetaRemote(i); err != nil {
@@ -142,7 +155,7 @@ func timeSliceCreate(timerUUID string, i ...interface{}) (timeSlice TimeSlice, e
 
 //timeSliceUpdate
 func timeSliceUpdate(timeSlice TimeSlice, i ...interface{}) (err error) {
-	var meta Meta
+	var meta lazyMeta
 
 	//sort the varadics into meta/remote
 	if meta, _, err = sortMetaRemote(i); err != nil {
@@ -161,7 +174,7 @@ func timeSliceUpdate(timeSlice TimeSlice, i ...interface{}) (err error) {
 
 //TimeSliceDelete
 func timeSliceDelete(timeSliceID string, i ...interface{}) (err error) {
-	var meta Meta
+	var meta lazyMeta
 
 	//sort the varadics into meta/remote
 	if meta, _, err = sortMetaRemote(i); err != nil {
@@ -177,8 +190,8 @@ func timeSliceDelete(timeSliceID string, i ...interface{}) (err error) {
 
 //TimeSliceRead
 func TimeSliceRead(timeSliceID string, i ...interface{}) (timeSlice TimeSlice, err error) {
-	var meta Meta
-	var remote Remote
+	var meta lazyMeta
+	var remote lazyRemote
 
 	//sort the varadics into meta/remote
 	if meta, remote, err = sortMetaRemote(i); err != nil {
@@ -215,8 +228,8 @@ func TimeSliceRead(timeSliceID string, i ...interface{}) (timeSlice TimeSlice, e
 
 //TimerCreate
 func TimerCreate(i ...interface{}) (timer Timer, err error) {
-	var remote Remote
-	var meta Meta
+	var remote lazyRemote
+	var meta lazyMeta
 
 	//sort the varadics into meta/remote
 	if meta, remote, err = sortMetaRemote(i); err != nil {
@@ -257,8 +270,8 @@ func TimerCreate(i ...interface{}) (timer Timer, err error) {
 
 //get a timer
 func TimerRead(id string, i ...interface{}) (timer Timer, err error) {
-	var remote Remote
-	var meta Meta
+	var remote lazyRemote
+	var meta lazyMeta
 	var timeSlice TimeSlice
 
 	//sort the varadics into meta/remote
@@ -284,8 +297,8 @@ func TimerRead(id string, i ...interface{}) (timer Timer, err error) {
 
 //TimerUpdate
 func TimerUpdate(t Timer, i ...interface{}) (timer Timer, err error) {
-	var remote Remote
-	var meta Meta
+	var remote lazyRemote
+	var meta lazyMeta
 
 	//sort the varadics into meta/remote
 	if meta, remote, err = sortMetaRemote(i); err != nil {
@@ -327,8 +340,8 @@ func TimerUpdate(t Timer, i ...interface{}) (timer Timer, err error) {
 
 //delete a timer
 func TimerDelete(timerID string, i ...interface{}) (err error) {
-	var remote Remote
-	var meta Meta
+	var remote lazyRemote
+	var meta lazyMeta
 
 	//sort the varadics into meta/remote
 	if meta, remote, err = sortMetaRemote(i); err != nil {
@@ -354,8 +367,8 @@ func TimerDelete(timerID string, i ...interface{}) (err error) {
 
 //TimerStart will
 func TimerStart(id string, startTime time.Time, i ...interface{}) (timer Timer, err error) {
-	var remote Remote
-	var meta Meta
+	var remote lazyRemote
+	var meta lazyMeta
 
 	//sort the varadics into meta/remote
 	if meta, remote, err = sortMetaRemote(i); err != nil {
@@ -433,8 +446,8 @@ func TimerStart(id string, startTime time.Time, i ...interface{}) (timer Timer, 
 
 //pause a timer
 func TimerPause(timerID string, pauseTime time.Time, i ...interface{}) (timer Timer, err error) {
-	var remote Remote
-	var meta Meta
+	var remote lazyRemote
+	var meta lazyMeta
 
 	//if the given timer exists, when we pause the timer, we will
 	// grab the active time slice, set the finish time to now
@@ -511,8 +524,8 @@ func TimerPause(timerID string, pauseTime time.Time, i ...interface{}) (timer Ti
 
 //submit a timer
 func TimerSubmit(timerID string, submitTime time.Time, i ...interface{}) (timer Timer, err error) {
-	var remote Remote
-	var meta Meta
+	var remote lazyRemote
+	var meta lazyMeta
 
 	//when the timer is submitted, the stop time is updated, the active
 	// time slice is completed with the current time and the timer is

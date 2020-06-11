@@ -1,64 +1,76 @@
 package bludgeonclient
 
 import (
+	"fmt"
+	"path/filepath"
+
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
+	cli "github.com/antonio-alexander/go-bludgeon/bludgeon/client/cli"
+	common "github.com/antonio-alexander/go-bludgeon/bludgeon/client/common"
+	client "github.com/antonio-alexander/go-bludgeon/bludgeon/client/functional"
 )
 
 func MainCli(pwd string, args []string, envs map[string]string) (err error) {
-	var options Options
-	var config Configuration
+	var options cli.Options
+	var config common.Configuration
 	var command bludgeon.CommandClient
 	var data interface{}
-	var meta bludgeon.Meta
-	var remote bludgeon.Remote
-	var metaFx, remoteFx, clientFx func()
-	var client Functional
-	// var cache Cache
+	var meta interface {
+		bludgeon.MetaOwner
+		bludgeon.MetaTimer
+		bludgeon.MetaTimeSlice
+	}
+	var remote interface {
+		bludgeon.RemoteOwner
+		bludgeon.RemoteTimer
+		bludgeon.RemoteTimeSlice
+	}
+	var cache common.Cache
 
 	//parse the arguments
-	if options, err = Parse(pwd, args, envs); err != nil {
+	if options, err = cli.Parse(pwd, args, envs); err != nil {
 		return
 	}
-	// //read cache
-	// if cache, err = CacheRead(filepath.Join(pwd, "data/bludgeon_cache.json")); err != nil {
-	// 	return
-	// }
-	// //if timer is empty, replace with data from cache
-	// if options.Timer.UUID == "" {
-	// 	options.Timer.UUID = cache.TimerID
-	// }
+	//read cache
+	if cache, err = common.CacheRead(filepath.Join(pwd, "data/bludgeon_cache.json")); err != nil {
+		return
+	}
+	//if timer is empty, replace with data from cache
+	if options.Timer.UUID == "" {
+		options.Timer.UUID = cache.TimerID
+	}
 	//read configuration
-	if config, err = ConfigRead(options.Configuration); err != nil {
+	if config, err = common.ConfigRead(options.Configuration); err != nil {
 		return
 	}
 	//initialize meta
-	if meta, metaFx, err = initMeta(config); err != nil {
+	if meta, err = initMeta(config.Meta.Type, nil); err != nil {
 		return
 	}
-	defer metaFx()
 	//initialize remote
-	if remote, remoteFx, err = initRemote(config); err != nil {
+	if remote, err = initRemote(config.Remote.Type, nil); err != nil {
 		return
 	}
-	defer remoteFx()
-	//initialize client
-	if client, clientFx, err = initClient(config, meta, remote); err != nil {
-		return
-	}
-	defer clientFx()
 	//convert options to command/data
-	if command, data, err = optionsToCommand(options); err != nil {
+	if command, data, err = cli.OptionsToCommand(options); err != nil {
 		return
 	}
+	c := client.NewClient(nil, nil, meta, remote)
 	//call command handler
-	if data, err = client.CommandHandler(command, data); err != nil {
-		return
+	if data, err = c.CommandHandler(command, data); err == nil {
+		//handle response
+		err = cli.HandleClientResponse(command, data)
 	}
-	//handle response
-	if err = handleClientResponse(command, data); err != nil {
-		return
+	//
+	if err := meta.Shutdown(); err != nil {
+		fmt.Println(err)
 	}
-	//TODO: update cache
+	//
+	if err := remote.Shutdown(); err != nil {
+		fmt.Println(err)
+	}
+	//close the client
+	c.Close()
 
 	return
 }

@@ -1,58 +1,58 @@
 package bludgeonserver
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest/server"
+	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest_server"
+	common "github.com/antonio-alexander/go-bludgeon/bludgeon/server/common"
+	endpoints "github.com/antonio-alexander/go-bludgeon/bludgeon/server/endpoints"
+	server "github.com/antonio-alexander/go-bludgeon/bludgeon/server/functional"
 )
 
 func MainRest(pwd string, args []string, envs map[string]string, chSignalInt chan os.Signal) (err error) {
-	var options Options
-	var config Configuration
-	var fxMetaCleanup func()
+	var config common.Configuration
 	var m interface {
 		bludgeon.MetaTimer
 		bludgeon.MetaTimeSlice
+		bludgeon.MetaOwner
 	}
-	//parse command line arguments
-	if options, err = Parse(pwd, args, envs); err != nil {
-		return
-	}
-	//configuration
-	if config, err = ConfigRead(options.Configuration); err != nil {
+	var logOut, logError = log.New(os.Stdout, "", 0), log.New(os.Stderr, "", 0)
+	var chExternal <-chan struct{}
+
+	//get config from environment
+	if config, err = common.GetConfigFromEnv(pwd, envs); err != nil {
 		return
 	}
 	//initialize meta
-	if m, fxMetaCleanup, err = initMeta(config); err != nil {
+	if m, err = initMeta(config.Meta.Type, config.Meta.Config[config.Meta.Type]); err != nil {
 		return
 	}
-	//defer meta cleanup
-	defer fxMetaCleanup()
 	//create rest server
 	r := rest.NewServer()
 	//create server
-	s := NewServer(m)
+	s := server.NewServer(logOut, logError, m)
 	//start the server
-	if err = s.Start(config); err == nil {
+	if chExternal, err = s.Start(config); err == nil {
 		//build rest routes for server
-		routes := s.BuildRoutes()
-		if err = r.BuildRoutes(routes); err == nil {
+		if err = r.BuildRoutes(endpoints.BuildRoutes(s)); err == nil {
 			//start the rest server
 			if err = r.Start(config.Server.Rest.Address, config.Server.Rest.Port); err == nil {
 				//block until the signal is killed
 				select {
 				case <-chSignalInt:
-					fmt.Println("Server stopped externally (os interrupt)")
+					logOut.Println("Server stopped externally (os interrupt)")
+					//stop server
+					if err := s.Stop(); err != nil {
+						logOut.Println(err)
+					}
+				case <-chExternal:
+					//server was stopped internally
 				}
 				//stop rest server
 				if err := r.Stop(); err != nil {
-					fmt.Println(err)
-				}
-				//stop server
-				if err := s.Stop(); err != nil {
-					fmt.Println(err)
+					logOut.Println(err)
 				}
 			}
 		}

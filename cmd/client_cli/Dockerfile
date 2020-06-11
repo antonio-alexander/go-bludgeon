@@ -16,8 +16,8 @@ RUN apk add --no-cache ca-certificates \
     && mkdir -p "$GOPATH/src" "$GOPATH/bin" \
     && chmod -R 777 "$GOPATH" \
     && go get github.com/go-delve/delve/cmd/dlv \
-    && go build -gcflags "all=-N -l"  -o /app/bludgeon_client\
-    && chmod +x /app/bludgeon_server
+    && go build -gcflags "all=-N -l"  -o /app/bludgeon_client \
+    && chmod +x /app/bludgeon_server 
 #build from a clean container (without golang)
 FROM alpine:latest
 #set working directory to app

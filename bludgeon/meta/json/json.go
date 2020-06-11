@@ -2,6 +2,7 @@ package bludgeonmetajson
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -19,8 +20,7 @@ type metaJSON struct {
 }
 
 func NewMetaJSON() interface {
-	Owner
-	bludgeon.Meta
+	bludgeon.MetaOwner
 	bludgeon.MetaTimer
 	bludgeon.MetaTimeSlice
 } {
@@ -81,31 +81,30 @@ func (m *metaJSON) read() (err error) {
 	return
 }
 
-//Owner
-type Owner interface {
-	//Initialize
-	Initialize(file string) (err error)
-
-	//Close
-	Close()
-}
-
 //ensure that metaJSON implements Owner
-var _ Owner = &metaJSON{}
+var _ bludgeon.MetaOwner = &metaJSON{}
 
 //Initialize
-func (m *metaJSON) Initialize(file string) (err error) {
+func (m *metaJSON) Initialize(element interface{}) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
+	var config Configuration
 	var folder string
+	var ok bool
 
+	//attempt to cast element into configuration
+	if config, ok = element.(Configuration); !ok {
+		err = errors.New("Unable to cast into configuration")
+
+		return
+	}
 	//store file
-	m.file = file
+	m.file = config.File
 	//attempt to read the file
 	if err = m.read(); err != nil {
 		//get the folder to create
-		folder = filepath.Dir(file)
+		folder = filepath.Dir(m.file)
 		//attempt to make the folder
 		err = os.MkdirAll(folder, os.ModePerm)
 	}
@@ -113,8 +112,8 @@ func (m *metaJSON) Initialize(file string) (err error) {
 	return
 }
 
-//Close
-func (m *metaJSON) Close() {
+//Shutdown
+func (m *metaJSON) Shutdown() (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -127,11 +126,11 @@ func (m *metaJSON) Close() {
 	return
 }
 
-//ensure that metaJSON implements meta.MetaTimer
-var _ bludgeon.Meta = &metaJSON{}
+//ensure that metaJSON implements bludgeon.MetaMetaTimer
+var _ bludgeon.MetaSerialize = &metaJSON{}
 
 //Serialize will attempt to commit current data
-func (m *metaJSON) Serialize() (err error) {
+func (m *metaJSON) MetaSerialize() (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -142,7 +141,7 @@ func (m *metaJSON) Serialize() (err error) {
 }
 
 //Deserialize will attempt to read current data in-memory
-func (m *metaJSON) DeSerialize() (err error) {
+func (m *metaJSON) MetaDeSerialize() (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -153,7 +152,7 @@ func (m *metaJSON) DeSerialize() (err error) {
 	return
 }
 
-//ensure that metaJSON implements meta.MetaTimer
+//ensure that metaJSON implements bludgeon.MetaMetaTimer
 var _ bludgeon.MetaTimer = &metaJSON{}
 
 //MetaTimerWrite
@@ -199,7 +198,7 @@ func (m *metaJSON) MetaTimerRead(timerID string) (timer bludgeon.Timer, err erro
 	return
 }
 
-//ensure that metaJSON implements meta.MetaTimer
+//ensure that metaJSON implements bludgeon.MetaMetaTimer
 var _ bludgeon.MetaTimeSlice = &metaJSON{}
 
 //MetaTimeSliceWrite

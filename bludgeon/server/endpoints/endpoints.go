@@ -1,18 +1,68 @@
-package bludgeonserver
+package bludgeonserverendpoints
 
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
+	common "github.com/antonio-alexander/go-bludgeon/bludgeon/server/common"
+	server "github.com/antonio-alexander/go-bludgeon/bludgeon/server/functional"
+
+	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest_server"
 	errors "github.com/pkg/errors"
 )
 
+//BuildRoutes will create all the routes and their functions to execute when received
+func BuildRoutes(s interface {
+	bludgeon.Logger
+	server.Functional
+}) []rest.HandleFuncConfig {
+	return []rest.HandleFuncConfig{
+		//admin
+		{Route: common.RouteServerStop, Method: POST, HandleFx: ServerStop(s)},
+		//timer
+		{Route: common.RouteTimerCreate, Method: POST, HandleFx: ServerTimerCreate(s)},
+		{Route: common.RouteTimerRead, Method: POST, HandleFx: ServerTimerRead(s)},
+		{Route: common.RouteTimerUpdate, Method: POST, HandleFx: ServerTimerUpdate(s)},
+		{Route: common.RouteTimerDelete, Method: POST, HandleFx: ServerTimerDelete(s)},
+		{Route: common.RouteTimerStart, Method: POST, HandleFx: ServerTimerStart(s)},
+		{Route: common.RouteTimerPause, Method: POST, HandleFx: ServerTimerPause(s)},
+		{Route: common.RouteTimerSubmit, Method: POST, HandleFx: ServerTimerSubmit(s)},
+		//time slice
+		{Route: common.RouteTimeSliceRead, Method: POST, HandleFx: ServerTimeSliceRead(s)},
+	}
+}
+
+//ServerStop
+func ServerStop(s interface {
+	bludgeon.Logger
+	server.Functional
+}) func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var token bludgeon.Token
+		var bytes []byte
+		var err error
+
+		//get token
+		if token, err = getToken(request); err == nil {
+			//attempt to execute the timer create
+			_, err = s.CommandHandler(bludgeon.CommandServerStop, nil, token)
+		}
+		//handle errors
+		if err = handleResponse(writer, err, bytes); err != nil {
+			err = errors.Wrap(err, "ServerTimerCreate")
+			s.Error(err)
+		}
+	}
+}
+
 //ServerTimerCreate
-func ServerTimerCreate(s Functional, log *log.Logger) func(http.ResponseWriter, *http.Request) {
+func ServerTimerCreate(s interface {
+	bludgeon.Logger
+	server.Functional
+}) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var token bludgeon.Token
 		var data interface{}
@@ -34,15 +84,18 @@ func ServerTimerCreate(s Functional, log *log.Logger) func(http.ResponseWriter, 
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
 			err = errors.Wrap(err, "ServerTimerCreate")
-			log.Println(err)
+			s.Error(err)
 		}
 	}
 }
 
 //ServerTimerRead
-func ServerTimerRead(s Functional, log *log.Logger) func(http.ResponseWriter, *http.Request) {
+func ServerTimerRead(s interface {
+	bludgeon.Logger
+	server.Functional
+}) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract ContractServerIn
+		var contract common.ContractServerIn
 		var token bludgeon.Token
 		var data interface{}
 		var bytes []byte
@@ -54,7 +107,7 @@ func ServerTimerRead(s Functional, log *log.Logger) func(http.ResponseWriter, *h
 			if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 				if err = json.Unmarshal(bytes, &contract); err == nil {
 					//attempt to execute the timer create
-					if data, err = s.CommandHandler(bludgeon.CommandServerTimerRead, CommandData{
+					if data, err = s.CommandHandler(bludgeon.CommandServerTimerRead, common.CommandData{
 						ID: contract.ID,
 					}, token); err == nil {
 						//attempt to marshal into bytes
@@ -70,15 +123,18 @@ func ServerTimerRead(s Functional, log *log.Logger) func(http.ResponseWriter, *h
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
 			err = errors.Wrap(err, "ServerTimerRead")
-			log.Println(err)
+			s.Error(err)
 		}
 	}
 }
 
 //ServerTimerUpdate
-func ServerTimerUpdate(s Functional, log *log.Logger) func(http.ResponseWriter, *http.Request) {
+func ServerTimerUpdate(s interface {
+	bludgeon.Logger
+	server.Functional
+}) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract ContractServerIn
+		var contract common.ContractServerIn
 		var token bludgeon.Token
 		var bytes []byte
 		var data interface{}
@@ -101,15 +157,18 @@ func ServerTimerUpdate(s Functional, log *log.Logger) func(http.ResponseWriter, 
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
 			err = errors.Wrap(err, "ServerTimerUpdate")
-			log.Println(err)
+			s.Error(err)
 		}
 	}
 }
 
 //ServerTimerDelete
-func ServerTimerDelete(s Functional, log *log.Logger) func(http.ResponseWriter, *http.Request) {
+func ServerTimerDelete(s interface {
+	bludgeon.Logger
+	server.Functional
+}) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract ContractServerIn
+		var contract common.ContractServerIn
 		var token bludgeon.Token
 		var bytes []byte
 		var err error
@@ -120,7 +179,7 @@ func ServerTimerDelete(s Functional, log *log.Logger) func(http.ResponseWriter, 
 			if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 				if err = json.Unmarshal(bytes, &contract); err == nil {
 					//attempt to execute the timer create
-					_, err = s.CommandHandler(bludgeon.CommandServerTimerDelete, CommandData{
+					_, err = s.CommandHandler(bludgeon.CommandServerTimerDelete, common.CommandData{
 						ID: contract.ID,
 					}, token)
 				}
@@ -129,15 +188,18 @@ func ServerTimerDelete(s Functional, log *log.Logger) func(http.ResponseWriter, 
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
 			err = errors.Wrap(err, "ServerTimerDelete")
-			log.Println(err)
+			s.Error(err)
 		}
 	}
 }
 
 //ServerTimerStart
-func ServerTimerStart(s Functional, log *log.Logger) func(http.ResponseWriter, *http.Request) {
+func ServerTimerStart(s interface {
+	bludgeon.Logger
+	server.Functional
+}) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract ContractServerIn
+		var contract common.ContractServerIn
 		var token bludgeon.Token
 		var data interface{}
 		var bytes []byte
@@ -149,7 +211,7 @@ func ServerTimerStart(s Functional, log *log.Logger) func(http.ResponseWriter, *
 			if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 				if err = json.Unmarshal(bytes, &contract); err == nil {
 					//attempt to execute the timer create
-					if data, err = s.CommandHandler(bludgeon.CommandServerTimerStart, CommandData{
+					if data, err = s.CommandHandler(bludgeon.CommandServerTimerStart, common.CommandData{
 						ID:        contract.ID,
 						StartTime: time.Unix(0, contract.StartTime),
 					}, token); err == nil {
@@ -165,15 +227,18 @@ func ServerTimerStart(s Functional, log *log.Logger) func(http.ResponseWriter, *
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
 			err = errors.Wrap(err, "ServerTimerStart")
-			log.Println(err)
+			s.Error(err)
 		}
 	}
 }
 
 //ServerTimerDelete
-func ServerTimerPause(s Functional, log *log.Logger) func(http.ResponseWriter, *http.Request) {
+func ServerTimerPause(s interface {
+	bludgeon.Logger
+	server.Functional
+}) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract ContractServerIn
+		var contract common.ContractServerIn
 		var token bludgeon.Token
 		var data interface{}
 		var bytes []byte
@@ -185,7 +250,7 @@ func ServerTimerPause(s Functional, log *log.Logger) func(http.ResponseWriter, *
 			if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 				if err = json.Unmarshal(bytes, &contract); err == nil {
 					//attempt to execute the timer create
-					if data, err = s.CommandHandler(bludgeon.CommandServerTimerPause, CommandData{
+					if data, err = s.CommandHandler(bludgeon.CommandServerTimerPause, common.CommandData{
 						ID:        contract.ID,
 						PauseTime: time.Unix(0, contract.PauseTime),
 					}, token); err == nil {
@@ -201,15 +266,18 @@ func ServerTimerPause(s Functional, log *log.Logger) func(http.ResponseWriter, *
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
 			err = errors.Wrap(err, "ServerTimerPause")
-			log.Println(err)
+			s.Error(err)
 		}
 	}
 }
 
 //ServerTimerSubmit
-func ServerTimerSubmit(s Functional, log *log.Logger) func(http.ResponseWriter, *http.Request) {
+func ServerTimerSubmit(s interface {
+	bludgeon.Logger
+	server.Functional
+}) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract ContractServerIn
+		var contract common.ContractServerIn
 		var token bludgeon.Token
 		var data interface{}
 		var bytes []byte
@@ -221,7 +289,7 @@ func ServerTimerSubmit(s Functional, log *log.Logger) func(http.ResponseWriter, 
 			if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 				if err = json.Unmarshal(bytes, &contract); err == nil {
 					//attempt to execute the timer create
-					if data, err = s.CommandHandler(bludgeon.CommandServerTimerSubmit, CommandData{
+					if data, err = s.CommandHandler(bludgeon.CommandServerTimerSubmit, common.CommandData{
 						ID:         contract.ID,
 						FinishTime: time.Unix(0, contract.FinishTime),
 					}, token); err == nil {
@@ -237,18 +305,21 @@ func ServerTimerSubmit(s Functional, log *log.Logger) func(http.ResponseWriter, 
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
 			err = errors.Wrap(err, "ServerTimerSubmit")
-			log.Println(err)
+			s.Error(err)
 		}
 	}
 }
 
 //ServerTimeSliceRead
-func ServerTimeSliceRead(s Functional, log *log.Logger) func(http.ResponseWriter, *http.Request) {
+func ServerTimeSliceRead(s interface {
+	bludgeon.Logger
+	server.Functional
+}) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var bytes []byte
 		var data interface{}
 		var err error
-		var contract ContractServerIn
+		var contract common.ContractServerIn
 		var token bludgeon.Token
 
 		//get token
@@ -257,7 +328,7 @@ func ServerTimeSliceRead(s Functional, log *log.Logger) func(http.ResponseWriter
 			if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 				if err = json.Unmarshal(bytes, &contract); err == nil {
 					//attempt to execute the timer create
-					if data, err = s.CommandHandler(bludgeon.CommandServerTimeSliceRead, CommandData{
+					if data, err = s.CommandHandler(bludgeon.CommandServerTimeSliceRead, common.CommandData{
 						ID: contract.ID,
 					}, token); err == nil {
 						//attempt to marshal into bytes
@@ -273,7 +344,7 @@ func ServerTimeSliceRead(s Functional, log *log.Logger) func(http.ResponseWriter
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
 			err = errors.Wrap(err, "ServerTimeSliceRead")
-			log.Println(err)
+			s.Error(err)
 		}
 	}
 }

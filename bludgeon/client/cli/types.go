@@ -1,58 +1,8 @@
-package bludgeonclient
+package bludgeonclientcli
 
 import (
-	"time"
-
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	mysql "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/sql/mysql"
 )
-
-// "text/tabwriter"
-
-//error constants
-const (
-	ErrStarted    string = "client started"
-	ErrNotStarted string = "client not started"
-)
-
-//SerializedData
-type SerializedData struct {
-	//
-}
-
-//common constants
-const (
-	SQL_DRIVER = "sqlite3"
-	HELP       = "Help Goes Here!"
-	// tabwriterFlag = tabwriter.Debug //tabwriter.AlignRight | tabwriter.Debug
-)
-
-//Configuration
-type Configuration struct {
-	Meta struct {
-		Type string `json:"Meta"`
-		JSON struct {
-			File string `json:"File"`
-		} `json:"JSON"`
-		MySQL mysql.Configuration `json:"Mysql"`
-	}
-	Remote struct {
-		Type       string `json:"Type"`
-		RestClient struct {
-			Address string        `json:"Address"`
-			Port    string        `json:"Port"`
-			Timeout time.Duration `json:"Timeout"`
-		} `json:"RestClient"`
-	} `json:"Remote"`
-	Client struct {
-		ServerAddress string
-		ServerPort    string
-		ClientAddress string
-		ClientPort    string
-		Task          int64
-		Employee      int64
-	} `json:"Client"`
-}
 
 //arguments
 const (
@@ -94,8 +44,4 @@ type Options struct {
 	Command       bludgeon.CommandClient //command
 	Configuration string                 //the filepath to the configuration
 	Timer         bludgeon.Timer         //timer object
-}
-
-type Cache struct {
-	TimerID string `json:"TimerID"`
 }
