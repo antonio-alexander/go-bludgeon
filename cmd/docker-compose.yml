@@ -5,32 +5,33 @@ services:
       image: bludgeon_db:latest
       restart: "always"
       build:
-        context: ./db_mysql
+        context: ./bludgeon-database-mysql
         dockerfile: ./Dockerfile
       ports:
         - "3306:3306"
       volumes:
-        - bludgeon_database:/var/lib/mysql
+        - bludgeon-database-mysql:/var/lib/mysql
       environment:
         - MYSQL_ALLOW_EMPTY_PASSWORD=true
         # - MYSQL_ROOT_PASSWORD=""
   bludgeon_server:
     container_name: "bludgeon_server"
+    image: bludgeon_server:latest
     restart: "always"
     build:
       context: ../
-      dockerfile: ./cmd/server_rest/Dockerfile
+      dockerfile: ./cmd/bludgeon-server-rest/Dockerfile
     ports:
       - "8080:8080"
     volumes:
-      - bludgeon_server-data:/app/data
-    # environment:
+      - bludgeon-server-data:/app/data
+    environment:
       # - BLUDGEON_REST_ADDRESS="" 
-      # - BLUDGEON_REST_PORT="8080" 
-      # - BLUDGEON_META_TYPE="json" 
-      # - BLUDGEON_META_JSON_FILE="/data/blugeon.json" 
-      # - DATABASE_ADDRESS="bludgeon_database"
-      # - DATABASE_PORT="3306" 
+      - BLUDGEON_REST_PORT=8080 
+      - BLUDGEON_META_TYPE=json 
+      - BLUDGEON_META_JSON_FILE=/app/data/blugeon.json
+      - DATABASE_ADDRESS=bludgeon_database
+      - DATABASE_PORT=3306 
 # bludgeon_client:
 #     container_name: "bludgeon_client"
 #     restart: "always"
@@ -50,7 +51,7 @@ services:
 #       - DATABASE_ADDRESS="bludgeon_database"
 #       - DATABASE_PORT="3306" 
 volumes:
-  bludgeon_server-data:
-  bludgeon_database:
+  bludgeon-server-data:
+  bludgeon-database-mysql:
   # - bludgeon_client-data
   # - bludgeon_client-config

@@ -74,15 +74,5 @@ type ContractServerIn struct {
 }
 
 type Configuration struct {
-	Meta struct {
-		Type   string                 `json:"Type"`
-		Config map[string]interface{} `json:"Config"`
-	} `json:"Meta"`
-	Server struct {
-		TokenWait int64 //how long a token is valid (seconds)
-		Rest      struct {
-			Address string `json:"Address"`
-			Port    string `json:"Port"`
-		} `json:"Rest"`
-	} `json:"Server"`
+	TokenWait int64 //how long a token is valid (seconds)
 }

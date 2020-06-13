@@ -4,6 +4,11 @@ import (
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
 )
 
+//common constants
+const (
+	DefaultFile = "data/bludgeon.json"
+)
+
 //error constants
 const (
 	ErrTimerNotFoundf     string = "Timer with id, \"%s\", not found locally"

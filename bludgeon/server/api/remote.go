@@ -1,7 +1,6 @@
 package bludgeonrestapi
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -31,12 +30,9 @@ func (r *remote) Initialize(element interface{}) (err error) {
 	defer r.Unlock()
 
 	var config Configuration
-	var ok bool
 
-	//cast into configuration
-	if config, ok = element.(Configuration); !ok {
-		err = errors.New("unable to cast into configuration")
-
+	//attempt to cast configuration
+	if config, err = castConfiguration(element); err != nil {
 		return
 	}
 	//store configuration

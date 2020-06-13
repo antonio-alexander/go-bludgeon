@@ -68,10 +68,10 @@ func TestMainCli(t *testing.T) {
 		"": {
 			pwd: "/Users/noobius/source_control/go/src/github.com/antonio-alexander/go-bludgeon/cmd/client_cli",
 			args: []string{
-				"--command", "create",
+				"--command", "read",
 				"--type", "timer",
-				"--id", "51db329b-9ab1-4636-840f-da06eb4acaea",
-				"--comment=\"This is a better test\"",
+				// "--id", "51db329b-9ab1-4636-840f-da06eb4acaea9878ecf4-dfd6-49d4-8326-3da7c4c7ff10",
+				// "--comment=\"This is a better test\"",
 			},
 		},
 	}

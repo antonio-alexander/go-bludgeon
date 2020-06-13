@@ -2,7 +2,6 @@ package bludgeonmetajson
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -91,12 +90,9 @@ func (m *metaJSON) Initialize(element interface{}) (err error) {
 
 	var config Configuration
 	var folder string
-	var ok bool
 
 	//attempt to cast element into configuration
-	if config, ok = element.(Configuration); !ok {
-		err = errors.New("Unable to cast into configuration")
-
+	if config, err = castConfiguration(element); err != nil {
 		return
 	}
 	//store file

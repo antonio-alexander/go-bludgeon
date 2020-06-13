@@ -3,7 +3,6 @@ package bludgeonclientcli
 import (
 	"flag"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
@@ -17,7 +16,6 @@ func Parse(pwd string, args []string, envs map[string]string) (o Options, err er
 	//options
 	flagSet.StringVar(&command, ArgCommand, DefaultCommand, UsageCommand)
 	flagSet.StringVar(&objectType, ArgType, DefaultType, UsageType)
-	flagSet.StringVar(&o.Configuration, ArgConfiguration, filepath.Join(pwd, bludgeon.DefaultConfigurationFile), UsageConfiguration)
 	//timer
 	flagSet.StringVar(&o.Timer.UUID, ArgTimerID, DefaultTimerID, UsageTimerID)
 	flagSet.Int64Var(&o.Timer.Start, ArgTimerStart, DefaultTimerStart, UsageTimerStart)

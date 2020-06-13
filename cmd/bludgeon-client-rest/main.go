@@ -19,7 +19,7 @@ func main() {
 	}
 	//execute the client main for cli
 	if err := client.MainCli(pwd, args, envs); err != nil {
-		os.Stderr.WriteString(err.Error())
+		os.Stderr.WriteString(err.Error() + "\n")
 		os.Exit(1)
 	}
 }

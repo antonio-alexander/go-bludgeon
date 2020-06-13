@@ -173,13 +173,10 @@ func (m *mysql) Initialize(element interface{}) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
-	var ok bool
 	var config Configuration
 
-	//cast configuration
-	if config, ok = element.(Configuration); !ok {
-		err = errors.New("Unable to cast into configuration")
-
+	//attempt to cast element into configuration
+	if config, err = castConfiguration(element); err != nil {
 		return
 	}
 	//connect

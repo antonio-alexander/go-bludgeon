@@ -54,17 +54,17 @@ const (
 
 //Configuration is a struct that contains al lthe possible configuration for supported database drivers
 type Configuration struct {
-	Driver          string        `json:"Driver"`          //go sql driver to user
-	DataSource      string        `json:"-"`               //data source
-	FilePath        string        `json:"FilePath"`        //filepath for sqlite
 	Hostname        string        `json:"Hostname"`        //hostame to user to access the database
 	Port            string        `json:"Port"`            //port to connect to
 	Username        string        `json:"Username"`        //username to authenticate with
 	Password        string        `json:"Password"`        //password to authenticate with
 	Database        string        `json:"Database"`        //database to connect to
-	ParseTime       bool          `json:"ParseTime"`       //whether or not to parse time
 	UseTransactions bool          `json:"UseTransactions"` //whether or not to use transactions
 	Timeout         time.Duration `json:"Timeout"`         //how long to wait with configuration
+	Driver          string        `json:"Driver"`          //go sql driver to user
+	DataSource      string        `json:"-"`               //data source
+	FilePath        string        `json:"FilePath"`        //filepath for sqlite
+	ParseTime       bool          `json:"ParseTime"`       //whether or not to parse time
 }
 
 //configuration constants

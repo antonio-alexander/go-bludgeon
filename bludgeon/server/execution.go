@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	json "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/json"
-	mysql "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/sql/mysql"
+	mysql "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/mysql"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
 )
@@ -16,7 +16,7 @@ func initMeta(metaType string, config interface{}) (meta interface {
 	bludgeon.MetaOwner
 }, err error) {
 
-	switch strings.ToLower(metaType) {
+	switch v := strings.ToLower(metaType); v {
 	case "json":
 		//create metajson
 		m := json.NewMetaJSON()
@@ -33,7 +33,7 @@ func initMeta(metaType string, config interface{}) (meta interface {
 		}
 		meta = m
 	default:
-		err = fmt.Errorf("Unsupported meta: %s", metaType)
+		err = fmt.Errorf("!!Unsupported meta: %s", v)
 	}
 
 	return

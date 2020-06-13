@@ -5,14 +5,14 @@ import (
 	"os"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
+	config "github.com/antonio-alexander/go-bludgeon/bludgeon/config/server"
 	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest_server"
-	common "github.com/antonio-alexander/go-bludgeon/bludgeon/server/common"
 	endpoints "github.com/antonio-alexander/go-bludgeon/bludgeon/server/endpoints"
 	server "github.com/antonio-alexander/go-bludgeon/bludgeon/server/functional"
 )
 
 func MainRest(pwd string, args []string, envs map[string]string, chSignalInt chan os.Signal) (err error) {
-	var config common.Configuration
+	var conf config.Configuration
 	var m interface {
 		bludgeon.MetaTimer
 		bludgeon.MetaTimeSlice
@@ -22,11 +22,11 @@ func MainRest(pwd string, args []string, envs map[string]string, chSignalInt cha
 	var chExternal <-chan struct{}
 
 	//get config from environment
-	if config, err = common.GetConfigFromEnv(pwd, envs); err != nil {
+	if conf, err = config.FromEnv(pwd, envs); err != nil {
 		return
 	}
 	//initialize meta
-	if m, err = initMeta(config.Meta.Type, config.Meta.Config[config.Meta.Type]); err != nil {
+	if m, err = initMeta(conf.Meta.Type, conf.Meta.Config[conf.Meta.Type]); err != nil {
 		return
 	}
 	//create rest server
@@ -34,11 +34,11 @@ func MainRest(pwd string, args []string, envs map[string]string, chSignalInt cha
 	//create server
 	s := server.NewServer(logOut, logError, m)
 	//start the server
-	if chExternal, err = s.Start(config); err == nil {
+	if chExternal, err = s.Start(conf.Server); err == nil {
 		//build rest routes for server
 		if err = r.BuildRoutes(endpoints.BuildRoutes(s)); err == nil {
 			//start the rest server
-			if err = r.Start(config.Server.Rest.Address, config.Server.Rest.Port); err == nil {
+			if err = r.Start(conf.Rest.Address, conf.Rest.Port); err == nil {
 				//block until the signal is killed
 				select {
 				case <-chSignalInt:

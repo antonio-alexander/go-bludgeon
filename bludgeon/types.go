@@ -16,7 +16,9 @@ import (
 const (
 	fmtTimeLong              = "Jan 2, 2006 at 3:04pm (MST)"
 	fmtTimeShort             = "2006-Jan-02"
-	DefaultConfigurationFile = "/config/bludgeon_config.json"
+	DefaultFolder            = ".bludgeon"
+	DefaultConfigurationFile = "config/bludgeon_config.json"
+	DefaultCacheFile         = "data/bludgeon_cache.json"
 )
 
 //error constants

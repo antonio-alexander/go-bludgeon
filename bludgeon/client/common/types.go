@@ -6,22 +6,12 @@ import (
 
 //Configuration
 type Configuration struct {
-	Meta struct {
-		Type   string                 `json:"Meta"`
-		Config map[string]interface{} `json:"Config"`
-	}
-	Remote struct {
-		Type   string                 `json:"Type"`
-		Config map[string]interface{} `json:"Config"`
-	} `json:"Remote"`
-	Client struct {
-		ServerAddress string
-		ServerPort    string
-		ClientAddress string
-		ClientPort    string
-		Task          int64
-		Employee      int64
-	} `json:"Client"`
+	ServerAddress string `json:"ServerAddress"`
+	ServerPort    string `json:"ServerPort"`
+	ClientAddress string `json:"ClientAddress"`
+	ClientPort    string `json:"ClientPort"`
+	// Task          int64  `json:"Task"`
+	// Employee      int64  `json:"Employee"`
 }
 
 type Cache struct {

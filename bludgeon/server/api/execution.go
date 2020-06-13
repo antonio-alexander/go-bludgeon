@@ -2,11 +2,26 @@ package bludgeonrestapi
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 )
+
+func castConfiguration(element interface{}) (c Configuration, err error) {
+
+	switch v := element.(type) {
+	case json.RawMessage:
+		err = json.Unmarshal(v, &c)
+	case Configuration:
+		c = v
+	default:
+		err = fmt.Errorf("Unsupported type: %t", element)
+	}
+
+	return
+}
 
 //doRequest
 func doRequest(uri, method string, dataIn []byte) (response *http.Response, err error) {

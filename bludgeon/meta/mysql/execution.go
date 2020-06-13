@@ -2,9 +2,24 @@ package bludgeonmetamysql
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 )
+
+func castConfiguration(element interface{}) (c Configuration, err error) {
+
+	switch v := element.(type) {
+	case json.RawMessage:
+		err = json.Unmarshal(v, &c)
+	case Configuration:
+		c = v
+	default:
+		err = fmt.Errorf("Unsupported type: %t", element)
+	}
+
+	return
+}
 
 //validateConfiguration is used to ensure that the values being configured make sense
 // it's not necessarily to prevent a misconfiguration, but to use default values in the

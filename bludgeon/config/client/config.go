@@ -1,4 +1,4 @@
-package bludgeonclient
+package bludgeonconfigclient
 
 import (
 	"encoding/json"
@@ -6,40 +6,35 @@ import (
 	"os"
 )
 
-func CacheRead(file string) (cache Cache, err error) {
+func Read(file, jsonFile string) (config Configuration, err error) {
 	var bytes []byte
 
 	//check if file exists
 	if _, err = os.Stat(file); os.IsNotExist(err) {
 		//load default configuration
-		cache = CacheDefault()
+		config = configDefault(jsonFile)
 		//write the default configuration
-		err = CacheWrite(file, cache)
+		err = Write(file, config)
 	} else {
 		//file exists
 		if bytes, err = ioutil.ReadFile(file); err != nil {
 			return
 		}
-		err = json.Unmarshal(bytes, &cache)
+		err = json.Unmarshal(bytes, &config)
 	}
+
 	return
 }
 
-func CacheWrite(file string, cache Cache) (err error) {
+func Write(file string, config Configuration) (err error) {
 	var bytes []byte
 
 	//marshal config into bytes
-	if bytes, err = json.MarshalIndent(&cache, "", "    "); err != nil {
+	if bytes, err = json.MarshalIndent(&config, "", "    "); err != nil {
 		return
 	}
 	//write configuration
 	err = ioutil.WriteFile(file, bytes, 0644)
-
-	return
-}
-
-func CacheDefault() (c Cache) {
-	c.TimerID = ""
 
 	return
 }
