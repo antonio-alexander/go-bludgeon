@@ -504,17 +504,17 @@ func TimerPause(timerID string, pauseTime time.Time, i ...interface{}) (timer Ti
 		timeSlice.ElapsedTime = timeSlice.Finish - timeSlice.Start
 		//set archived to true
 		timeSlice.Archived = true
-		//update the timer, remove its time slice and update the elapsed time
-		//set the activeSliceUUID to empty
-		timer.ActiveSliceUUID = ""
 		//calculate elapsed time
 		timer.ElapsedTime = timer.ElapsedTime + timeSlice.ElapsedTime
 		//update the timeslice
 		if err = timeSliceUpdate(timeSlice, meta); err != nil {
 			return
 		}
+		//update the timer, remove its time slice and update the elapsed time
+		//set the activeSliceUUID to empty
+		timer.ActiveSliceUUID = ""
 		//update the timer
-		if _, err = TimerUpdate(timer, meta); err != nil {
+		if err = meta.MetaTimerWrite(timer.UUID, timer); err != nil {
 			return
 		}
 	}
@@ -590,7 +590,7 @@ func TimerSubmit(timerID string, submitTime time.Time, i ...interface{}) (timer 
 			return
 		}
 		//update the timer
-		if _, err = TimerUpdate(timer, meta); err != nil {
+		if err = meta.MetaTimerWrite(timer.UUID, timer); err != nil {
 			return
 		}
 	}
