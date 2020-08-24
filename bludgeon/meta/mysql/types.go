@@ -2,7 +2,6 @@ package bludgeonmetamysql
 
 import (
 	"database/sql"
-	"time"
 )
 
 //common constants
@@ -11,24 +10,6 @@ const (
 	DatabaseIsolation = sql.LevelSerializable
 	//LogAlias provides the alias when data is logged
 	LogAlias = "Database"
-	//DefaultDriver provides a default driver to use for configuration when no configuration is found
-	DefaultDriver = "mysql"
-	//DefaultUsername provides a default username to use for configuration when no configuration is found
-	DefaultUsername = "bludgeon"
-	//DefaultPassword provides a default pasword to use for configuration when no configuration is found
-	DefaultPassword = "bludgeon"
-	//DefaultDatabase provides a default database to use for configuration when no configuration is found
-	DefaultDatabase = "bludgeon"
-	//DefaultParseTime provides a default value for whether or not to parse time for configuration when no configuration is found
-	DefaultParseTime = true
-	//DefaultDatabasePath provides a default database filepath to use for configuration when no configuration is found
-	DefaultDatabasePath = "bludgeon.db"
-	//DefaultMysqlPort provides a default port for mysql databases to use for configuration when no configuration is found
-	DefaultMysqlPort = "3306"
-	//DefaultPostgresPort provides a default port for postgres databases to use for configuration when no configuration is found
-	DefaultPostgresPort = "5432"
-	//DefaultHostname provides a default hostname to connect to databases to use for configuration when no configuration is found
-	DefaultHostname = "Localhost"
 )
 
 //error constants
@@ -40,8 +21,6 @@ const (
 	//
 	//ErrDatabaseNil provides a string to return as an error if the database pointer is nil
 	ErrDatabaseNil string = "Internal database pointer is nil"
-	//ErrDriverUnsupported provides a string to return as an error if a driver isn't supported
-	ErrDriverUnsupported string = "Configured driver: %s, not supported"
 	//ErrDatabaseNotNil provides a string to return as an error if you attempt to connect to an already initialized database
 	ErrDatabaseNotNil string = "Internal database pointer is not nil, reconnect or close to connect"
 	//ErrUpdateFailed provides a string to return as an error if an update fails and the result returns 0 rows affected
@@ -50,26 +29,6 @@ const (
 	ErrDeleteFailed string = "Delete failed, id not found"
 	//ErrQueryFailed provides a string to return as an error in the event a query fails and no other error is returned
 	ErrQueryFailed string = "Query: \"%s\", failed"
-)
-
-//Configuration is a struct that contains al lthe possible configuration for supported database drivers
-type Configuration struct {
-	Hostname        string        `json:"Hostname"`        //hostame to user to access the database
-	Port            string        `json:"Port"`            //port to connect to
-	Username        string        `json:"Username"`        //username to authenticate with
-	Password        string        `json:"Password"`        //password to authenticate with
-	Database        string        `json:"Database"`        //database to connect to
-	UseTransactions bool          `json:"UseTransactions"` //whether or not to use transactions
-	Timeout         time.Duration `json:"Timeout"`         //how long to wait with configuration
-	Driver          string        `json:"Driver"`          //go sql driver to user
-	DataSource      string        `json:"-"`               //data source
-	FilePath        string        `json:"FilePath"`        //filepath for sqlite
-	ParseTime       bool          `json:"ParseTime"`       //whether or not to parse time
-}
-
-//configuration constants
-const (
-	DefaultTimeout time.Duration = 5 * time.Second
 )
 
 //query constants

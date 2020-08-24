@@ -18,16 +18,19 @@ import (
 // was present locally
 
 type lazyMeta interface {
+	//
 	MetaTimer
+
+	//
 	MetaTimeSlice
 }
 
 type lazyRemote interface {
 	//RemoteTimer
-	RemoteTimer
+	FunctionalTimer
 
 	//RemoteTimeSlice
-	RemoteTimeSlice
+	FunctionalTimeSlice
 }
 
 //sortMetaRemote the goal of this function is to sort varadics and output
@@ -71,7 +74,7 @@ func timerRead(timerID string, meta lazyMeta, remote lazyRemote) (timer Timer, e
 			//if meta is not nil, update meta with the newly read timer
 			if meta != nil {
 				//store the timer in the local cache
-				if err = meta.MetaTimerWrite(timerID, timer); err != nil {
+				if err = meta.TimerWrite(timerID, timer); err != nil {
 					return
 				}
 			}
@@ -83,7 +86,7 @@ func timerRead(timerID string, meta lazyMeta, remote lazyRemote) (timer Timer, e
 	//read the meta timer if remote is nil or there is an error
 	if (err != nil || remote == nil) && meta != nil {
 		//attempt to read the timer locally
-		if timer, err = meta.MetaTimerRead(timerID); err != nil {
+		if timer, err = meta.TimerRead(timerID); err != nil {
 			//TODO: store meta error
 			return
 		}
@@ -144,7 +147,7 @@ func timeSliceCreate(timerUUID string, i ...interface{}) (timeSlice TimeSlice, e
 		//update the time slice's timer ID
 		timeSlice.TimerUUID = timerUUID
 		//store the timeslice
-		if err = meta.MetaTimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
+		if err = meta.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
 			//TODO: store the meta error
 			return
 		}
@@ -163,7 +166,7 @@ func timeSliceUpdate(timeSlice TimeSlice, i ...interface{}) (err error) {
 	}
 	//store the timeslice if meta is not nil
 	if meta != nil {
-		if err = meta.MetaTimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
+		if err = meta.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
 			//TODO: store the meta error
 			return
 		}
@@ -182,7 +185,7 @@ func timeSliceDelete(timeSliceID string, i ...interface{}) (err error) {
 	}
 	if meta != nil {
 		//delete the timeslice
-		err = meta.MetaTimeSliceDelete(timeSliceID)
+		err = meta.TimeSliceDelete(timeSliceID)
 	}
 
 	return
@@ -205,7 +208,7 @@ func TimeSliceRead(timeSliceID string, i ...interface{}) (timeSlice TimeSlice, e
 		} else {
 			//store timeSlice in meta
 			if meta != nil {
-				if err = meta.MetaTimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
+				if err = meta.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
 					//TODO: store meta error
 
 					return
@@ -217,7 +220,7 @@ func TimeSliceRead(timeSliceID string, i ...interface{}) (timeSlice TimeSlice, e
 	}
 	//only query meta if remote fails, is nil and meta is not nil
 	if (err != nil || remote == nil) && meta != nil {
-		if timeSlice, err = meta.MetaTimeSliceRead(timeSliceID); err != nil {
+		if timeSlice, err = meta.TimeSliceRead(timeSliceID); err != nil {
 			//TODO: store meta eror
 			return
 		}
@@ -243,7 +246,7 @@ func TimerCreate(i ...interface{}) (timer Timer, err error) {
 		} else {
 			if meta != nil {
 				//update the timer in meta
-				if err = meta.MetaTimerWrite(timer.UUID, timer); err != nil {
+				if err = meta.TimerWrite(timer.UUID, timer); err != nil {
 					//TODO: cache meta error
 					return
 				}
@@ -259,7 +262,7 @@ func TimerCreate(i ...interface{}) (timer Timer, err error) {
 			return
 		}
 		//update the timer in meta
-		if err = meta.MetaTimerWrite(timer.UUID, timer); err != nil {
+		if err = meta.TimerWrite(timer.UUID, timer); err != nil {
 			//TODO: store meta error
 			return
 		}
@@ -311,7 +314,7 @@ func TimerUpdate(t Timer, i ...interface{}) (timer Timer, err error) {
 			//TODO: cache the operation
 		} else {
 			if meta != nil {
-				if err = meta.MetaTimerWrite(timer.UUID, timer); err != nil {
+				if err = meta.TimerWrite(timer.UUID, timer); err != nil {
 					//TODO: store meta error
 
 					return
@@ -332,7 +335,7 @@ func TimerUpdate(t Timer, i ...interface{}) (timer Timer, err error) {
 			timer.Comment = t.Comment
 		}
 		//store the timeslice
-		err = meta.MetaTimerWrite(timer.UUID, timer)
+		err = meta.TimerWrite(timer.UUID, timer)
 	}
 
 	return
@@ -356,7 +359,7 @@ func TimerDelete(timerID string, i ...interface{}) (err error) {
 	}
 	//if meta is non nil, delete the timer
 	if meta != nil {
-		if err = meta.MetaTimerDelete(timerID); err != nil {
+		if err = meta.TimerDelete(timerID); err != nil {
 			//TODO: store meta error
 			return
 		}
@@ -383,7 +386,7 @@ func TimerStart(id string, startTime time.Time, i ...interface{}) (timer Timer, 
 		} else {
 			if meta != nil {
 				//store updated timer in meta
-				if err = meta.MetaTimerWrite(id, timer); err != nil {
+				if err = meta.TimerWrite(id, timer); err != nil {
 					//TODO: store meta timer
 					return
 				}
@@ -429,12 +432,12 @@ func TimerStart(id string, startTime time.Time, i ...interface{}) (timer Timer, 
 		//store the timeSlice
 		timer.ActiveSliceUUID = timeSlice.UUID
 		//store the time slice
-		if err = meta.MetaTimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
+		if err = meta.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
 			//TODO: store meta error
 			return
 		}
 		//store the timer
-		if err = meta.MetaTimerWrite(timer.UUID, timer); err != nil {
+		if err = meta.TimerWrite(timer.UUID, timer); err != nil {
 			//TODO: store meta error
 			return
 		}
@@ -467,7 +470,7 @@ func TimerPause(timerID string, pauseTime time.Time, i ...interface{}) (timer Ti
 			//REVIEW: should we also store the slice??
 			if meta != nil {
 				//store updated timer
-				if err = meta.MetaTimerWrite(timerID, timer); err != nil {
+				if err = meta.TimerWrite(timerID, timer); err != nil {
 					//TODO: store meta error
 					return
 				}
@@ -514,7 +517,7 @@ func TimerPause(timerID string, pauseTime time.Time, i ...interface{}) (timer Ti
 		//set the activeSliceUUID to empty
 		timer.ActiveSliceUUID = ""
 		//update the timer
-		if err = meta.MetaTimerWrite(timer.UUID, timer); err != nil {
+		if err = meta.TimerWrite(timer.UUID, timer); err != nil {
 			return
 		}
 	}
@@ -546,7 +549,7 @@ func TimerSubmit(timerID string, submitTime time.Time, i ...interface{}) (timer 
 			//REVIEW: should we also store the active time slice?
 			if meta != nil {
 				//TODO: store finished time
-				if err = meta.MetaTimerWrite(timerID, timer); err != nil {
+				if err = meta.TimerWrite(timerID, timer); err != nil {
 					//TODO: store meta error
 					return
 				}
@@ -590,7 +593,7 @@ func TimerSubmit(timerID string, submitTime time.Time, i ...interface{}) (timer 
 			return
 		}
 		//update the timer
-		if err = meta.MetaTimerWrite(timer.UUID, timer); err != nil {
+		if err = meta.TimerWrite(timer.UUID, timer); err != nil {
 			return
 		}
 	}

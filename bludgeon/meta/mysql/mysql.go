@@ -8,19 +8,22 @@ import (
 	"sync"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
+
+	config "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/mysql/config"
+
 	//shadow import for mysql driver support
 	_ "github.com/go-sql-driver/mysql"
 )
 
 type mysql struct {
-	sync.RWMutex                   //mutex for threadsafe functionality
-	sync.WaitGroup                 //waitgroup to manage goroutines
-	started        bool            //whether or not started
-	config         Configuration   //configuration
-	stopper        chan struct{}   //stopper for go routines
-	chDisconnect   chan struct{}   //disconnect channel
-	db             *sql.DB         //pointer to the database
-	ctx            context.Context //context
+	sync.RWMutex                        //mutex for threadsafe functionality
+	sync.WaitGroup                      //waitgroup to manage goroutines
+	started        bool                 //whether or not started
+	config         config.Configuration //configuration
+	stopper        chan struct{}        //stopper for go routines
+	chDisconnect   chan struct{}        //disconnect channel
+	db             *sql.DB              //pointer to the database
+	ctx            context.Context      //context
 }
 
 func NewMetaMySQL() interface {
@@ -37,12 +40,9 @@ func NewMetaMySQL() interface {
 
 //Connect will attempt to connect to the databse with the given driver and dataSourceName. If the
 // connection is successful, it will attempt to ping the server
-func (m *mysql) connect(config Configuration) (err error) {
+func (m *mysql) connect(config config.Configuration) (err error) {
 
 	//
-	if m.config, err = validateConfiguration(config); err != nil {
-		return
-	}
 	if m.config.Driver, m.config.DataSource, err = convertConfiguration(m.config); err != nil {
 		return
 	}
@@ -173,7 +173,7 @@ func (m *mysql) Initialize(element interface{}) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
-	var config Configuration
+	var config config.Configuration
 
 	//attempt to cast element into configuration
 	if config, err = castConfiguration(element); err != nil {
@@ -254,8 +254,8 @@ func (m *mysql) Shutdown() (err error) {
 
 // }
 
-// //ensure that mysql implements meta.Functional
-// var _ meta.Functional = &mysql{}
+// //ensure that mysql implements bludgeon.MetaFunctional
+// var _ bludgeon.MetaFunctional = &mysql{}
 
 // type Functional interface {
 // 	//LaunchManage
@@ -323,11 +323,11 @@ func (m *mysql) Shutdown() (err error) {
 // 	return
 // }
 
-//ensure that mysql implements meta.MetaTimer
+//ensure that mysql implements bludgeon.MetaMetaTimer
 var _ bludgeon.MetaTimer = &mysql{}
 
 //MetaTimerRead
-func (m *mysql) MetaTimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
+func (m *mysql) TimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -368,7 +368,7 @@ func (m *mysql) MetaTimerRead(timerUUID string) (timer bludgeon.Timer, err error
 }
 
 //MetaTimerWrite
-func (m *mysql) MetaTimerWrite(timerID string, timer bludgeon.Timer) (err error) {
+func (m *mysql) TimerWrite(timerID string, timer bludgeon.Timer) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -385,7 +385,7 @@ func (m *mysql) MetaTimerWrite(timerID string, timer bludgeon.Timer) (err error)
 }
 
 //MetaTimerDelete
-func (m *mysql) MetaTimerDelete(timerUUID string) (err error) {
+func (m *mysql) TimerDelete(timerUUID string) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -401,11 +401,11 @@ func (m *mysql) MetaTimerDelete(timerUUID string) (err error) {
 	return
 }
 
-//ensure that mysql implements meta.MetaTimer
+//ensure that mysql implements bludgeon.MetaMetaTimer
 var _ bludgeon.MetaTimeSlice = &mysql{}
 
 //MetaTimeSliceRead
-func (m *mysql) MetaTimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice, err error) {
+func (m *mysql) TimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice, err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -445,7 +445,7 @@ func (m *mysql) MetaTimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSl
 }
 
 //MetaTimeSliceWrite
-func (m *mysql) MetaTimeSliceWrite(timeSliceID string, timeSlice bludgeon.TimeSlice) (err error) {
+func (m *mysql) TimeSliceWrite(timeSliceID string, timeSlice bludgeon.TimeSlice) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -462,7 +462,7 @@ func (m *mysql) MetaTimeSliceWrite(timeSliceID string, timeSlice bludgeon.TimeSl
 }
 
 //MetaTimeSliceDelete
-func (m *mysql) MetaTimeSliceDelete(timeSliceID string) (err error) {
+func (m *mysql) TimeSliceDelete(timeSliceID string) (err error) {
 	m.Lock()
 	defer m.Unlock()
 

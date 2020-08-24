@@ -21,7 +21,3 @@ type SerializedData struct {
 	Timers     map[string]bludgeon.Timer     `json:"Timers"`
 	TimeSlices map[string]bludgeon.TimeSlice `json:"TimeSlices"`
 }
-
-type Configuration struct {
-	File string `json:"File"`
-}

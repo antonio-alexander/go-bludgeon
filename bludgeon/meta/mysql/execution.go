@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	config "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/mysql/config"
 )
 
-func castConfiguration(element interface{}) (c Configuration, err error) {
-
+func castConfiguration(element interface{}) (c config.Configuration, err error) {
 	switch v := element.(type) {
 	case json.RawMessage:
 		err = json.Unmarshal(v, &c)
-	case Configuration:
+	case config.Configuration:
 		c = v
 	default:
 		err = fmt.Errorf("Unsupported type: %t", element)
@@ -21,52 +22,8 @@ func castConfiguration(element interface{}) (c Configuration, err error) {
 	return
 }
 
-//validateConfiguration is used to ensure that the values being configured make sense
-// it's not necessarily to prevent a misconfiguration, but to use default values in the
-// event a value doesn't exist
-func validateConfiguration(configIn Configuration) (configOut Configuration, err error) {
-	configOut = configIn
-	switch configOut.Driver {
-	case "mysql", "postgres":
-		switch configOut.Driver {
-		case "mysql":
-			if configOut.Port == "" {
-				configOut.Port = DefaultMysqlPort
-			}
-		case "postgres":
-			if configOut.Port == "" {
-				configOut.Port = DefaultPostgresPort
-			}
-		}
-		if configOut.Database == "" {
-			configOut.Database = DefaultDatabase
-		}
-		if configOut.Username == "" {
-			configOut.Username = DefaultUsername
-		}
-		if configOut.Password == "" {
-			configOut.Password = DefaultPassword
-		}
-		if configOut.Hostname == "" {
-			configOut.Hostname = DefaultHostname
-		}
-	case "sqlite":
-		if configOut.FilePath == "" {
-			configOut.FilePath = DefaultDatabasePath
-		}
-	default:
-		err = fmt.Errorf(ErrDriverUnsupported, configOut.Driver)
-	}
-
-	if configOut.Timeout <= 0 {
-		configOut.Timeout = DefaultTimeout
-	}
-
-	return
-}
-
 //ConvertConfiguration will use a configuration and output a driver string and source
-func convertConfiguration(config Configuration) (driver string, dataSource string, err error) {
+func convertConfiguration(config config.Configuration) (driver string, dataSource string, err error) {
 	switch config.Driver {
 	case "sqlite":
 		//"sqlite3", "./foo.db"

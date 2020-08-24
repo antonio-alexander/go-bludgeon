@@ -31,10 +31,10 @@ const (
 	ErrBadUnitID           string = "UnitID is invalid or missing"
 	ErrBadEmployeeIDTaskID string = "EmployeeID and/or TaskID is invalid or mising"
 	ErrBadClientIDUnitID   string = "ClientID and/or UnitID is invalid or missing"
-	ErrTimerIsArchivedf    string = "Timer with id, \"%s\", is archived"
-	ErrNoActiveTimeSlicef  string = "Timer with id, \"%s\", has no active slice"
 	ErrTimerNotFoundf      string = "Timer with id, \"%s\" not found"
 	ErrTimeSliceNotFoundf  string = "TimeSlice with id, \"%s\" not found"
+	ErrTimerIsArchivedf    string = "Timer with id, \"%s\", is archived"
+	ErrNoActiveTimeSlicef  string = "Timer with id, \"%s\", has no active slice"
 )
 
 //header constants
@@ -90,124 +90,13 @@ type Token struct {
 	Time  int64
 }
 
-type CommandClient uint8
-
-//command constants
-const (
-	CommandClientNull        CommandClient = iota
-	CommandClientShutdown    CommandClient = iota
-	CommandClientTimerCreate CommandClient = iota
-	CommandClientTimerRead   CommandClient = iota
-	CommandClientTimerDelete CommandClient = iota
-	CommandClientTimerStart  CommandClient = iota
-	CommandClientTimerStop   CommandClient = iota
-	CommandClientTimerPause  CommandClient = iota
-	CommandClientTimerSubmit CommandClient = iota
-	CommandClientTimerUpdate CommandClient = iota
-	CommandClientInvalid     CommandClient = iota
-)
-
-func (c CommandClient) String() string {
-	switch c {
-	case CommandClientTimerCreate:
-		return "timercreate"
-	case CommandClientTimerRead:
-		return "timerread"
-	case CommandClientTimerDelete:
-		return "timerdelete"
-	case CommandClientTimerStart:
-		return "timerstart"
-	case CommandClientTimerStop:
-		return "timerstop"
-	case CommandClientTimerPause:
-		return "timerpause"
-	case CommandClientTimerSubmit:
-		return "timersubmit"
-	case CommandClientTimerUpdate:
-		return "timerupdate"
-	default:
-		return ""
-	}
-}
-
-func AtoCommandClient(s string) CommandClient {
-	switch strings.ToLower(s) {
-	case "timercreate":
-		return CommandClientTimerCreate
-	case "timerread":
-		return CommandClientTimerRead
-	case "timerdelete":
-		return CommandClientTimerDelete
-	case "timerstart":
-		return CommandClientTimerStart
-	case "timerstop":
-		return CommandClientTimerStop
-	case "timerpause":
-		return CommandClientTimerPause
-	case "timersubmit":
-		return CommandClientTimerSubmit
-	case "timerupdate":
-		return CommandClientTimerUpdate
-	default:
-		return CommandClientInvalid
-	}
-}
-
-func AtoObject(s string) interface{} {
-	//parse the object type
-	switch strings.ToLower(s) {
-	case "t", "timer":
-		return Timer{}
-	default:
-		return nil
-	}
-}
-
-type CommandServer uint8
-
-//command constants
-const (
-	CommandServerNull CommandServer = iota
-	//server/admin
-	CommandServerStop CommandServer = iota
-	//timer
-	CommandServerTimerCreate CommandServer = iota
-	CommandServerTimerRead   CommandServer = iota
-	CommandServerTimerUpdate CommandServer = iota
-	CommandServerTimerDelete CommandServer = iota
-	CommandServerTimerStart  CommandServer = iota
-	CommandServerTimerPause  CommandServer = iota
-	CommandServerTimerSubmit CommandServer = iota
-	//timeSlice
-	CommandServerTimeSliceRead CommandServer = iota
-	//token
-	CommandServerTokenAcquire CommandServer = iota
-	CommandServerTokenRelease CommandServer = iota
-	CommandServerTokenVerify  CommandServer = iota
-	// CommandServerProjectCreate   CommandServer = iota
-	// CommandServerProjectRead     CommandServer = iota
-	// CommandServerProjectsRead    CommandServer = iota
-	// CommandServerProjectUpdate   CommandServer = iota
-	// CommandServerProjectDelete   CommandServer = iota
-	// CommandServerEmployeeCreate  CommandServer = iota
-	// CommandServerEmployeeRead    CommandServer = iota
-	// CommandServerEmployeesRead   CommandServer = iota
-	// CommandServerEmployeeUpdate  CommandServer = iota
-	// CommandServerEmployeeDelete  CommandServer = iota
-	// CommandServerClientCreate    CommandServer = iota
-	// CommandServerClientRead      CommandServer = iota
-	// CommandServerClientsRead     CommandServer = iota
-	// CommandServerClientUpdate    CommandServer = iota
-	// CommandServerClientDelete    CommandServer = iota
-	CommandServerInvalid CommandServer = iota
-)
-
-func (c CommandServer) String() string {
-	switch c {
-	//TODO: generate stringers
-	default:
-		return "invalid"
-	}
+type CacheData struct {
+	//REVIEW: this will probably just use a signal to send
+	// a callback with a type and some common identiier, this
+	// will be absolutely useless unless the client stays in
+	// memory (e.g. like REST and not CLI)
+	//command
+	//interface
 }
 
 //TaskState provides a type to define the state of a task
@@ -282,53 +171,6 @@ type Options struct {
 	Token      string `json:"TokenID,omit_empty"`
 }
 
-type CacheData struct {
-	//REVIEW: this will probably just use a signal to send
-	// a callback with a type and some common identiier, this
-	// will be absolutely useless unless the client stays in
-	// memory (e.g. like REST and not CLI)
-	//command
-	//interface
-}
-
-type RemoteOwner interface {
-	//Initialize
-	Initialize(config interface{}) (err error)
-
-	//Shutdown
-	Shutdown() (err error)
-}
-
-//RemoteTimer
-type RemoteTimer interface {
-	//TimerCreate
-	TimerCreate() (timer Timer, err error)
-
-	//TimerRead
-	TimerRead(id string) (timer Timer, err error)
-
-	//TimerUpdate
-	TimerUpdate(t Timer) (timer Timer, err error)
-
-	//TimerDelete
-	TimerDelete(id string) (err error)
-
-	//TimerStart
-	TimerStart(timerID string, startTime time.Time) (timer Timer, err error)
-
-	//TimerPause
-	TimerPause(timerID string, pauseTime time.Time) (timer Timer, err error)
-
-	//TimerSubmit
-	TimerSubmit(timerID string, finishTime time.Time) (timer Timer, err error)
-}
-
-//RemoteTimeSlice
-type RemoteTimeSlice interface {
-	//TimeSliceRead
-	TimeSliceRead(id string) (timeSlice TimeSlice, err error)
-}
-
 type Logger interface {
 	//Println
 	Println(v ...interface{})
@@ -346,6 +188,110 @@ type Logger interface {
 	Errorf(format string, v ...interface{})
 }
 
+type FunctionalOwner interface {
+	//Initialize
+	Initialize(config interface{}) (err error)
+
+	//Shutdown
+	Shutdown() (err error)
+}
+
+//FunctionalTimer
+type FunctionalTimer interface {
+	//TimerCreate
+	TimerCreate() (timer Timer, err error)
+
+	//TimerRead
+	TimerRead(id string) (timer Timer, err error)
+
+	//TimerUpdate
+	TimerUpdate(timerIn Timer) (timerOut Timer, err error)
+
+	//TimerDelete
+	TimerDelete(id string) (err error)
+
+	//TimerStart
+	TimerStart(timerID string, startTime time.Time) (timer Timer, err error)
+
+	//TimerPause
+	TimerPause(timerID string, pauseTime time.Time) (timer Timer, err error)
+
+	//TimerSubmit
+	TimerSubmit(timerID string, finishTime time.Time) (timer Timer, err error)
+}
+
+//FunctionalTimeSlice
+type FunctionalTimeSlice interface {
+	//TimeSliceRead
+	TimeSliceRead(id string) (timeSlice TimeSlice, err error)
+}
+
+type MetaType uint8
+
+//task states
+const (
+	MetaTypeInvalid MetaType = iota
+	MetaTypeJSON    MetaType = iota
+	MetaTypeMySQL   MetaType = iota
+)
+
+func (m MetaType) String() string {
+	switch m {
+	case MetaTypeJSON:
+		return "json"
+	case MetaTypeMySQL:
+		return "mysql"
+	default:
+		return "invalid"
+	}
+}
+
+func AtoMetaType(s string) MetaType {
+	switch strings.ToLower(s) {
+	case "json":
+		return MetaTypeJSON
+	case "mysql":
+		return MetaTypeMySQL
+	default:
+		return MetaTypeInvalid
+	}
+}
+
+type RemoteType uint8
+
+const (
+	RemoteTypeInvalid RemoteType = iota
+	RemoteTypeRest    RemoteType = iota
+)
+
+func AtoRemoteType(s string) RemoteType {
+	switch strings.ToLower(s) {
+	case "rest":
+		return RemoteTypeRest
+	default:
+		return RemoteTypeInvalid
+	}
+}
+
+type ObjectType uint8
+
+const (
+	ObjectTypeInvalid   ObjectType = iota
+	ObjectTypeTimer     ObjectType = iota
+	ObjectTypeTimeSlice ObjectType = iota
+)
+
+func AtoObjectType(s string) ObjectType {
+	switch strings.ToLower(s) {
+	case "timer":
+		return ObjectTypeTimer
+	case "timeslice":
+		return ObjectTypeTimeSlice
+	default:
+		return ObjectTypeInvalid
+	}
+}
+
 type MetaOwner interface {
 	//
 	Initialize(config interface{}) (err error)
@@ -356,32 +302,32 @@ type MetaOwner interface {
 
 type MetaSerialize interface {
 	//Serialize will attempt to commit current data
-	MetaSerialize() (err error)
+	Serialize() (err error)
 
 	//Deserialize will attempt to read current data in-memory
-	MetaDeSerialize() (err error)
+	DeSerialize() (err error)
 }
 
 //MetaTimer
 type MetaTimer interface {
 	//MetaTimerWrite
-	MetaTimerWrite(timerID string, timer Timer) (err error)
+	TimerWrite(timerID string, timer Timer) (err error)
 
 	//MetaTimerDelete
-	MetaTimerDelete(timerID string) (err error)
+	TimerDelete(timerID string) (err error)
 
 	//MetaTimerRead
-	MetaTimerRead(timerID string) (timer Timer, err error)
+	TimerRead(timerID string) (timer Timer, err error)
 }
 
 //MetaTimeSlice
 type MetaTimeSlice interface {
 	//MetaTimerWrite
-	MetaTimeSliceWrite(timeSliceID string, timeSlice TimeSlice) (err error)
+	TimeSliceWrite(timeSliceID string, timeSlice TimeSlice) (err error)
 
 	//MetaTimerDelete
-	MetaTimeSliceDelete(timeSliceID string) (err error)
+	TimeSliceDelete(timeSliceID string) (err error)
 
 	//MetaTimerRead
-	MetaTimeSliceRead(timeSliceID string) (timeSlice TimeSlice, err error)
+	TimeSliceRead(timeSliceID string) (timeSlice TimeSlice, err error)
 }

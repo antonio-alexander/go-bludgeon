@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
+	config "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/json/config"
 )
 
 type metaJSON struct {
@@ -88,7 +89,7 @@ func (m *metaJSON) Initialize(element interface{}) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
-	var config Configuration
+	var config config.Configuration
 	var folder string
 
 	//attempt to cast element into configuration
@@ -126,7 +127,7 @@ func (m *metaJSON) Shutdown() (err error) {
 var _ bludgeon.MetaSerialize = &metaJSON{}
 
 //Serialize will attempt to commit current data
-func (m *metaJSON) MetaSerialize() (err error) {
+func (m *metaJSON) Serialize() (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -137,7 +138,7 @@ func (m *metaJSON) MetaSerialize() (err error) {
 }
 
 //Deserialize will attempt to read current data in-memory
-func (m *metaJSON) MetaDeSerialize() (err error) {
+func (m *metaJSON) DeSerialize() (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -152,7 +153,7 @@ func (m *metaJSON) MetaDeSerialize() (err error) {
 var _ bludgeon.MetaTimer = &metaJSON{}
 
 //MetaTimerWrite
-func (m *metaJSON) MetaTimerWrite(timerID string, timer bludgeon.Timer) (err error) {
+func (m *metaJSON) TimerWrite(timerID string, timer bludgeon.Timer) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -165,7 +166,7 @@ func (m *metaJSON) MetaTimerWrite(timerID string, timer bludgeon.Timer) (err err
 }
 
 //MetaTimerDelete
-func (m *metaJSON) MetaTimerDelete(timerID string) (err error) {
+func (m *metaJSON) TimerDelete(timerID string) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -178,7 +179,7 @@ func (m *metaJSON) MetaTimerDelete(timerID string) (err error) {
 }
 
 //MetaTimerRead
-func (m *metaJSON) MetaTimerRead(timerID string) (timer bludgeon.Timer, err error) {
+func (m *metaJSON) TimerRead(timerID string) (timer bludgeon.Timer, err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -198,7 +199,7 @@ func (m *metaJSON) MetaTimerRead(timerID string) (timer bludgeon.Timer, err erro
 var _ bludgeon.MetaTimeSlice = &metaJSON{}
 
 //MetaTimeSliceWrite
-func (m *metaJSON) MetaTimeSliceWrite(timeSliceID string, timeSlice bludgeon.TimeSlice) (err error) {
+func (m *metaJSON) TimeSliceWrite(timeSliceID string, timeSlice bludgeon.TimeSlice) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -211,7 +212,7 @@ func (m *metaJSON) MetaTimeSliceWrite(timeSliceID string, timeSlice bludgeon.Tim
 }
 
 //MetaTimeSliceDelete
-func (m *metaJSON) MetaTimeSliceDelete(timeSliceID string) (err error) {
+func (m *metaJSON) TimeSliceDelete(timeSliceID string) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -224,7 +225,7 @@ func (m *metaJSON) MetaTimeSliceDelete(timeSliceID string) (err error) {
 }
 
 //MetaTimeSliceRead
-func (m *metaJSON) MetaTimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice, err error) {
+func (m *metaJSON) TimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice, err error) {
 	m.Lock()
 	defer m.Unlock()
 

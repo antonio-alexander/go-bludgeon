@@ -1,0 +1,130 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"strings"
+	"time"
+
+	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
+	cli "github.com/antonio-alexander/go-bludgeon/bludgeon/cli"
+	client "github.com/antonio-alexander/go-bludgeon/bludgeon/client"
+	config "github.com/antonio-alexander/go-bludgeon/bludgeon/config"
+	json "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/json"
+	api "github.com/antonio-alexander/go-bludgeon/bludgeon/rest/api"
+	"github.com/pkg/errors"
+)
+
+func main() {
+	//get environment
+	pwd, _ := os.Getwd()
+	args := os.Args[1:]
+	envs := make(map[string]string)
+	for _, env := range os.Environ() {
+		if s := strings.Split(env, "="); len(s) > 1 {
+			envs[s[0]] = s[1]
+		}
+	}
+	//execute the client main for cli
+	if err := Main(pwd, args, envs); err != nil {
+		os.Stderr.WriteString(err.Error() + "\n")
+		os.Exit(1)
+	}
+}
+
+func Main(pwd string, args []string, envs map[string]string) (err error) {
+	var options cli.Options
+	var conf config.Client
+	var cacheFile, configFile string
+	var cache client.Cache
+	var meta interface {
+		bludgeon.MetaOwner
+		bludgeon.MetaTimer
+	}
+	var remote interface {
+		bludgeon.FunctionalOwner
+		bludgeon.FunctionalTimer
+		bludgeon.FunctionalTimeSlice
+	}
+
+	//
+	if configFile, cacheFile, err = bludgeon.Files(pwd); err != nil {
+		return
+	}
+	if options, err = cli.Parse(pwd, args, envs); err != nil {
+		return
+	}
+	if cache, err = client.CacheRead(cacheFile); err != nil {
+		return
+	}
+	if options.Timer.UUID == "" {
+		options.Timer.UUID = cache.TimerID
+	}
+	if err = config.Read(configFile, pwd, envs, &conf); err != nil {
+		return
+	}
+	switch conf.RemoteType {
+	case bludgeon.RemoteTypeRest:
+		remote = api.NewFunctional()
+		//TODO: verify that remote is legit
+		if err = remote.Initialize(conf.Remote[bludgeon.RemoteTypeRest]); err != nil {
+			return
+		}
+	default:
+		//TODO: add error
+	}
+	switch conf.MetaType {
+	case bludgeon.MetaTypeJSON:
+		meta = json.NewMetaJSON()
+		//TODO: verify that meta is legit
+		if err = meta.Initialize(conf.Meta[bludgeon.MetaTypeJSON]); err != nil {
+			return
+		}
+	default:
+		//TODO: add error
+	}
+	c := client.NewClient(log.New(os.Stdout, "", 0), log.New(os.Stderr, "", 0), meta, remote)
+	switch options.ObjectType {
+	case bludgeon.ObjectTypeTimer:
+		var timer bludgeon.Timer
+
+		switch strings.ToLower(options.Command) {
+		case "create":
+			timer, err = c.TimerCreate()
+		case "read":
+			timer, err = c.TimerRead(options.Timer.UUID)
+		case "update":
+			timer, err = c.TimerUpdate(options.Timer)
+		case "delete":
+			err = c.TimerDelete(options.Timer.UUID)
+		case "start":
+			timer, err = c.TimerStart(options.Timer.UUID, time.Unix(0, options.Timer.Start))
+		case "pause":
+			//REVIEW: i don't think this works
+			timer, err = c.TimerPause(options.Timer.UUID, time.Unix(0, options.Timer.Finish))
+		case "submit":
+			timer, err = c.TimerSubmit(options.Timer.UUID, time.Unix(0, options.Timer.Finish))
+		default:
+			err = errors.Errorf("Unsupported command: %s", options.Command)
+		}
+		if err == nil {
+			switch strings.ToLower(options.Command) {
+			case "delete":
+			default:
+				fmt.Println(timer)
+			}
+		}
+	default:
+		err = errors.Errorf("Unsupported object: %s", options.ObjectType)
+	}
+	if err := meta.Shutdown(); err != nil {
+		fmt.Println(err)
+	}
+	if err := remote.Shutdown(); err != nil {
+		fmt.Println(err)
+	}
+	c.Close()
+
+	return
+}
