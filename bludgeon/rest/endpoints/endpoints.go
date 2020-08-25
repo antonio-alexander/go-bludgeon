@@ -14,6 +14,10 @@ import (
 
 //BuildRoutes will create all the routes and their functions to execute when received
 func BuildRoutes(logger bludgeon.Logger, functional interface{}) (routes []rest.HandleFuncConfig) {
+	//REVIEW: in the future when we add tokens, we'll need to create some way to check tokens for
+	// certain functions, we may need to implement varratics to add support for tokens for the
+	// server actions, may not be able to re-use the existing endpoints
+
 	//get the routes for the functional timer, and then the timeslice
 	if f, ok := functional.(bludgeon.FunctionalTimer); ok {
 		routes = append(routes, []rest.HandleFuncConfig{
@@ -31,34 +35,28 @@ func BuildRoutes(logger bludgeon.Logger, functional interface{}) (routes []rest.
 			{Route: rest.RouteTimeSliceRead, Method: POST, HandleFx: TimeSliceRead(logger, f)},
 		}...)
 	}
-	// if f, ok := functional.(bludgeon.FunctionalOwner); ok {
-	// 	routes = append(routes, []rest.HandleFuncConfig{
-	// 		{Route: rest.RouteStop, Method: POST, HandleFx: Stop(logger, f)},
-	// 	}...)
-	// }
+	if f, ok := functional.(bludgeon.FunctionalManage); ok {
+		routes = append(routes, []rest.HandleFuncConfig{
+			{Route: rest.RouteStop, Method: POST, HandleFx: Stop(logger, f)},
+		}...)
+	}
 
 	return
 }
 
-// //ServerStop
-// func Stop(l bludgeon.Logger, f 	bludgeon.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
-// 	return func(writer http.ResponseWriter, request *http.Request) {
-// 		var token bludgeon.Token
-// 		var bytes []byte
-// 		var err error
+//Stop
+func Stop(l bludgeon.Logger, f bludgeon.FunctionalManage) func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var err error
 
-// 		//get token
-// 		if token, err = getToken(request); err == nil {
-// 			//attempt to execute the timer create
-// 			_, err = f.Stop(bludgeon.CommandServerStop, nil, token)
-// 		}
-// 		//handle errors
-// 		if err = handleResponse(writer, err, bytes); err != nil {
-// 			err = errors.Wrap(err, "Stop")
-// 			l.Error(err)
-// 		}
-// 	}
-// }
+		//attempt to execute the timer create
+		err = f.Stop()
+		//handle errors
+		if err = handleResponse(writer, err, nil); err != nil {
+			l.Error(errors.Wrap(err, "Stop"))
+		}
+	}
+}
 
 //TimerCreate
 func TimerCreate(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
@@ -73,8 +71,7 @@ func TimerCreate(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respon
 		}
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
-			err = errors.Wrap(err, "TimerCreate")
-			l.Error(err)
+			l.Error(errors.Wrap(err, "TimerCreate"))
 		}
 	}
 }
@@ -98,8 +95,7 @@ func TimerRead(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Response
 		}
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
-			err = errors.Wrap(err, "TimerRead")
-			l.Error(err)
+			l.Error(errors.Wrap(err, "TimerRead"))
 		}
 	}
 }
@@ -123,8 +119,7 @@ func TimerUpdate(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respon
 		}
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
-			err = errors.Wrap(err, "TimerUpdate")
-			l.Error(err)
+			l.Error(errors.Wrap(err, "TimerUpdate"))
 		}
 	}
 }
@@ -144,9 +139,8 @@ func TimerDelete(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respon
 			}
 		}
 		//handle errors
-		if err = handleResponse(writer, err, bytes); err != nil {
-			err = errors.Wrap(err, "TimerDelete")
-			l.Error(err)
+		if err = handleResponse(writer, err, nil); err != nil {
+			l.Error(errors.Wrap(err, "TimerDelete"))
 		}
 	}
 }
@@ -170,8 +164,7 @@ func TimerStart(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respons
 		}
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
-			err = errors.Wrap(err, "TimerStart")
-			l.Error(err)
+			l.Error(errors.Wrap(err, "TimerStart"))
 		}
 	}
 }
@@ -195,8 +188,7 @@ func TimerPause(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respons
 		}
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
-			err = errors.Wrap(err, "TimerPause")
-			l.Error(err)
+			l.Error(errors.Wrap(err, "TimerPause"))
 		}
 	}
 }
@@ -220,8 +212,7 @@ func TimerSubmit(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respon
 		}
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
-			err = errors.Wrap(err, "TimerSubmit")
-			l.Error(err)
+			l.Error(errors.Wrap(err, "TimerSubmit"))
 		}
 	}
 }
@@ -245,8 +236,7 @@ func TimeSliceRead(l bludgeon.Logger, f bludgeon.FunctionalTimeSlice) func(http.
 		}
 		//handle errors
 		if err = handleResponse(writer, err, bytes); err != nil {
-			err = errors.Wrap(err, "TimeSliceRead")
-			l.Error(err)
+			l.Error(errors.Wrap(err, "TimeSliceRead"))
 		}
 	}
 }

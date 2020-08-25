@@ -7,20 +7,11 @@ import (
 //route constants
 const (
 	//
-	RouteServer     = "/api/server"
-	RouteServerStop = RouteServer + "/stop"
+	RouteStop = "/api/stop"
 	//
 	RouteAdmin       = "/api/admin"
 	RouteAdminConfig = RouteAdmin + "/config"
 	RouteAdminStatus = RouteAdmin + "/status"
-)
-
-//route constants
-const (
-	//
-	RouteClient      = "/api/client"
-	RouteClientStop  = RouteClient + "/stop"
-	RouteClientStart = RouteClient + "/start"
 	//
 	RouteTimer       = "/api/timer"
 	RouteTimerCreate = RouteTimer + "/create"
@@ -63,13 +54,15 @@ const (
 	RouteTokenRelease = "/api/token/release"
 	RouteTokenVerify  = "/api/token/verify"
 	//
-	RouteDebugEnable  = "/api/debug/enable"
-	RouteDebugDisable = "/api/debug/disable"
+	RouteDebug        = "/api/debug"
+	RouteDebugEnable  = RouteDebug + "enable"
+	RouteDebugDisable = RouteDebug + "disable"
 	//
-	RouteSyncTimersProject  = "/api/sync/timers_project"
-	RouteSyncTimersEmployee = "/api/sync/timers_employee"
-	RouteSyncTasksProject   = "/api/sync/tasks_project"
-	RouteSyncTasksEmployee  = "/api/sync/tasks_employee"
+	RouteSync               = "/api/sync"
+	RouteSyncTimersProject  = RouteSync + "/timers_project"
+	RouteSyncTimersEmployee = RouteSync + "/timers_employee"
+	RouteSyncTasksProject   = RouteSync + "/tasks_project"
+	RouteSyncTasksEmployee  = RouteSync + "/tasks_employee"
 )
 
 //Contract

@@ -196,6 +196,11 @@ type FunctionalOwner interface {
 	Shutdown() (err error)
 }
 
+type FunctionalManage interface {
+	//
+	Stop() (err error)
+}
+
 //FunctionalTimer
 type FunctionalTimer interface {
 	//TimerCreate
@@ -226,13 +231,13 @@ type FunctionalTimeSlice interface {
 	TimeSliceRead(id string) (timeSlice TimeSlice, err error)
 }
 
-type MetaType uint8
+type MetaType string
 
 //task states
 const (
-	MetaTypeInvalid MetaType = iota
-	MetaTypeJSON    MetaType = iota
-	MetaTypeMySQL   MetaType = iota
+	MetaTypeInvalid MetaType = "invalid"
+	MetaTypeJSON    MetaType = "json"
+	MetaTypeMySQL   MetaType = "mysql"
 )
 
 func (m MetaType) String() string {
@@ -257,11 +262,11 @@ func AtoMetaType(s string) MetaType {
 	}
 }
 
-type RemoteType uint8
+type RemoteType string
 
 const (
-	RemoteTypeInvalid RemoteType = iota
-	RemoteTypeRest    RemoteType = iota
+	RemoteTypeInvalid RemoteType = "invalid"
+	RemoteTypeRest    RemoteType = "rest"
 )
 
 func AtoRemoteType(s string) RemoteType {
@@ -273,12 +278,12 @@ func AtoRemoteType(s string) RemoteType {
 	}
 }
 
-type ObjectType uint8
+type ObjectType string
 
 const (
-	ObjectTypeInvalid   ObjectType = iota
-	ObjectTypeTimer     ObjectType = iota
-	ObjectTypeTimeSlice ObjectType = iota
+	ObjectTypeInvalid   ObjectType = "invalid"
+	ObjectTypeTimer     ObjectType = "timer"
+	ObjectTypeTimeSlice ObjectType = "timeslice"
 )
 
 func AtoObjectType(s string) ObjectType {

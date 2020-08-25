@@ -15,8 +15,10 @@
 # vendor/
 
 #binaries
-cmd/client_cli/client_cli
-cmd/server_rest/server_rest
+cmd/client-cli/client-cli
+cmd/server-rest/server-rest
+cmd/client-cli/bludgeon-client-cli
+cmd/server-rest/bludgeon-server-rest
 
 #configuration
 cmd/**/data/*

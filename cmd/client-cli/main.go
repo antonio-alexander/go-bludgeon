@@ -13,6 +13,7 @@ import (
 	config "github.com/antonio-alexander/go-bludgeon/bludgeon/config"
 	json "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/json"
 	api "github.com/antonio-alexander/go-bludgeon/bludgeon/rest/api"
+
 	"github.com/pkg/errors"
 )
 
@@ -36,7 +37,7 @@ func main() {
 func Main(pwd string, args []string, envs map[string]string) (err error) {
 	var options cli.Options
 	var conf config.Client
-	var cacheFile, configFile string
+	var cacheFile string
 	var cache client.Cache
 	var meta interface {
 		bludgeon.MetaOwner
@@ -49,7 +50,7 @@ func Main(pwd string, args []string, envs map[string]string) (err error) {
 	}
 
 	//
-	if configFile, cacheFile, err = bludgeon.Files(pwd); err != nil {
+	if _, cacheFile, err = bludgeon.Files(pwd, &conf); err != nil {
 		return
 	}
 	if options, err = cli.Parse(pwd, args, envs); err != nil {
@@ -61,7 +62,7 @@ func Main(pwd string, args []string, envs map[string]string) (err error) {
 	if options.Timer.UUID == "" {
 		options.Timer.UUID = cache.TimerID
 	}
-	if err = config.Read(configFile, pwd, envs, &conf); err != nil {
+	if err = config.Read("", pwd, envs, &conf); err != nil {
 		return
 	}
 	switch conf.RemoteType {
@@ -72,7 +73,9 @@ func Main(pwd string, args []string, envs map[string]string) (err error) {
 			return
 		}
 	default:
-		//TODO: add error
+		err = errors.Errorf("Unsupported remote: %s", conf.RemoteType)
+
+		return
 	}
 	switch conf.MetaType {
 	case bludgeon.MetaTypeJSON:
@@ -82,7 +85,9 @@ func Main(pwd string, args []string, envs map[string]string) (err error) {
 			return
 		}
 	default:
-		//TODO: add error
+		err = errors.Errorf("Unsupported meta: %s", conf.MetaType)
+
+		return
 	}
 	c := client.NewClient(log.New(os.Stdout, "", 0), log.New(os.Stderr, "", 0), meta, remote)
 	switch options.ObjectType {
@@ -119,10 +124,10 @@ func Main(pwd string, args []string, envs map[string]string) (err error) {
 		err = errors.Errorf("Unsupported object: %s", options.ObjectType)
 	}
 	if err := meta.Shutdown(); err != nil {
-		fmt.Println(err)
+		fmt.Println(errors.Wrap(err, "Meta Shutdown"))
 	}
 	if err := remote.Shutdown(); err != nil {
-		fmt.Println(err)
+		fmt.Println(errors.Wrap(err, "Remote Shutdown"))
 	}
 	c.Close()
 

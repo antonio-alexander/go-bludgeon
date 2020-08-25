@@ -13,6 +13,7 @@ import (
 	endpoints "github.com/antonio-alexander/go-bludgeon/bludgeon/rest/endpoints"
 	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest/server"
 	server "github.com/antonio-alexander/go-bludgeon/bludgeon/server"
+
 	"github.com/pkg/errors"
 )
 
@@ -50,10 +51,13 @@ func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os
 	var chExternal <-chan struct{}
 
 	//
-	if configPath, _, err = bludgeon.Files(pwd); err != nil {
+	if configPath, _, err = bludgeon.Files(pwd, &conf); err != nil {
 		return
 	}
 	if err = config.Read(configPath, pwd, envs, &conf); err != nil {
+		return
+	}
+	if err = config.Write(configPath, &conf); err != nil {
 		return
 	}
 	switch conf.MetaType {
@@ -68,14 +72,16 @@ func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os
 			return
 		}
 	default:
-		err = errors.Errorf("!!Unsupported meta: %s", conf.MetaType)
+		err = errors.Errorf("Unsupported meta: %s", conf.MetaType)
 
 		return
 	}
 	r, s := rest.NewServer(), server.NewServer(logOut, logError, meta)
 	if chExternal, err = s.Start(conf.Server); err == nil {
-		if err = r.BuildRoutes(endpoints.BuildRoutes(nil, s)); err == nil {
+		routes := endpoints.BuildRoutes(nil, s)
+		if err = r.BuildRoutes(routes); err == nil {
 			if err = r.Start(conf.Rest.Address, conf.Rest.Port); err == nil {
+				logOut.Printf("Rest Server started on %s:%s", conf.Rest.Address, conf.Rest.Port)
 				select {
 				case <-chSignalInt:
 					logOut.Println("Server stopped externally (os interrupt)")
@@ -83,9 +89,7 @@ func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os
 						logOut.Println(err)
 					}
 				case <-chExternal:
-				}
-				if err := r.Stop(); err != nil {
-					logOut.Println(err)
+					logOut.Println("Server stopped internally")
 				}
 			}
 		}

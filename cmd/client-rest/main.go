@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	cli "github.com/antonio-alexander/go-bludgeon/bludgeon/cli"
 	client "github.com/antonio-alexander/go-bludgeon/bludgeon/client"
 	config "github.com/antonio-alexander/go-bludgeon/bludgeon/config"
 	json "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/json"
@@ -36,24 +35,17 @@ func main() {
 }
 
 func Main(pwd string, args []string, envs map[string]string, osSignal chan os.Signal) (err error) {
-	var configFile, cacheFile string
-	var options cli.Options
+	// var options cli.Options
 	var conf config.Client
-	var cache client.Cache
+	var configFile string
 
 	//
-	if configFile, cacheFile, err = bludgeon.Files(pwd); err != nil {
+	if configFile, _, err = bludgeon.Files(pwd, &conf); err != nil {
 		return
 	}
-	if options, err = cli.Parse(pwd, args, envs); err != nil {
-		return
-	}
-	if cache, err = client.CacheRead(cacheFile); err != nil {
-		return
-	}
-	if options.Timer.UUID == "" {
-		options.Timer.UUID = cache.TimerID
-	}
+	// if options, err = cli.Parse(pwd, args, envs); err != nil {
+	// 	return
+	// }
 	if err = config.Read(configFile, pwd, envs, &conf); err != nil {
 		return
 	}
