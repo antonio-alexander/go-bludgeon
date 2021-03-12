@@ -98,6 +98,8 @@ func Write(configPath string, config interface{}) (err error) {
 }
 
 func fromEnv(pwd string, envs map[string]string, config interface{}) (err error) {
+	// var directory string
+
 	//
 	switch c := config.(type) {
 	case *Client:
@@ -224,43 +226,6 @@ func fromEnv(pwd string, envs map[string]string, config interface{}) (err error)
 	default:
 		err = errors.Errorf(ErrUnsupportedConfigf, c)
 	}
-
-	//
-	// for _, metaType := range []string{"json", "mysql"} {
-	// 	var bytes json.RawMessage
-
-	// 	//get meta configuration
-	// 	switch metaType {
-	// 	case "json":
-	// 		var config mjson.Configuration
-
-	// 		//get json file
-	// 		if jsonFile, ok := envs[EnvNameBludgeonMetaJSONFile]; ok {
-	// 			config.File = jsonFile
-	// 		}
-	// 		if bytes, err = json.Marshal(&config); err != nil {
-	// 			return
-	// 		}
-	// 		c.Meta.Config["json"] = bytes
-	// 	case "mysql":
-	// 		var config mysql.Configuration
-
-	// 		//get database address
-	// 		if databaseAddress, ok := envs[EnvNameDatabaseAddress]; ok {
-	// 			config.Hostname = databaseAddress
-	// 		}
-	// 		//get database port
-	// 		if databasePort, ok := envs[EnvNameDatabasePort]; ok {
-	// 			config.Port = databasePort
-	// 		}
-	// 		if bytes, err = json.Marshal(&config); err != nil {
-	// 			return
-	// 		}
-	// 		c.Meta.Config["mysql"] = bytes
-	// 	default:
-	// 		err = fmt.Errorf("Unsupported meta: \"%s\"", metaType)
-	// 	}
-	// }
 
 	return
 }

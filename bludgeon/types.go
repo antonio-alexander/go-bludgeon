@@ -68,11 +68,11 @@ type TimeSlice struct {
 type Timer struct {
 	UUID            string `json:"UUID"`            //unique id to be shared across network
 	ActiveSliceUUID string `json:"ActiveSliceUUID"` //unique id to be shared across network
+	Comment         string `json:"Comment"`         //a comment describing the timer
 	Start           int64  `json:"Start"`           //the start time in unix nano
 	Finish          int64  `json:"Finish"`          //the finish time in unix nano
 	ElapsedTime     int64  `json:"ElapsedTime"`     //how much time has elapsed
 	Completed       bool   `json:"Completed"`       //this is set to true once the timer has been submitted
-	Comment         string `json:"Comment"`         //a comment describing the timer
 	Archived        bool   `json:"Archived"`        //whether or not the timer is archived
 	//currently unused
 	// Billed     bool   `json:"Billed"` //this is set once it has been billed so it "can't" be modified

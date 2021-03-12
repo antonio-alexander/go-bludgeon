@@ -1,13 +1,18 @@
 package bludgeonmetajsonconfig
 
+//error constants
+const (
+	ErrFileEmpty string = "File is empty"
+)
+
 //environmental variables
 const (
-	EnvNameBludgeonMetaJSONFile string = "BLUDGEON_META_JSON_FILE"
+	EnvNameFile string = "BLUDGEON_META_JSON_FILE"
 )
 
 //defaults
 const (
-	DefaultBludgeonMetaJSONFile string = "data/bludgeon.json"
+	DefaultFile string = "data/bludgeon.json"
 )
 
 type Configuration struct {
