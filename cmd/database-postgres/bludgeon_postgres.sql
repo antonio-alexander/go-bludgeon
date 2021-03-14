@@ -94,14 +94,16 @@ CREATE TABLE bludgeon.project (
 ALTER TABLE bludgeon.project OWNER TO postgres;
 -- ddl-end --
 
--- object: bludgeon.time_slice | type: TABLE --
--- DROP TABLE IF EXISTS bludgeon.time_slice CASCADE;
-CREATE TABLE bludgeon.time_slice (
+-- object: bludgeon.timer_slice | type: TABLE --
+-- DROP TABLE IF EXISTS bludgeon.timer_slice CASCADE;
+CREATE TABLE bludgeon.timer_slice (
 	timer_id bigint NOT NULL,
-	slice_id bigint NOT NULL
+	slice_id bigint NOT NULL,
+	CONSTRAINT time_slice_pk PRIMARY KEY (timer_id,slice_id)
+
 );
 -- ddl-end --
-ALTER TABLE bludgeon.time_slice OWNER TO postgres;
+ALTER TABLE bludgeon.timer_slice OWNER TO postgres;
 -- ddl-end --
 
 -- object: bludgeon.timer_elapsed | type: TABLE --
@@ -140,28 +142,90 @@ CREATE TABLE bludgeon.timer_employee (
 ALTER TABLE bludgeon.timer_employee OWNER TO postgres;
 -- ddl-end --
 
--- object: bludgeon.project_timer | type: TABLE --
--- DROP TABLE IF EXISTS bludgeon.project_timer CASCADE;
-CREATE TABLE bludgeon.project_timer (
+-- object: bludgeon.timer_project | type: TABLE --
+-- DROP TABLE IF EXISTS bludgeon.timer_project CASCADE;
+CREATE TABLE bludgeon.timer_project (
 	timer_id bigint NOT NULL,
 	project_id bigint NOT NULL,
 	CONSTRAINT project_timer_pk PRIMARY KEY (timer_id,project_id)
 
 );
 -- ddl-end --
-ALTER TABLE bludgeon.project_timer OWNER TO postgres;
+ALTER TABLE bludgeon.timer_project OWNER TO postgres;
 -- ddl-end --
 
--- object: timer_id | type: CONSTRAINT --
--- ALTER TABLE bludgeon.time_slice DROP CONSTRAINT IF EXISTS timer_id CASCADE;
-ALTER TABLE bludgeon.time_slice ADD CONSTRAINT timer_id FOREIGN KEY (timer_id)
+-- object: bludgeon.timer_slice_active | type: TABLE --
+-- DROP TABLE IF EXISTS bludgeon.timer_slice_active CASCADE;
+CREATE TABLE bludgeon.timer_slice_active (
+	slice_id bigint NOT NULL,
+	timer_id bigint NOT NULL,
+	CONSTRAINT time_slice_active_pk PRIMARY KEY (slice_id,timer_id)
+
+);
+-- ddl-end --
+ALTER TABLE bludgeon.timer_slice_active OWNER TO postgres;
+-- ddl-end --
+
+-- object: client_timer_idx | type: INDEX --
+-- DROP INDEX IF EXISTS bludgeon.client_timer_idx CASCADE;
+CREATE INDEX client_timer_idx ON bludgeon.timer_client
+	USING btree
+	(
+	  client_id,
+	  timer_id
+	);
+-- ddl-end --
+
+-- object: employee_timer_idx | type: INDEX --
+-- DROP INDEX IF EXISTS bludgeon.employee_timer_idx CASCADE;
+CREATE INDEX employee_timer_idx ON bludgeon.timer_employee
+	USING btree
+	(
+	  employee_id,
+	  timer_id
+	);
+-- ddl-end --
+
+-- object: project_timer_idx | type: INDEX --
+-- DROP INDEX IF EXISTS bludgeon.project_timer_idx CASCADE;
+CREATE INDEX project_timer_idx ON bludgeon.timer_project
+	USING btree
+	(
+	  project_id,
+	  timer_id
+	);
+-- ddl-end --
+
+-- object: timer_slice_idx | type: INDEX --
+-- DROP INDEX IF EXISTS bludgeon.timer_slice_idx CASCADE;
+CREATE INDEX timer_slice_idx ON bludgeon.timer_slice_active
+	USING btree
+	(
+	  timer_id,
+	  slice_id
+	);
+-- ddl-end --
+
+-- object: slice_timer_idx | type: INDEX --
+-- DROP INDEX IF EXISTS bludgeon.slice_timer_idx CASCADE;
+CREATE INDEX slice_timer_idx ON bludgeon.timer_slice
+	USING btree
+	(
+	  slice_id,
+	  timer_id
+	);
+-- ddl-end --
+
+-- object: timer_id_fk | type: CONSTRAINT --
+-- ALTER TABLE bludgeon.timer_slice DROP CONSTRAINT IF EXISTS timer_id_fk CASCADE;
+ALTER TABLE bludgeon.timer_slice ADD CONSTRAINT timer_id_fk FOREIGN KEY (timer_id)
 REFERENCES bludgeon.timer (timer_id) MATCH FULL
 ON DELETE NO ACTION ON UPDATE NO ACTION;
 -- ddl-end --
 
--- object: slice_id | type: CONSTRAINT --
--- ALTER TABLE bludgeon.time_slice DROP CONSTRAINT IF EXISTS slice_id CASCADE;
-ALTER TABLE bludgeon.time_slice ADD CONSTRAINT slice_id FOREIGN KEY (slice_id)
+-- object: slice_id_fk | type: CONSTRAINT --
+-- ALTER TABLE bludgeon.timer_slice DROP CONSTRAINT IF EXISTS slice_id_fk CASCADE;
+ALTER TABLE bludgeon.timer_slice ADD CONSTRAINT slice_id_fk FOREIGN KEY (slice_id)
 REFERENCES bludgeon.slice (slice_id) MATCH FULL
 ON DELETE NO ACTION ON UPDATE NO ACTION;
 -- ddl-end --
@@ -173,45 +237,59 @@ REFERENCES bludgeon.timer (timer_id) MATCH FULL
 ON DELETE NO ACTION ON UPDATE NO ACTION;
 -- ddl-end --
 
--- object: timer_id | type: CONSTRAINT --
--- ALTER TABLE bludgeon.timer_client DROP CONSTRAINT IF EXISTS timer_id CASCADE;
-ALTER TABLE bludgeon.timer_client ADD CONSTRAINT timer_id FOREIGN KEY (timer_id)
+-- object: timer_id_fk | type: CONSTRAINT --
+-- ALTER TABLE bludgeon.timer_client DROP CONSTRAINT IF EXISTS timer_id_fk CASCADE;
+ALTER TABLE bludgeon.timer_client ADD CONSTRAINT timer_id_fk FOREIGN KEY (timer_id)
 REFERENCES bludgeon.timer (timer_id) MATCH FULL
 ON DELETE NO ACTION ON UPDATE NO ACTION;
 -- ddl-end --
 
--- object: client_id | type: CONSTRAINT --
--- ALTER TABLE bludgeon.timer_client DROP CONSTRAINT IF EXISTS client_id CASCADE;
-ALTER TABLE bludgeon.timer_client ADD CONSTRAINT client_id FOREIGN KEY (client_id)
+-- object: client_id_fk | type: CONSTRAINT --
+-- ALTER TABLE bludgeon.timer_client DROP CONSTRAINT IF EXISTS client_id_fk CASCADE;
+ALTER TABLE bludgeon.timer_client ADD CONSTRAINT client_id_fk FOREIGN KEY (client_id)
 REFERENCES bludgeon.client (client_id) MATCH FULL
 ON DELETE NO ACTION ON UPDATE NO ACTION;
 -- ddl-end --
 
--- object: timer_id | type: CONSTRAINT --
--- ALTER TABLE bludgeon.timer_employee DROP CONSTRAINT IF EXISTS timer_id CASCADE;
-ALTER TABLE bludgeon.timer_employee ADD CONSTRAINT timer_id FOREIGN KEY (timer_id)
+-- object: timer_id_fk | type: CONSTRAINT --
+-- ALTER TABLE bludgeon.timer_employee DROP CONSTRAINT IF EXISTS timer_id_fk CASCADE;
+ALTER TABLE bludgeon.timer_employee ADD CONSTRAINT timer_id_fk FOREIGN KEY (timer_id)
 REFERENCES bludgeon.timer (timer_id) MATCH FULL
 ON DELETE NO ACTION ON UPDATE NO ACTION;
 -- ddl-end --
 
--- object: employee_id | type: CONSTRAINT --
--- ALTER TABLE bludgeon.timer_employee DROP CONSTRAINT IF EXISTS employee_id CASCADE;
-ALTER TABLE bludgeon.timer_employee ADD CONSTRAINT employee_id FOREIGN KEY (employee_id)
+-- object: employee_id_fk | type: CONSTRAINT --
+-- ALTER TABLE bludgeon.timer_employee DROP CONSTRAINT IF EXISTS employee_id_fk CASCADE;
+ALTER TABLE bludgeon.timer_employee ADD CONSTRAINT employee_id_fk FOREIGN KEY (employee_id)
 REFERENCES bludgeon.employee (employee_id) MATCH FULL
 ON DELETE NO ACTION ON UPDATE NO ACTION;
 -- ddl-end --
 
--- object: project_id | type: CONSTRAINT --
--- ALTER TABLE bludgeon.project_timer DROP CONSTRAINT IF EXISTS project_id CASCADE;
-ALTER TABLE bludgeon.project_timer ADD CONSTRAINT project_id FOREIGN KEY (project_id)
+-- object: project_id_fk | type: CONSTRAINT --
+-- ALTER TABLE bludgeon.timer_project DROP CONSTRAINT IF EXISTS project_id_fk CASCADE;
+ALTER TABLE bludgeon.timer_project ADD CONSTRAINT project_id_fk FOREIGN KEY (project_id)
 REFERENCES bludgeon.project (project_id) MATCH FULL
 ON DELETE NO ACTION ON UPDATE NO ACTION;
 -- ddl-end --
 
--- object: timer_id | type: CONSTRAINT --
--- ALTER TABLE bludgeon.project_timer DROP CONSTRAINT IF EXISTS timer_id CASCADE;
-ALTER TABLE bludgeon.project_timer ADD CONSTRAINT timer_id FOREIGN KEY (project_id)
+-- object: timer_id_fk | type: CONSTRAINT --
+-- ALTER TABLE bludgeon.timer_project DROP CONSTRAINT IF EXISTS timer_id_fk CASCADE;
+ALTER TABLE bludgeon.timer_project ADD CONSTRAINT timer_id_fk FOREIGN KEY (project_id)
 REFERENCES bludgeon.timer (timer_id) MATCH FULL
+ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- ddl-end --
+
+-- object: timer_id_fk | type: CONSTRAINT --
+-- ALTER TABLE bludgeon.timer_slice_active DROP CONSTRAINT IF EXISTS timer_id_fk CASCADE;
+ALTER TABLE bludgeon.timer_slice_active ADD CONSTRAINT timer_id_fk FOREIGN KEY (timer_id)
+REFERENCES bludgeon.timer (timer_id) MATCH FULL
+ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- ddl-end --
+
+-- object: slice_id_fk | type: CONSTRAINT --
+-- ALTER TABLE bludgeon.timer_slice_active DROP CONSTRAINT IF EXISTS slice_id_fk CASCADE;
+ALTER TABLE bludgeon.timer_slice_active ADD CONSTRAINT slice_id_fk FOREIGN KEY (slice_id)
+REFERENCES bludgeon.slice (slice_id) MATCH FULL
 ON DELETE NO ACTION ON UPDATE NO ACTION;
 -- ddl-end --
 
