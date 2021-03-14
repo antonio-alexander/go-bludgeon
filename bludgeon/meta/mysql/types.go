@@ -33,53 +33,19 @@ const (
 
 //query constants
 const (
-	TableTimer            string = "timer"
-	QueryTimerCreateTable string = `CREATE TABLE IF NOT EXISTS ` + TableTimer + ` (
-		id BIGINT NOT NULL AUTO_INCREMENT,
-		uuid TEXT(36),
-		activesliceuuid TEXT(36),    
-		start BIGINT,
-		finish BIGINT,
-		elapsedtime BIGINT,
-		comment TEXT,
-		INDEX(id),
-		UNIQUE(uuid(36)),
-		PRIMARY KEY (id)
-		-- FOREIGN KEY (employeeid)
-			-- REFERENCES employee(id)
-			-- ON UPDATE CASCADE ON DELETE RESTRICT
-	)ENGINE=InnoDB;`
+	TableTimer       string = "timer"
 	QueryTimerUpsert string = `INSERT into ` + TableTimer + ` (uuid, activesliceuuid, start, finish, elapsedtime, comment) VALUES(?, ?, ?, ?, ?, ?)
 	ON DUPLICATE KEY 
 		UPDATE uuid=?, activesliceuuid=?, start=?, finish=?, elapsedtime=?, comment=?`
-	QueryTimerDeletef string = `DELETE FROM ` + TableTimer + ` where uuid = ?`
-	QueryTimerSelectf string = `SELECT uuid, activesliceuuid, start, finish, elapsedtime from ` + TableTimer + ` WHERE uuid = ?`
-	//
-	TableTimeSlice            string = "timeslice"
-	QueryTimeSliceCreateTable string = `CREATE TABLE IF NOT EXISTS ` + TableTimeSlice + ` (
-		id BIGINT NOT NULL AUTO_INCREMENT,
-		uuid TEXT(36),
-		timeruuid TEXT(36),    
-		start BIGINT,
-		finish BIGINT,
-		elapsedtime BIGINT,
-		INDEX(id),
-		UNIQUE(uuid(36)),
-		PRIMARY KEY (id)
-		-- FOREIGN KEY (timeruuid(36))
-		--     REFERENCES timer(uuid)
-		--     ON DELETE CASCADE
-	)ENGINE=InnoDB;`
+	QueryTimerDeletef    string = `DELETE FROM ` + TableTimer + ` where uuid = ?`
+	QueryTimerSelectf    string = `SELECT uuid, activesliceuuid, start, finish, elapsedtime from ` + TableTimer + ` WHERE uuid = ?`
+	TableTimeSlice       string = "slice"
 	QueryTimeSliceUpsert string = `INSERT into ` + TableTimeSlice + ` (uuid, timeruuid, start, finish, elapsedtime) VALUES(?, ?, ?, ?, ?)
 	ON DUPLICATE KEY
 		UPDATE uuid=?, start=?, finish=?, elapsedtime=?`
 	QueryTimeSliceDeletef string = `DELETE FROM ` + TableTimeSlice + ` where uuid = ?`
 	QueryTimeSliceSelectf string = `SELECT uuid, timeruuid, start, finish, elapsedtime from ` + TableTimeSlice + ` WHERE uuid = ?`
+	TableProject          string = "project"
+	TableClient           string = "client"
+	TableEmployee         string = "employee"
 )
-
-// //TableProject is the string defining the name of the project table
-// TableProject string = "project"
-// //TableClient is the string defining the name of the client table
-// TableClient string = "client"
-// //TableEmployee is the string defining the name of the employee table
-// TableEmployee string = "employee"
