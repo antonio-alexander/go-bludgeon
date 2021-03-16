@@ -8,13 +8,16 @@ USE bludgeon;
 CREATE TABLE IF NOT EXISTS timer (     
     timer_id BIGINT NOT NULL AUTO_INCREMENT,
     timer_uuid TEXT(36) NOT NULL,
-    timestamp_start BIGINT,
-    timestamp_finish BIGINT,
-    comment TEXT,
+    timer_start BIGINT NOT NULL,
+    timer_finish BIGINT,
+    timer_comment TEXT NOT NULL DEFAULT "",
+    timer_completed BOOLEAN NOT NULL DEFAULT FALSE,
+    timer_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    timer_billed BOOLEAN NOT NULL DEFAULT FALSE,
 
     PRIMARY KEY (timer_id),
-    INDEX(timer_id),
-    UNIQUE(timer_uuid(36))
+    UNIQUE(timer_uuid(36)),
+    INDEX(timer_id)
 
 )ENGINE=InnoDB;
 
@@ -22,8 +25,9 @@ CREATE TABLE IF NOT EXISTS timer (
 CREATE TABLE IF NOT EXISTS slice (     
     slice_id BIGINT NOT NULL AUTO_INCREMENT,
     slice_uuid TEXT(36) NOT NULL,
-    timestamp_start BIGINT NOT NULL,
-    timestamp_finish BIGINT,
+    slice_start BIGINT NOT NULL,
+    slice_finish BIGINT,
+    slice_archived BOOLEAN,
 
     PRIMARY KEY (slice_id),
     UNIQUE(slice_uuid(36))
@@ -36,9 +40,9 @@ CREATE TABLE IF NOT EXISTS timer_slice (
     slice_id BIGINT NOT NULL,
 
     PRIMARY KEY (timer_id, slice_id),
-    INDEX (slice_id, timer_id),
     FOREIGN KEY (timer_id) REFERENCES timer(timer_id),
-    FOREIGN KEY (slice_id) REFERENCES slice(slice_id)
+    FOREIGN KEY (slice_id) REFERENCES slice(slice_id),
+    INDEX (slice_id, timer_id),
 
 )Engine=InnoDB;
 
@@ -49,7 +53,8 @@ CREATE TABLE IF NOT EXISTS timer_slice_active (
 
     PRIMARY KEY (timer_id, slice_id),
     FOREIGN KEY (timer_id) REFERENCES timer(timer_id),
-    FOREIGN KEY (slice_id) REFERENCES slice(slice_id)
+    FOREIGN KEY (slice_id) REFERENCES slice(slice_id),
+    INDEX (slice_id, timer_id)
 
 )Engine=InnoDB;
 
@@ -57,8 +62,7 @@ CREATE TABLE IF NOT EXISTS timer_slice_active (
 CREATE TABLE IF NOT EXISTS client (
     client_id BIGINT NOT NULL AUTO_INCREMENT,
     client_uuid TEXT(36) NOT NULL,
-    first_name TEXT,
-    last_name TEXT,
+    client_name TEXT,
 
     PRIMARY KEY (client_id),
     UNIQUE(client_uuid(36))
@@ -81,11 +85,11 @@ CREATE TABLE IF NOT EXISTS timer_client (
 CREATE TABLE IF NOT EXISTS employee (
     employee_id BIGINT NOT NULL AUTO_INCREMENT,
     employee_uuid TEXT,
-    name TEXT,
-    rate FLOAT,
+    employee_first_name TEXT,
+    employee_last_name TEXT,
 
     PRIMARY KEY (employee_id),
-    UNIQUE(employee_id)
+    UNIQUE(employee_uuid)
 
 )ENGINE=InnoDB;
 
@@ -108,6 +112,7 @@ CREATE TABLE IF NOT EXISTS project (
     description TEXT,
 
     PRIMARY KEY (project_id),
+    UNIQUE(project_uuid),
     INDEX(project_id)
     
 )ENGINE=InnoDB;

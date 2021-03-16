@@ -1,14 +1,14 @@
 package bludgeonmetamysql
 
 import (
-	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
+
+	"github.com/pkg/errors"
 
 	_ "github.com/go-sql-driver/mysql" //import for driver support
 )
@@ -16,13 +16,12 @@ import (
 const timeout time.Duration = 5 * time.Second
 
 type mysql struct {
-	sync.RWMutex                   //mutex for threadsafe functionality
-	sync.WaitGroup                 //waitgroup to manage goroutines
-	started        bool            //whether or not started
-	config         Configuration   //configuration
-	stopper        chan struct{}   //stopper for go routines
-	db             *sql.DB         //pointer to the database
-	ctx            context.Context //context
+	sync.RWMutex                 //mutex for threadsafe functionality
+	sync.WaitGroup               //waitgroup to manage goroutines
+	started        bool          //whether or not started
+	config         Configuration //configuration
+	stopper        chan struct{} //stopper for go routines
+	db             *sql.DB       //pointer to the database
 }
 
 func NewMetaMySQL() interface {
@@ -30,81 +29,14 @@ func NewMetaMySQL() interface {
 	bludgeon.MetaTimer
 	bludgeon.MetaTimeSlice
 } {
+	config := &Configuration{}
+	config.Default()
 	//create internal pointers
 	//create mysql pointer
 	return &mysql{
 		stopper: make(chan struct{}),
+		config:  *config,
 	}
-}
-
-//queryNoResult is used to perform a query and return an error and ignore the result
-// it's used in the API to allow "how" queries are run be located in one place and if
-// necessary, this code can use a switch case to run differently depending on the type of
-// database configured, this will not return a result
-func (m *mysql) queryNoResult(query string, v ...interface{}) (err error) {
-	var tx *sql.Tx
-
-	//check to see if the pointer is nil, if so, exit immediately
-	if m.db == nil {
-		err = errors.New(ErrDatabaseNil)
-		return
-	}
-	//create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	//begin the transaction
-	if tx, err = m.db.BeginTx(ctx, &sql.TxOptions{Isolation: DatabaseIsolation}); err != nil {
-		return
-	}
-	defer tx.Rollback()
-	//if no error starting the transaction, attempt to execute it
-	if _, err = tx.ExecContext(ctx, query, v...); err != nil {
-		return
-	}
-	//if no error, commit the changes
-	if err = tx.Commit(); err != nil {
-		//if there is an error, attempt to rollback the changes
-		tx.Rollback()
-	}
-
-	return
-}
-
-//queryResult is used to perform a query and return an error and ignore the result
-// it's used in the API to allow "how" queries are run be located in one place and if
-// necessary, this code can use a switch case to run differently depending on the type of
-// database configured, this will return a result
-func (m *mysql) queryResult(query string, v ...interface{}) (result sql.Result, err error) {
-	var tx *sql.Tx
-
-	//check to see if the pointer is nil, if so, exit immediately
-	if m.db == nil {
-		err = errors.New(ErrDatabaseNil)
-		return
-	}
-	//create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	//begin the transaction
-	if tx, err = m.db.BeginTx(ctx, &sql.TxOptions{Isolation: DatabaseIsolation}); err != nil {
-		return
-	}
-	defer tx.Rollback()
-	//if no error starting the transaction, attempt to execute it
-	if result, err = tx.ExecContext(ctx, query, v...); err != nil {
-		return
-	}
-	//if no error, commit the changes
-	if err = tx.Commit(); err != nil {
-		//if there is an error, attempt to rollback the changes
-		if err = tx.Rollback(); err != nil {
-			return
-		}
-		//return an error if the commit fails and the rollback doesn't fail
-		err = fmt.Errorf(ErrQueryFailed, query)
-	}
-
-	return
 }
 
 //ensure that mysql implements Owner
@@ -157,75 +89,96 @@ var _ bludgeon.MetaTimer = &mysql{}
 
 //MetaTimerRead
 func (m *mysql) TimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
-	m.Lock()
-	defer m.Unlock()
+	m.RLock()
+	defer m.RUnlock()
 
-	var rows *sql.Rows
-	var timers []bludgeon.Timer
+	var tx *sql.Tx
+	var row *sql.Row
+	var query string
 
-	//query rows for timer, this should only return a single element because timerID should be a primary column
-	if rows, err = m.db.Query(QueryTimerSelectf, timerUUID); err != nil {
+	if tx, err = m.db.Begin(); err != nil {
 		return
 	}
-	//range over rows and get data
-	for rows.Next() {
-		var timer bludgeon.Timer
-
-		//TODO: add completed and archived
-		if err = rows.Scan(&timer.UUID, &timer.ActiveSliceUUID, &timer.Start, &timer.Finish, &timer.ElapsedTime, &timer.Comment); err != nil {
-			break
+	defer tx.Rollback()
+	query = fmt.Sprintf(`SELECT timer_uuid, timer_start, timer_finish, timer_comment, timer_billed, timer_completed, timer_archived
+		FROM %s WHERE timer_uuid = ?`, TableTimer)
+	row = tx.QueryRow(query, timerUUID)
+	if err = row.Scan(
+		&timer.UUID,
+		&timer.Start,
+		&timer.Finish,
+		&timer.Comment,
+		&timer.Completed,
+		&timer.Billed,
+		&timer.Archived,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			err = errors.Errorf(ErrTimerNotFoundf, timerUUID)
 		}
-		//add timer to timers
-		timers = append(timers, timer)
-	}
-	if err != nil {
-		rows.Close()
 
 		return
 	}
-
-	//check for errors
-	err = rows.Err()
-	//check timers
-	if len(timers) > 0 {
-		timer = timers[0]
-	} else {
-		err = fmt.Errorf(bludgeon.ErrTimerNotFoundf, timerUUID)
-	}
+	//TODO: add code to get the active slice
+	//TODO: add code to get the elapsed time
+	err = tx.Rollback()
 
 	return
 }
 
 //MetaTimerWrite
-func (m *mysql) TimerWrite(timerID string, timer bludgeon.Timer) (err error) {
-	m.Lock()
-	defer m.Unlock()
+func (m *mysql) TimerWrite(timerUUID string, timer bludgeon.Timer) (err error) {
+	m.RLock()
+	defer m.RUnlock()
 
 	var result sql.Result
+	var tx *sql.Tx
 
-	//upsert the timer
-	if result, err = m.queryResult(QueryTimerUpsert, timer.UUID, timer.ActiveSliceUUID, timer.Start, timer.Finish, timer.ElapsedTime, timer.Comment,
-		timer.UUID, timer.ActiveSliceUUID, timer.Start, timer.Finish, timer.ElapsedTime, timer.Comment); err != nil {
+	if tx, err = m.db.Begin(); err != nil {
 		return
 	}
-	err = rowsAffected(result, ErrUpdateFailed)
+	defer tx.Rollback()
+	//REVIEW: do we need to add code to leave finish null if timer_finish is set to 0?
+	//REVIEW: how would we handle a uuid collision here?
+	query := fmt.Sprintf(`INSERT into %s (timer_uuid, timer_start, timer_finish, timer_comment, timer_billed, timer_completed, timer_archived) VALUES(?, ?, ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY 
+			UPDATE timer_start=?, timer_finish=?, timer_comment=?, timer_billed=?, timer_completed=?, timer_archived=?`, TableTimer)
+	if result, err = tx.Exec(query, timerUUID, timer.Start, timer.Finish, timer.Comment, timer.Billed, timer.Completed, timer.Archived,
+		timer.Start, timer.Finish, timer.Comment, timer.Billed, timer.Completed, timer.Archived); err != nil {
+		return
+	}
+	if err = rowsAffected(result, ErrUpdateFailed); err != nil {
+		return
+	}
+	//TODO: add code for adding active slice
+	err = tx.Commit()
 
 	return
 }
 
 //MetaTimerDelete
 func (m *mysql) TimerDelete(timerUUID string) (err error) {
-	m.Lock()
-	defer m.Unlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	var result sql.Result
+	var tx *sql.Tx
+	var query string
 
-	//delete the timer
-	if result, err = m.queryResult(QueryTimerDeletef, timerUUID); err != nil {
+	if tx, err = m.db.Begin(); err != nil {
 		return
 	}
-	//ensure that rows were affected
-	err = rowsAffected(result, ErrDeleteFailed)
+	defer tx.Rollback()
+	query = fmt.Sprintf(`DELETE FROM %s WHERE timer_uuid = ?`, TableTimer)
+	if result, err = tx.Exec(query, timerUUID); err != nil {
+		return
+	}
+	if err = rowsAffected(result, ErrDeleteFailed); err != nil {
+		return
+	}
+	//TODO: add code to delete associated time slices
+	//TODO add code to delete active time slices
+	//TODO: add code to delete
+	err = tx.Commit()
 
 	return
 }
@@ -234,75 +187,90 @@ func (m *mysql) TimerDelete(timerUUID string) (err error) {
 var _ bludgeon.MetaTimeSlice = &mysql{}
 
 //MetaTimeSliceRead
-func (m *mysql) TimeSliceRead(timeSliceID string) (timeSlice bludgeon.TimeSlice, err error) {
-	m.Lock()
-	defer m.Unlock()
+func (m *mysql) TimeSliceRead(timeSliceUUID string) (timeSlice bludgeon.TimeSlice, err error) {
+	m.RLock()
+	defer m.RUnlock()
 
-	var rows *sql.Rows
-	var timeSlices []bludgeon.TimeSlice
+	var row *sql.Row
+	var query string
+	var tx *sql.Tx
 
+	if tx, err = m.db.Begin(); err != nil {
+		return
+	}
+	defer tx.Rollback()
 	//query rows for timer, this should only return a single element because timerID should be a primary column
-	if rows, err = m.db.Query(QueryTimeSliceSelectf, timeSliceID); err == nil {
-		for rows.Next() {
-			var timeSlice bludgeon.TimeSlice
-
-			//TODO: add completed and archived
-			if err = rows.Scan(&timeSlice.UUID, &timeSlice.TimerUUID, &timeSlice.Start, &timeSlice.Finish, &timeSlice.ElapsedTime); err != nil {
-				break
-			}
-
-			//add timer to timers
-			timeSlices = append(timeSlices, timeSlice)
-		}
-	}
-	if err != nil {
-		rows.Close()
-
+	query = fmt.Sprintf("SELECT slice_uuid, slice_start, slice_finish, slice_archived FROM %s WHERE slice_uuid = ?", TableSlice)
+	row = m.db.QueryRow(query, timeSliceUUID)
+	if err = row.Scan(
+		&timeSlice.UUID,
+		&timeSlice.Start,
+		&timeSlice.Finish,
+		&timeSlice.Archived,
+	); err != nil {
 		return
 	}
-	if err = rows.Err(); err != nil {
-		return
-	}
-	//check timers
-	if len(timeSlices) > 0 {
-		timeSlice = timeSlices[0]
-	} else {
-		err = fmt.Errorf(bludgeon.ErrTimeSliceNotFoundf, timeSliceID)
-	}
+	//TODO: add associated timer uuid
+	//TODO: add code to get the associated timer uuid
+	//TODO: add code to get the elapsed time?
+	// err = fmt.Errorf(bludgeon.ErrTimeSliceNotFoundf, timeSliceID)
 
 	return
 }
 
 //MetaTimeSliceWrite
-func (m *mysql) TimeSliceWrite(timeSliceID string, timeSlice bludgeon.TimeSlice) (err error) {
-	m.Lock()
-	defer m.Unlock()
+func (m *mysql) TimeSliceWrite(timeSliceUUID string, timeSlice bludgeon.TimeSlice) (err error) {
+	m.RLock()
+	defer m.RUnlock()
 
 	var result sql.Result
+	var query string
+	var tx *sql.Tx
 
-	//upsert the tiem slice
-	if result, err = m.queryResult(QueryTimeSliceUpsert, timeSlice.UUID, timeSlice.TimerUUID, timeSlice.Start, timeSlice.Finish, timeSlice.ElapsedTime,
-		timeSlice.UUID, timeSlice.Start, timeSlice.Finish, timeSlice.ElapsedTime); err != nil {
+	if tx, err = m.db.Begin(); err != nil {
 		return
 	}
-	err = rowsAffected(result, ErrUpdateFailed)
+	defer tx.Rollback()
+	query = fmt.Sprintf(`INSERT INTO %s (slice_uuid, slice_start, slice_finish, slice_archived) VALUES(?, ?, ?, ?)
+	ON DUPLICATE KEY
+		UPDATE slice_start=?, slice_finish=?, slice_archived=?`, TableSlice)
+	if result, err = tx.Exec(query, timeSliceUUID, timeSlice.Start, timeSlice.Finish, timeSlice.Archived,
+		timeSlice.Start, timeSlice.Finish, timeSlice.Archived); err != nil {
+		return
+	}
+	if err = rowsAffected(result, ErrUpdateFailed); err != nil {
+		return
+	}
+	//TODO: add association with timer
+	err = tx.Commit()
 
 	return
 }
 
 //MetaTimeSliceDelete
-func (m *mysql) TimeSliceDelete(timeSliceID string) (err error) {
-	m.Lock()
-	defer m.Unlock()
+func (m *mysql) TimeSliceDelete(timeSliceUUID string) (err error) {
+	m.RLock()
+	defer m.RUnlock()
 
 	var result sql.Result
+	var query string
+	var tx *sql.Tx
 
-	//delete the timer
-	if result, err = m.queryResult(QueryTimeSliceDeletef, timeSliceID); err != nil {
+	if tx, err = m.db.Begin(); err != nil {
+		return
+	}
+	defer tx.Rollback()
+	query = fmt.Sprintf("DELETE FROM %s WHERE slice_uuid = ?", TableSlice)
+	if result, err = tx.Exec(query, timeSliceUUID); err != nil {
 		return
 	}
 	//ensure that rows were affected
-	err = rowsAffected(result, ErrDeleteFailed)
+	if err = rowsAffected(result, ErrDeleteFailed); err != nil {
+		return
+	}
+	//TODO: add code to handle active slice
+	//TODO: add code to update elapsed time?
+	err = tx.Commit()
 
 	return
 }

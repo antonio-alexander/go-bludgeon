@@ -18,7 +18,6 @@ const (
 	ErrTimeSliceNotFoundf string = "TimeSlice with id, \"%s\", not found locally"
 	ErrTimerIsArchivedf   string = "Timer with id, \"%s\", is archived"
 	ErrNotImplemented     string = "Not implemented"
-	//
 	//ErrDatabaseNil provides a string to return as an error if the database pointer is nil
 	ErrDatabaseNil string = "Internal database pointer is nil"
 	//ErrDatabaseNotNil provides a string to return as an error if you attempt to connect to an already initialized database
@@ -34,18 +33,10 @@ const (
 //query constants
 const (
 	TableTimer       string = "timer"
-	QueryTimerUpsert string = `INSERT into ` + TableTimer + ` (uuid, activesliceuuid, start, finish, elapsedtime, comment) VALUES(?, ?, ?, ?, ?, ?)
-	ON DUPLICATE KEY 
-		UPDATE uuid=?, activesliceuuid=?, start=?, finish=?, elapsedtime=?, comment=?`
-	QueryTimerDeletef    string = `DELETE FROM ` + TableTimer + ` where uuid = ?`
-	QueryTimerSelectf    string = `SELECT uuid, activesliceuuid, start, finish, elapsedtime from ` + TableTimer + ` WHERE uuid = ?`
-	TableTimeSlice       string = "slice"
-	QueryTimeSliceUpsert string = `INSERT into ` + TableTimeSlice + ` (uuid, timeruuid, start, finish, elapsedtime) VALUES(?, ?, ?, ?, ?)
-	ON DUPLICATE KEY
-		UPDATE uuid=?, start=?, finish=?, elapsedtime=?`
-	QueryTimeSliceDeletef string = `DELETE FROM ` + TableTimeSlice + ` where uuid = ?`
-	QueryTimeSliceSelectf string = `SELECT uuid, timeruuid, start, finish, elapsedtime from ` + TableTimeSlice + ` WHERE uuid = ?`
-	TableProject          string = "project"
-	TableClient           string = "client"
-	TableEmployee         string = "employee"
+	TableSlice       string = "slice"
+	TableTimerSlice  string = "timer_slice"
+	TableActiveSlice string = "timer_slice_active"
+	TableProject     string = "project"
+	TableClient      string = "client"
+	TableEmployee    string = "employee"
 )

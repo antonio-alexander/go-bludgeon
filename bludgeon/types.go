@@ -74,9 +74,8 @@ type Timer struct {
 	ElapsedTime     int64  `json:"ElapsedTime"`     //how much time has elapsed
 	Completed       bool   `json:"Completed"`       //this is set to true once the timer has been submitted
 	Archived        bool   `json:"Archived"`        //whether or not the timer is archived
-	//currently unused
-	// Billed     bool   `json:"Billed"` //this is set once it has been billed so it "can't" be modified
-	// EmployeeID int64  `json:"EmployeeID"`
+	Billed          bool   `json:"Billed"`          //this is set once it has been billed so it "can't" be modified
+	EmployeeID      int64  `json:"EmployeeID"`
 }
 
 func (t Timer) String() string {

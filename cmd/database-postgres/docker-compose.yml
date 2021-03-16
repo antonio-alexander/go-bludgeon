@@ -12,7 +12,8 @@ services:
     volumes:
       - bludgeon-database-postgres:/var/lib/postgres
     environment:
-      - MYSQL_ALLOW_EMPTY_PASSWORD=true
-      # - MYSQL_ROOT_PASSWORD=""
+      POSTGRES_USER: bludgeon
+      POSTGRES_DB: bludgeon
+      POSTGRES_PASSWORD: bludgeon
 volumes:
   bludgeon-database-postgres:
