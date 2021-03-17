@@ -101,13 +101,13 @@ func TestIntInitializeShutdown(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestIntTimerRead(t *testing.T) {
+func TestIntTimerReadWrite(t *testing.T) {
 	//Test:
 	//Notes:
 	//Verification:
 
-	uuid, err := bludgeon.GenerateID()
 	tNow := time.Now()
+	uuid, err := bludgeon.GenerateID()
 	assert.Nil(t, err)
 	timerWrite := bludgeon.Timer{
 		UUID: uuid,
@@ -124,8 +124,8 @@ func TestIntTimerRead(t *testing.T) {
 	db := mysql.NewMetaMySQL()
 	err = db.Initialize(validConfig)
 	assert.Nil(t, err)
-	db.TimerWrite(uuid, timerWrite)
-	//read timer
+	err = db.TimerWrite(uuid, timerWrite)
+	assert.Nil(t, err)
 	timerRead, err := db.TimerRead(uuid)
 	assert.Nil(t, err)
 	assert.Equal(t, timerWrite, timerRead)
@@ -133,7 +133,7 @@ func TestIntTimerRead(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestIntTimerDelete(t *testing.T) {
+func TestIntDelete(t *testing.T) {
 	//Test:
 	//Notes:
 	//Verification:
@@ -156,8 +156,8 @@ func TestIntTimerDelete(t *testing.T) {
 	db := mysql.NewMetaMySQL()
 	err = db.Initialize(validConfig)
 	assert.Nil(t, err)
-	db.TimerWrite(uuid, timerWrite)
-	//read timer
+	err = db.TimerWrite(uuid, timerWrite)
+	assert.Nil(t, err)
 	timerRead, err := db.TimerRead(uuid)
 	assert.Nil(t, err)
 	assert.Equal(t, timerWrite, timerRead)
@@ -166,6 +166,111 @@ func TestIntTimerDelete(t *testing.T) {
 	_, err = db.TimerRead(uuid)
 	assert.NotNil(t, err)
 	assert.Equal(t, fmt.Sprintf(mysql.ErrTimerNotFoundf, uuid), err.Error())
+	err = db.Shutdown()
+	assert.Nil(t, err)
+}
+
+func TestIntSliceReadWrite(t *testing.T) {
+	//Test:
+	//Notes:
+	//Verification:
+
+	uuid, err := bludgeon.GenerateID()
+	tNow := time.Now()
+	assert.Nil(t, err)
+	sliceWrite := bludgeon.TimeSlice{
+		UUID: uuid,
+		// TimerUUID:   uuid,
+		Start:  tNow.UnixNano(),
+		Finish: tNow.Add(5 * time.Second).UnixNano(),
+		// ElapsedTime: 0,
+		Archived: true,
+	}
+	db := mysql.NewMetaMySQL()
+	err = db.Initialize(validConfig)
+	assert.Nil(t, err)
+	err = db.TimeSliceWrite(uuid, sliceWrite)
+	assert.Nil(t, err)
+	sliceRead, err := db.TimeSliceRead(uuid)
+	assert.Nil(t, err)
+	assert.Equal(t, sliceWrite, sliceRead)
+	err = db.Shutdown()
+	assert.Nil(t, err)
+}
+
+func TestIntSliceDelete(t *testing.T) {
+	//Test:
+	//Notes:
+	//Verification:
+
+	tNow := time.Now()
+	uuid, err := bludgeon.GenerateID()
+	assert.Nil(t, err)
+	sliceWrite := bludgeon.TimeSlice{
+		UUID: uuid,
+		// TimerUUID:   uuid,
+		Start:  tNow.UnixNano(),
+		Finish: tNow.Add(5 * time.Second).UnixNano(),
+		// ElapsedTime: 0,
+		Archived: false,
+	}
+	db := mysql.NewMetaMySQL()
+	err = db.Initialize(validConfig)
+	assert.Nil(t, err)
+	err = db.TimeSliceWrite(uuid, sliceWrite)
+	assert.Nil(t, err)
+	sliceRead, err := db.TimeSliceRead(uuid)
+	assert.Nil(t, err)
+	assert.Equal(t, sliceWrite, sliceRead)
+	err = db.TimeSliceDelete(uuid)
+	assert.Nil(t, err)
+	_, err = db.TimerRead(uuid)
+	assert.NotNil(t, err)
+	assert.Equal(t, fmt.Sprintf(mysql.ErrTimerNotFoundf, uuid), err.Error())
+	err = db.Shutdown()
+	assert.Nil(t, err)
+}
+
+func TestIntSliceTimer(t *testing.T) {
+	//Test:
+	//Notes:
+	//Verification:
+
+	tNow := time.Now()
+	timerUUID, err := bludgeon.GenerateID()
+	assert.Nil(t, err)
+	sliceUUID, err := bludgeon.GenerateID()
+	assert.Nil(t, err)
+	timerWrite := bludgeon.Timer{
+		UUID: timerUUID,
+		// ActiveSliceUUID: "",
+		Comment: "This is a test comment",
+		Start:   tNow.UnixNano(),
+		Finish:  tNow.Add(5 * time.Second).UnixNano(),
+		// ElapsedTime: 0,
+		Completed: true,
+		Archived:  false,
+		Billed:    true,
+		// EmployeeID:  0,
+	}
+	sliceWrite := bludgeon.TimeSlice{
+		UUID:      sliceUUID,
+		TimerUUID: timerUUID,
+		Start:     tNow.UnixNano(),
+		Finish:    tNow.Add(5 * time.Second).UnixNano(),
+		// ElapsedTime: 0,
+		Archived: true,
+	}
+	db := mysql.NewMetaMySQL()
+	err = db.Initialize(validConfig)
+	assert.Nil(t, err)
+	err = db.TimerWrite(timerUUID, timerWrite)
+	assert.Nil(t, err)
+	err = db.TimeSliceWrite(sliceUUID, sliceWrite)
+	assert.Nil(t, err)
+	sliceRead, err := db.TimeSliceRead(sliceUUID)
+	assert.Nil(t, err)
+	assert.Equal(t, sliceWrite, sliceRead)
 	err = db.Shutdown()
 	assert.Nil(t, err)
 }

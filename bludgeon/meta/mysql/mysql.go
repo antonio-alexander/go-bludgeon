@@ -201,19 +201,35 @@ func (m *mysql) TimeSliceRead(timeSliceUUID string) (timeSlice bludgeon.TimeSlic
 	defer tx.Rollback()
 	//query rows for timer, this should only return a single element because timerID should be a primary column
 	query = fmt.Sprintf("SELECT slice_uuid, slice_start, slice_finish, slice_archived FROM %s WHERE slice_uuid = ?", TableSlice)
-	row = m.db.QueryRow(query, timeSliceUUID)
+	row = tx.QueryRow(query, timeSliceUUID)
 	if err = row.Scan(
 		&timeSlice.UUID,
 		&timeSlice.Start,
 		&timeSlice.Finish,
 		&timeSlice.Archived,
 	); err != nil {
+		if err == sql.ErrNoRows {
+			err = errors.Errorf(ErrTimeSliceNotFoundf, timeSliceUUID)
+		}
+
 		return
 	}
 	//TODO: add associated timer uuid
-	//TODO: add code to get the associated timer uuid
+	query = fmt.Sprintf(`SELECT timer_uuid FROM %s 
+		INNER JOIN %s ON %s.timer_id=%s.timer_id 
+		INNER JOIN %s ON %s.slice_id=%s.slice_id WHERE slice_uuid=?`,
+		TableTimer,
+		TableTimerSlice, TableTimer, TableTimerSlice,
+		TableSlice, TableSlice, TableTimerSlice,
+	)
+	row = tx.QueryRow(query, timeSlice.UUID)
+	if err = row.Scan(&timeSlice.TimerUUID); err != nil {
+		if err != sql.ErrNoRows {
+			return
+		}
+		err = nil
+	}
 	//TODO: add code to get the elapsed time?
-	// err = fmt.Errorf(bludgeon.ErrTimeSliceNotFoundf, timeSliceID)
 
 	return
 }
@@ -232,7 +248,7 @@ func (m *mysql) TimeSliceWrite(timeSliceUUID string, timeSlice bludgeon.TimeSlic
 	}
 	defer tx.Rollback()
 	query = fmt.Sprintf(`INSERT INTO %s (slice_uuid, slice_start, slice_finish, slice_archived) VALUES(?, ?, ?, ?)
-	ON DUPLICATE KEY
+		ON DUPLICATE KEY
 		UPDATE slice_start=?, slice_finish=?, slice_archived=?`, TableSlice)
 	if result, err = tx.Exec(query, timeSliceUUID, timeSlice.Start, timeSlice.Finish, timeSlice.Archived,
 		timeSlice.Start, timeSlice.Finish, timeSlice.Archived); err != nil {
@@ -241,7 +257,18 @@ func (m *mysql) TimeSliceWrite(timeSliceUUID string, timeSlice bludgeon.TimeSlic
 	if err = rowsAffected(result, ErrUpdateFailed); err != nil {
 		return
 	}
-	//TODO: add association with timer
+	if timeSlice.TimerUUID != "" {
+		query = fmt.Sprintf(`INSERT INTO %s (timer_id, slice_id) values((%s),(%s))
+			ON DUPLICATE KEY UPDATE timer_id=timer_id, slice_id=slice_id`,
+			TableTimerSlice,
+			fmt.Sprintf("SELECT timer_id FROM %s WHERE timer_uuid=\"%s\"", TableTimer, timeSlice.TimerUUID),
+			fmt.Sprintf("SELECT slice_id FROM %s WHERE slice_uuid=\"%s\"", TableSlice, timeSlice.UUID),
+		)
+		if _, err = tx.Exec(query); err != nil {
+			return
+		}
+	}
+	//TODO: get the elapsed time
 	err = tx.Commit()
 
 	return
@@ -260,6 +287,16 @@ func (m *mysql) TimeSliceDelete(timeSliceUUID string) (err error) {
 		return
 	}
 	defer tx.Rollback()
+	//TODO: delete the association for timerID
+	query = fmt.Sprintf("DELETE FROM %s WHERE slice_id=(SELECT slice_id FROM %s WHERE slice_uuid=?)", TableTimerSlice, TableSlice)
+	if _, err = tx.Exec(query, timeSliceUUID); err != nil {
+		return
+	}
+	//TODO: add code to handle active slice
+	query = fmt.Sprintf("DELETE FROM %s WHERE slice_id=(SELECT slice_id FROM %s WHERE slice_uuid=?)", TableTimerSliceActive, TableSlice)
+	if _, err = tx.Exec(query, timeSliceUUID); err != nil {
+		return
+	}
 	query = fmt.Sprintf("DELETE FROM %s WHERE slice_uuid = ?", TableSlice)
 	if result, err = tx.Exec(query, timeSliceUUID); err != nil {
 		return
@@ -268,7 +305,6 @@ func (m *mysql) TimeSliceDelete(timeSliceUUID string) (err error) {
 	if err = rowsAffected(result, ErrDeleteFailed); err != nil {
 		return
 	}
-	//TODO: add code to handle active slice
 	//TODO: add code to update elapsed time?
 	err = tx.Commit()
 

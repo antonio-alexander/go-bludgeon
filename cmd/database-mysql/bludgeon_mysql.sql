@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS timer_slice (
     PRIMARY KEY (timer_id, slice_id),
     FOREIGN KEY (timer_id) REFERENCES timer(timer_id),
     FOREIGN KEY (slice_id) REFERENCES slice(slice_id),
-    INDEX (slice_id, timer_id),
+    INDEX (slice_id, timer_id)
 
 )Engine=InnoDB;
 

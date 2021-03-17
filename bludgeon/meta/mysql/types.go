@@ -32,11 +32,11 @@ const (
 
 //query constants
 const (
-	TableTimer       string = "timer"
-	TableSlice       string = "slice"
-	TableTimerSlice  string = "timer_slice"
-	TableActiveSlice string = "timer_slice_active"
-	TableProject     string = "project"
-	TableClient      string = "client"
-	TableEmployee    string = "employee"
+	TableTimer            string = "timer"
+	TableSlice            string = "slice"
+	TableTimerSlice       string = "timer_slice"
+	TableTimerSliceActive string = "timer_slice_active"
+	TableProject          string = "project"
+	TableClient           string = "client"
+	TableEmployee         string = "employee"
 )
