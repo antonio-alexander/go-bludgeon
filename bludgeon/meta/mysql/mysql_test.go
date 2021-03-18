@@ -274,3 +274,50 @@ func TestIntSliceTimer(t *testing.T) {
 	err = db.Shutdown()
 	assert.Nil(t, err)
 }
+
+func TestIntTimerActiveSlice(t *testing.T) {
+	//Test:
+	//Notes:
+	//Verification:
+
+	tNow := time.Now()
+	timerUUID, err := bludgeon.GenerateID()
+	assert.Nil(t, err)
+	sliceUUID, err := bludgeon.GenerateID()
+	assert.Nil(t, err)
+	timerWrite := bludgeon.Timer{
+		UUID: timerUUID,
+		// ActiveSliceUUID: "",
+		Comment: "This is a test comment",
+		Start:   tNow.UnixNano(),
+		Finish:  tNow.Add(5 * time.Second).UnixNano(),
+		// ElapsedTime: 0,
+		Completed: true,
+		Archived:  false,
+		Billed:    true,
+		// EmployeeID:  0,
+	}
+	sliceWrite := bludgeon.TimeSlice{
+		UUID:      sliceUUID,
+		TimerUUID: timerUUID,
+		Start:     tNow.UnixNano(),
+		Finish:    tNow.Add(5 * time.Second).UnixNano(),
+		// ElapsedTime: 0,
+		Archived: true,
+	}
+	db := mysql.NewMetaMySQL()
+	err = db.Initialize(validConfig)
+	assert.Nil(t, err)
+	err = db.TimerWrite(timerUUID, timerWrite)
+	assert.Nil(t, err)
+	err = db.TimeSliceWrite(sliceUUID, sliceWrite)
+	assert.Nil(t, err)
+	timerWrite.ActiveSliceUUID = sliceUUID
+	err = db.TimerWrite(timerUUID, timerWrite)
+	assert.Nil(t, err)
+	timerRead, err := db.TimerRead(timerUUID)
+	assert.Nil(t, err)
+	assert.Equal(t, timerWrite, timerRead)
+	err = db.Shutdown()
+	assert.Nil(t, err)
+}

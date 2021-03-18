@@ -92,10 +92,17 @@ func (m *mysql) TimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
 	m.RLock()
 	defer m.RUnlock()
 
-	var tx *sql.Tx
+	//REVIEW: does it make sense to read all of the items within a transaction and then
+	// roll it back?
+
 	var row *sql.Row
 	var query string
+	var tx *sql.Tx
 
+	//start a transaction (to be rolled back), then do the following:
+	// (1) Query standalone attributes from the timer table
+	// (2) Query any active timeslice
+	// (3) Query elapsed time
 	if tx, err = m.db.Begin(); err != nil {
 		return
 	}
@@ -118,7 +125,21 @@ func (m *mysql) TimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
 
 		return
 	}
-	//TODO: add code to get the active slice
+	query = fmt.Sprintf(`SELECT slice_uuid FROM %s 
+		INNER JOIN %s ON %s.slice_id=%s.slice_id
+		INNER JOIN %s ON %s.timer_id=%s.timer_id
+		WHERE timer_uuid=?`,
+		TableSlice,
+		TableTimerSliceActive, TableSlice, TableTimerSliceActive,
+		TableTimer, TableTimer, TableTimerSliceActive,
+	)
+	row = tx.QueryRow(query, timer.UUID)
+	if err = row.Scan(&timer.ActiveSliceUUID); err != nil {
+		if err != sql.ErrNoRows {
+			return
+		}
+		err = nil
+	}
 	//TODO: add code to get the elapsed time
 	err = tx.Rollback()
 
@@ -130,26 +151,48 @@ func (m *mysql) TimerWrite(timerUUID string, timer bludgeon.Timer) (err error) {
 	m.RLock()
 	defer m.RUnlock()
 
-	var result sql.Result
 	var tx *sql.Tx
 
+	//Start a transaction, then do the following:
+	// (1) Attempt to upsert the standalone timer attributes
+	// (2) Set or unset the active timeslice as provided
 	if tx, err = m.db.Begin(); err != nil {
 		return
 	}
 	defer tx.Rollback()
-	//REVIEW: do we need to add code to leave finish null if timer_finish is set to 0?
 	//REVIEW: how would we handle a uuid collision here?
-	query := fmt.Sprintf(`INSERT into %s (timer_uuid, timer_start, timer_finish, timer_comment, timer_billed, timer_completed, timer_archived) VALUES(?, ?, ?, ?, ?, ?, ?)
+	query := fmt.Sprintf(`INSERT into %s (timer_uuid, timer_start, timer_finish, timer_comment, timer_billed, timer_completed, timer_archived)
+		VALUES(?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY 
 			UPDATE timer_start=?, timer_finish=?, timer_comment=?, timer_billed=?, timer_completed=?, timer_archived=?`, TableTimer)
-	if result, err = tx.Exec(query, timerUUID, timer.Start, timer.Finish, timer.Comment, timer.Billed, timer.Completed, timer.Archived,
-		timer.Start, timer.Finish, timer.Comment, timer.Billed, timer.Completed, timer.Archived); err != nil {
+	if _, err = tx.Exec(query,
+		timerUUID, timer.Start, timer.Finish, timer.Comment, timer.Billed, timer.Completed, timer.Archived,
+		timer.Start, timer.Finish, timer.Comment, timer.Billed, timer.Completed, timer.Archived,
+	); err != nil {
 		return
 	}
-	if err = rowsAffected(result, ErrUpdateFailed); err != nil {
-		return
+	//KIM: No need to check if rows were affected since none of the above may
+	// have changed
+	if timer.ActiveSliceUUID != "" {
+		//REVIEW: insert ignore is dangerous...but this doesn't do a whole lot
+		// query = fmt.Sprintf(`INSERT INTO %s (timer_id, slice_id) values((%s),(%s)) ON DUPLICATE KEY timer_id=timer_id`,
+		query = fmt.Sprintf(`INSERT IGNORE INTO %s (timer_id, slice_id) values((%s),(%s))`,
+			TableTimerSliceActive,
+			fmt.Sprintf("SELECT timer_id FROM %s WHERE timer_uuid=\"%s\"", TableTimer, timer.UUID),
+			fmt.Sprintf("SELECT slice_id FROM %s WHERE slice_uuid=\"%s\"", TableSlice, timer.ActiveSliceUUID),
+		)
+		if _, err = tx.Exec(query); err != nil {
+			return
+		}
+	} else {
+		query = fmt.Sprintf(`DELETE FROM %s WHERE timer_id=(%s)`,
+			TableTimerSliceActive,
+			fmt.Sprintf("SELECT timer_id FROM %s WHERE timer_uuid=\"%s\"", TableTimer, timer.UUID),
+		)
+		if _, err = tx.Exec(query); err != nil {
+			return
+		}
 	}
-	//TODO: add code for adding active slice
 	err = tx.Commit()
 
 	return
@@ -161,9 +204,15 @@ func (m *mysql) TimerDelete(timerUUID string) (err error) {
 	defer m.RUnlock()
 
 	var result sql.Result
-	var tx *sql.Tx
 	var query string
+	var tx *sql.Tx
 
+	//REVIEW: is on cascade delete the answer?
+
+	//Start a transaction and do the following:
+	// (1) Delete the timer from the timer table
+	// (2) Delete any associated slices
+	// (3) Delete
 	if tx, err = m.db.Begin(); err != nil {
 		return
 	}

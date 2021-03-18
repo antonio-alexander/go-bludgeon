@@ -40,8 +40,12 @@ CREATE TABLE IF NOT EXISTS timer_slice (
     slice_id BIGINT NOT NULL,
 
     PRIMARY KEY (timer_id, slice_id),
-    FOREIGN KEY (timer_id) REFERENCES timer(timer_id),
-    FOREIGN KEY (slice_id) REFERENCES slice(slice_id),
+    FOREIGN KEY (timer_id) 
+        REFERENCES timer(timer_id),
+        -- ON DELETE CASCADE,
+    FOREIGN KEY (slice_id) 
+        REFERENCES slice(slice_id),
+        -- ON DELETE CASCADE,
     INDEX (slice_id, timer_id)
 
 )Engine=InnoDB;
