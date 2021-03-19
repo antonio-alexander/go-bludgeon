@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.9.3" use-changelog="false" last-position="408,1042" last-zoom="1" max-obj-count="15"
+<dbmodel pgmodeler-ver="0.9.3" use-changelog="false" last-position="466,1054" last-zoom="1" max-obj-count="9"
 	 default-schema="public" default-owner="postgres">
 <role name="bludgeon">
 </role>
@@ -19,10 +19,10 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<role name="bludgeon"/>
 </schema>
 
-<table name="timer" layer="0" collapse-mode="2" max-obj-count="9" z-value="0">
+<table name="timer" layer="0" collapse-mode="2" max-obj-count="12" z-value="0">
 	<schema name="bludgeon"/>
 	<role name="postgres"/>
-	<position x="1220" y="1120"/>
+	<position x="1220" y="1240"/>
 	<column name="timer_id" not-null="true"
 	 identity-type="ALWAYS" start="1" increment="1" min-value="0" max-value="9223372036854775807" cache="1">
 		<type name="bigint" length="0"/>
@@ -48,6 +48,12 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="timer_completed" not-null="true" default-value="FALSE">
 		<type name="bool" length="0"/>
 	</column>
+	<column name="task_id">
+		<type name="bigint" length="0"/>
+	</column>
+	<column name="employee_id" not-null="true">
+		<type name="bigint" length="0"/>
+	</column>
 	<constraint name="timer_pk" type="pk-constr" table="bludgeon.timer">
 		<columns names="timer_id" ref-type="src-columns"/>
 	</constraint>
@@ -56,16 +62,19 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="slice" layer="0" collapse-mode="2" max-obj-count="6" z-value="0">
+<table name="slice" layer="0" collapse-mode="2" max-obj-count="8" z-value="0">
 	<schema name="bludgeon"/>
 	<role name="postgres"/>
-	<position x="1960" y="1120"/>
+	<position x="1860" y="1220"/>
 	<column name="slice_id" not-null="true"
 	 identity-type="ALWAYS">
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="slice_uuid" not-null="true">
 		<type name="char" length="36"/>
+	</column>
+	<column name="timer_id" not-null="true">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="slice_start" not-null="true">
 		<type name="bigint" length="0"/>
@@ -75,6 +84,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<column name="slice_archived" not-null="true" default-value="FALSE">
 		<type name="bool" length="0"/>
+	</column>
+	<column name="slice_elapsed_time" default-value="(slice_finish-slice_start)" generated="true">
+		<type name="bigint" length="0"/>
 	</column>
 	<constraint name="slice_pk" type="pk-constr" table="bludgeon.slice">
 		<columns names="slice_id" ref-type="src-columns"/>
@@ -87,7 +99,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="client" layer="0" collapse-mode="2" max-obj-count="3" z-value="0">
 	<schema name="bludgeon"/>
 	<role name="postgres"/>
-	<position x="20" y="1120"/>
+	<position x="560" y="1240"/>
 	<column name="client_id" not-null="true"
 	 identity-type="ALWAYS" start="1" increment="1" min-value="0" max-value="9223372036854775807" cache="1">
 		<type name="bigint" length="0"/>
@@ -109,7 +121,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="employee" layer="0" collapse-mode="2" max-obj-count="4" z-value="0">
 	<schema name="bludgeon"/>
 	<role name="postgres"/>
-	<position x="580" y="1120"/>
+	<position x="840" y="1240"/>
 	<column name="employee_id" not-null="true"
 	 identity-type="ALWAYS" start="1" increment="1" min-value="0" max-value="9223372036854775807" cache="1">
 		<type name="bigint" length="0"/>
@@ -134,7 +146,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="project" layer="0" collapse-mode="2" max-obj-count="3" z-value="0">
 	<schema name="bludgeon"/>
 	<role name="postgres"/>
-	<position x="320" y="1320"/>
+	<position x="880" y="1480"/>
 	<column name="project_id" not-null="true"
 	 identity-type="ALWAYS" start="1" increment="1" min-value="0" max-value="9223372036854775807" cache="1">
 		<type name="bigint" length="0"/>
@@ -148,42 +160,15 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="project_pk" type="pk-constr" table="bludgeon.project">
 		<columns names="project_id" ref-type="src-columns"/>
 	</constraint>
-</table>
-
-<table name="timer_slice" layer="0" collapse-mode="2" max-obj-count="3" z-value="0">
-	<schema name="bludgeon"/>
-	<role name="postgres"/>
-	<position x="1600" y="1120"/>
-	<column name="timer_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="slice_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<constraint name="time_slice_pk" type="pk-constr" table="bludgeon.timer_slice">
-		<columns names="timer_id,slice_id" ref-type="src-columns"/>
-	</constraint>
-</table>
-
-<table name="timer_elapsed" layer="0" collapse-mode="2" max-obj-count="2" z-value="0">
-	<schema name="bludgeon"/>
-	<role name="postgres"/>
-	<position x="1300" y="1540"/>
-	<column name="timer_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="timer_elapsed_time">
-		<type name="bigint" length="0"/>
-	</column>
-	<constraint name="timer_elapsed_pk" type="pk-constr" table="bludgeon.timer_elapsed">
-		<columns names="timer_id" ref-type="src-columns"/>
+	<constraint name="project_uuid_unique" type="uq-constr" table="bludgeon.project">
+		<columns names="project_uuid" ref-type="src-columns"/>
 	</constraint>
 </table>
 
 <table name="project_client" layer="0" collapse-mode="2" max-obj-count="3" z-value="0">
 	<schema name="bludgeon"/>
 	<role name="postgres"/>
-	<position x="320" y="1120"/>
+	<position x="560" y="1480"/>
 	<column name="project_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
@@ -195,40 +180,10 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="timer_employee" layer="0" collapse-mode="2" max-obj-count="3" z-value="0">
+<table name="timer_slice_active" layer="0" collapse-mode="2" max-obj-count="4" z-value="0">
 	<schema name="bludgeon"/>
 	<role name="postgres"/>
-	<position x="900" y="1120"/>
-	<column name="timer_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="employee_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<constraint name="timer_employee_pk" type="pk-constr" table="bludgeon.timer_employee">
-		<columns names="timer_id,employee_id" ref-type="src-columns"/>
-	</constraint>
-</table>
-
-<table name="timer_task" layer="0" collapse-mode="2" max-obj-count="3" z-value="0">
-	<schema name="bludgeon"/>
-	<role name="postgres"/>
-	<position x="960" y="1500"/>
-	<column name="timer_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="task_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<constraint name="timer_task_pk" type="pk-constr" table="bludgeon.timer_task">
-		<columns names="timer_id,task_id" ref-type="src-columns"/>
-	</constraint>
-</table>
-
-<table name="timer_slice_active" layer="0" collapse-mode="2" max-obj-count="3" z-value="0">
-	<schema name="bludgeon"/>
-	<role name="postgres"/>
-	<position x="1600" y="1300"/>
+	<position x="1540" y="1420"/>
 	<column name="slice_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
@@ -237,6 +192,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<constraint name="time_slice_active_pk" type="pk-constr" table="bludgeon.timer_slice_active">
 		<columns names="slice_id,timer_id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="timer_id_unique" type="uq-constr" table="bludgeon.timer_slice_active">
+		<columns names="timer_id" ref-type="src-columns"/>
 	</constraint>
 </table>
 
@@ -251,28 +209,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<index name="employee_timer_idx" table="bludgeon.timer_employee"
-	 concurrent="false" unique="false" fast-update="false" buffering="false"
-	 index-type="btree" factor="0">
-		<idxelement use-sorting="false">
-			<column name="employee_id"/>
-		</idxelement>
-		<idxelement use-sorting="false">
-			<column name="timer_id"/>
-		</idxelement>
-</index>
-
-<index name="task_timer_idx" table="bludgeon.timer_task"
-	 concurrent="false" unique="false" fast-update="false" buffering="false"
-	 index-type="btree" factor="0">
-		<idxelement use-sorting="false">
-			<column name="task_id"/>
-		</idxelement>
-		<idxelement use-sorting="false">
-			<column name="timer_id"/>
-		</idxelement>
-</index>
-
 <index name="timer_slice_idx" table="bludgeon.timer_slice_active"
 	 concurrent="false" unique="false" fast-update="false" buffering="false"
 	 index-type="btree" factor="0">
@@ -284,27 +220,19 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<index name="slice_timer_idx" table="bludgeon.timer_slice"
-	 concurrent="false" unique="false" fast-update="false" buffering="false"
-	 index-type="btree" factor="0">
-		<idxelement use-sorting="false">
-			<column name="slice_id"/>
-		</idxelement>
-		<idxelement use-sorting="false">
-			<column name="timer_id"/>
-		</idxelement>
-</index>
-
-<table name="task" layer="0" collapse-mode="2" max-obj-count="3" z-value="0">
+<table name="task" layer="0" collapse-mode="2" max-obj-count="4" z-value="0">
 	<schema name="bludgeon"/>
 	<role name="postgres"/>
-	<position x="640" y="1500"/>
+	<position x="1220" y="1560"/>
 	<column name="task_id" not-null="true"
 	 identity-type="ALWAYS">
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="task_uuid" not-null="true">
 		<type name="char" length="36"/>
+	</column>
+	<column name="project_id" not-null="true">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="task_description">
 		<type name="text" length="0"/>
@@ -317,46 +245,20 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="project_task" layer="0" collapse-mode="2" max-obj-count="3" z-value="0">
-	<schema name="bludgeon"/>
-	<role name="postgres"/>
-	<position x="640" y="1320"/>
-	<column name="project_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="task_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<constraint name="project_task_pk" type="pk-constr" table="bludgeon.project_task">
-		<columns names="project_id,task_id" ref-type="src-columns"/>
-	</constraint>
-</table>
+<constraint name="task_id_fk" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.task" table="bludgeon.timer">
+	<columns names="task_id" ref-type="src-columns"/>
+	<columns names="task_id" ref-type="dst-columns"/>
+</constraint>
 
-<index name="task_project_idx" table="bludgeon.project_task"
-	 concurrent="false" unique="false" fast-update="false" buffering="false"
-	 index-type="btree" factor="0">
-		<idxelement use-sorting="false">
-			<column name="task_id"/>
-		</idxelement>
-		<idxelement use-sorting="false">
-			<column name="project_id"/>
-		</idxelement>
-</index>
+<constraint name="employee_id_fk" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.employee" table="bludgeon.timer">
+	<columns names="employee_id" ref-type="src-columns"/>
+	<columns names="employee_id" ref-type="dst-columns"/>
+</constraint>
 
 <constraint name="timer_id_fk" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.timer" table="bludgeon.timer_slice">
-	<columns names="timer_id" ref-type="src-columns"/>
-	<columns names="timer_id" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="slice_id_fk" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.slice" table="bludgeon.timer_slice">
-	<columns names="slice_id" ref-type="src-columns"/>
-	<columns names="slice_id" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="timer_id" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.timer" table="bludgeon.timer_elapsed">
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.timer" table="bludgeon.slice">
 	<columns names="timer_id" ref-type="src-columns"/>
 	<columns names="timer_id" ref-type="dst-columns"/>
 </constraint>
@@ -374,30 +276,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 </constraint>
 
 <constraint name="timer_id_fk" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.timer" table="bludgeon.timer_employee">
-	<columns names="timer_id" ref-type="src-columns"/>
-	<columns names="timer_id" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="employee_id_fk" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.employee" table="bludgeon.timer_employee">
-	<columns names="employee_id" ref-type="src-columns"/>
-	<columns names="employee_id" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="task_id_fk" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.task" table="bludgeon.timer_task">
-	<columns names="task_id" ref-type="src-columns"/>
-	<columns names="task_id" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="timer_id_fk" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.timer" table="bludgeon.timer_task">
-	<columns names="task_id" ref-type="src-columns"/>
-	<columns names="timer_id" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="timer_id_fk" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.timer" table="bludgeon.timer_slice_active">
 	<columns names="timer_id" ref-type="src-columns"/>
 	<columns names="timer_id" ref-type="dst-columns"/>
@@ -410,50 +288,14 @@ CAUTION: Do not modify this file unless you know what you are doing.
 </constraint>
 
 <constraint name="project_id_fk" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.project" table="bludgeon.project_task">
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.project" table="bludgeon.task">
 	<columns names="project_id" ref-type="src-columns"/>
 	<columns names="project_id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="task_id_fk" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="bludgeon.task" table="bludgeon.project_task">
-	<columns names="task_id" ref-type="src-columns"/>
-	<columns names="task_id" ref-type="dst-columns"/>
-</constraint>
-
-<relationship name="rel_time_slice_timer" type="relfk" layer="0"
-	 src-table="bludgeon.timer_slice"
-	 dst-table="bludgeon.timer" reference-fk="timer_id_fk"
-	 src-required="false" dst-required="true"/>
-
-<relationship name="rel_time_slice_slice" type="relfk" layer="0"
-	 src-table="bludgeon.timer_slice"
-	 dst-table="bludgeon.slice" reference-fk="slice_id_fk"
-	 src-required="false" dst-required="true"/>
-
 <relationship name="rel_timer_client_client" type="relfk" layer="0"
 	 src-table="bludgeon.project_client"
 	 dst-table="bludgeon.client" reference-fk="client_id_fk"
-	 src-required="false" dst-required="true"/>
-
-<relationship name="rel_timer_employee_timer" type="relfk" layer="0"
-	 src-table="bludgeon.timer_employee"
-	 dst-table="bludgeon.timer" reference-fk="timer_id_fk"
-	 src-required="false" dst-required="true"/>
-
-<relationship name="rel_timer_employee_employee" type="relfk" layer="0"
-	 src-table="bludgeon.timer_employee"
-	 dst-table="bludgeon.employee" reference-fk="employee_id_fk"
-	 src-required="false" dst-required="true"/>
-
-<relationship name="rel_project_timer_timer" type="relfk" layer="0"
-	 src-table="bludgeon.timer_task"
-	 dst-table="bludgeon.timer" reference-fk="timer_id_fk"
-	 src-required="false" dst-required="true"/>
-
-<relationship name="rel_timer_elapsed_timer" type="relfk" layer="0"
-	 src-table="bludgeon.timer_elapsed"
-	 dst-table="bludgeon.timer" reference-fk="timer_id"
 	 src-required="false" dst-required="true"/>
 
 <relationship name="rel_time_slice_active_timer" type="relfk" layer="0"
@@ -471,19 +313,24 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 dst-table="bludgeon.project" reference-fk="project_id_fk"
 	 src-required="false" dst-required="true"/>
 
-<relationship name="rel_timer_project_cp_project" type="relfk" layer="0"
-	 src-table="bludgeon.project_task"
+<relationship name="rel_task_project" type="relfk" layer="0"
+	 src-table="bludgeon.task"
 	 dst-table="bludgeon.project" reference-fk="project_id_fk"
 	 src-required="false" dst-required="true"/>
 
-<relationship name="rel_project_task_task" type="relfk" layer="0"
-	 src-table="bludgeon.project_task"
+<relationship name="rel_timer_task" type="relfk" layer="0"
+	 src-table="bludgeon.timer"
 	 dst-table="bludgeon.task" reference-fk="task_id_fk"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_slice_timer" type="relfk" layer="0"
+	 src-table="bludgeon.slice"
+	 dst-table="bludgeon.timer" reference-fk="timer_id_fk"
 	 src-required="false" dst-required="true"/>
 
-<relationship name="rel_timer_project_task" type="relfk" layer="0"
-	 src-table="bludgeon.timer_task"
-	 dst-table="bludgeon.task" reference-fk="task_id_fk"
+<relationship name="rel_timer_employee" type="relfk" layer="0"
+	 src-table="bludgeon.timer"
+	 dst-table="bludgeon.employee" reference-fk="employee_id_fk"
 	 src-required="false" dst-required="true"/>
 
 </dbmodel>

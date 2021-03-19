@@ -120,7 +120,7 @@ func (m *mysql) TimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
 		&timer.Archived,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			err = errors.Errorf(ErrTimerNotFoundf, timerUUID)
+			err = errors.Wrapf(err, ErrTimerNotFoundf, timerUUID)
 		}
 
 		return
@@ -249,16 +249,17 @@ func (m *mysql) TimeSliceRead(timeSliceUUID string) (timeSlice bludgeon.TimeSlic
 	}
 	defer tx.Rollback()
 	//query rows for timer, this should only return a single element because timerID should be a primary column
-	query = fmt.Sprintf("SELECT slice_uuid, slice_start, slice_finish, slice_archived FROM %s WHERE slice_uuid = ?", TableSlice)
+	query = fmt.Sprintf("SELECT slice_uuid, slice_start, slice_finish, slice_archived, COALESCE(slice_elapsed_time,0) FROM %s WHERE slice_uuid = ?", TableSlice)
 	row = tx.QueryRow(query, timeSliceUUID)
 	if err = row.Scan(
 		&timeSlice.UUID,
 		&timeSlice.Start,
 		&timeSlice.Finish,
 		&timeSlice.Archived,
+		&timeSlice.ElapsedTime,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			err = errors.Errorf(ErrTimeSliceNotFoundf, timeSliceUUID)
+			err = errors.Wrapf(err, ErrTimeSliceNotFoundf, timeSliceUUID)
 		}
 
 		return
@@ -278,7 +279,6 @@ func (m *mysql) TimeSliceRead(timeSliceUUID string) (timeSlice bludgeon.TimeSlic
 		}
 		err = nil
 	}
-	//TODO: add code to get the elapsed time?
 
 	return
 }
