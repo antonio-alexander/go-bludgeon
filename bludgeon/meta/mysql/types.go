@@ -34,9 +34,8 @@ const (
 const (
 	TableTimer            string = "timer"
 	TableSlice            string = "slice"
-	TableTimerSlice       string = "timer_slice"
 	TableTimerSliceActive string = "timer_slice_active"
-	TableProject          string = "project"
-	TableClient           string = "client"
-	TableEmployee         string = "employee"
+	// TableProject          string = "project"
+	// TableClient           string = "client"
+	// TableEmployee         string = "employee"
 )

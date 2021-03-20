@@ -107,27 +107,23 @@ func (m *mysql) TimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
 		return
 	}
 	defer tx.Rollback()
-	query = fmt.Sprintf(`SELECT timer_uuid, timer_start, timer_finish, timer_comment, timer_billed, timer_completed, timer_archived
+	query = fmt.Sprintf(`SELECT timer_uuid, timer_start, timer_finish, timer_comment, 
+			timer_archived, timer_billed, timer_completed
 		FROM %s WHERE timer_uuid = ?`, TableTimer)
 	row = tx.QueryRow(query, timerUUID)
 	if err = row.Scan(
-		&timer.UUID,
-		&timer.Start,
-		&timer.Finish,
-		&timer.Comment,
-		&timer.Completed,
-		&timer.Billed,
-		&timer.Archived,
+		&timer.UUID, &timer.Start, &timer.Finish, &timer.Comment,
+		&timer.Archived, &timer.Billed, &timer.Completed,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			err = errors.Wrapf(err, ErrTimerNotFoundf, timerUUID)
+			err = errors.Errorf(ErrTimerNotFoundf, timerUUID)
 		}
 
 		return
 	}
-	query = fmt.Sprintf(`SELECT slice_uuid FROM %s 
-		INNER JOIN %s ON %s.slice_id=%s.slice_id
-		INNER JOIN %s ON %s.timer_id=%s.timer_id
+	query = fmt.Sprintf(`SELECT slice_uuid FROM %s
+			INNER JOIN %s ON %s.slice_id=%s.slice_id
+			INNER JOIN %s ON %s.timer_id=%s.timer_id
 		WHERE timer_uuid=?`,
 		TableSlice,
 		TableTimerSliceActive, TableSlice, TableTimerSliceActive,
@@ -140,7 +136,16 @@ func (m *mysql) TimerRead(timerUUID string) (timer bludgeon.Timer, err error) {
 		}
 		err = nil
 	}
-	//TODO: add code to get the elapsed time
+	query = fmt.Sprintf(`SELECT COALESCE(sum(slice_elapsed_time),0) 
+		FROM %s INNER JOIN %s ON %s.timer_id = %s.timer_id WHERE timer_uuid=?`,
+		TableSlice, TableTimer, TableSlice, TableTimer)
+	row = tx.QueryRow(query, timer.UUID)
+	if err = row.Scan(&timer.ElapsedTime); err != nil {
+		if err != sql.ErrNoRows {
+			return
+		}
+		err = nil
+	}
 	err = tx.Rollback()
 
 	return
@@ -151,6 +156,8 @@ func (m *mysql) TimerWrite(timerUUID string, timer bludgeon.Timer) (err error) {
 	m.RLock()
 	defer m.RUnlock()
 
+	//REVIEW: how would we handle a uuid collision here?
+
 	var tx *sql.Tx
 
 	//Start a transaction, then do the following:
@@ -160,14 +167,15 @@ func (m *mysql) TimerWrite(timerUUID string, timer bludgeon.Timer) (err error) {
 		return
 	}
 	defer tx.Rollback()
-	//REVIEW: how would we handle a uuid collision here?
-	query := fmt.Sprintf(`INSERT into %s (timer_uuid, timer_start, timer_finish, timer_comment, timer_billed, timer_completed, timer_archived)
+	query := fmt.Sprintf(`INSERT INTO %s (timer_uuid, timer_start, timer_finish, timer_comment, 
+			timer_archived, timer_billed, timer_completed)
 		VALUES(?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY 
-			UPDATE timer_start=?, timer_finish=?, timer_comment=?, timer_billed=?, timer_completed=?, timer_archived=?`, TableTimer)
+			UPDATE timer_start=VALUES(timer_start), timer_finish=VALUES(timer_finish), timer_comment=VALUES(timer_comment), 
+			timer_billed=VALUES(timer_billed), timer_completed=VALUES(timer_completed), timer_archived=VALUES(timer_archived)`, TableTimer)
 	if _, err = tx.Exec(query,
-		timerUUID, timer.Start, timer.Finish, timer.Comment, timer.Billed, timer.Completed, timer.Archived,
-		timer.Start, timer.Finish, timer.Comment, timer.Billed, timer.Completed, timer.Archived,
+		timerUUID, timer.Start, timer.Finish, timer.Comment,
+		timer.Archived, timer.Billed, timer.Completed,
 	); err != nil {
 		return
 	}
@@ -175,7 +183,6 @@ func (m *mysql) TimerWrite(timerUUID string, timer bludgeon.Timer) (err error) {
 	// have changed
 	if timer.ActiveSliceUUID != "" {
 		//REVIEW: insert ignore is dangerous...but this doesn't do a whole lot
-		// query = fmt.Sprintf(`INSERT INTO %s (timer_id, slice_id) values((%s),(%s)) ON DUPLICATE KEY timer_id=timer_id`,
 		query = fmt.Sprintf(`INSERT IGNORE INTO %s (timer_id, slice_id) values((%s),(%s))`,
 			TableTimerSliceActive,
 			fmt.Sprintf("SELECT timer_id FROM %s WHERE timer_uuid=\"%s\"", TableTimer, timer.UUID),
@@ -207,8 +214,6 @@ func (m *mysql) TimerDelete(timerUUID string) (err error) {
 	var query string
 	var tx *sql.Tx
 
-	//REVIEW: is on cascade delete the answer?
-
 	//Start a transaction and do the following:
 	// (1) Delete the timer from the timer table
 	// (2) Delete any associated slices
@@ -217,16 +222,23 @@ func (m *mysql) TimerDelete(timerUUID string) (err error) {
 		return
 	}
 	defer tx.Rollback()
-	query = fmt.Sprintf(`DELETE FROM %s WHERE timer_uuid = ?`, TableTimer)
+	query = fmt.Sprintf(`DELETE FROM %s WHERE timer_id=(SELECT timer_id from %s WHERE timer_uuid=?)`,
+		TableTimerSliceActive, TableTimer)
+	if _, err = tx.Exec(query, timerUUID); err != nil {
+		return
+	}
+	query = fmt.Sprintf(`DELETE FROM %s WHERE timer_id=(SELECT timer_id from %s WHERE timer_uuid=?)`,
+		TableSlice, TableTimer)
+	if _, err = tx.Exec(query, timerUUID); err != nil {
+		return
+	}
+	query = fmt.Sprintf(`DELETE FROM %s WHERE timer_uuid=?`, TableTimer)
 	if result, err = tx.Exec(query, timerUUID); err != nil {
 		return
 	}
 	if err = rowsAffected(result, ErrDeleteFailed); err != nil {
 		return
 	}
-	//TODO: add code to delete associated time slices
-	//TODO add code to delete active time slices
-	//TODO: add code to delete
 	err = tx.Commit()
 
 	return
@@ -236,89 +248,58 @@ func (m *mysql) TimerDelete(timerUUID string) (err error) {
 var _ bludgeon.MetaTimeSlice = &mysql{}
 
 //MetaTimeSliceRead
-func (m *mysql) TimeSliceRead(timeSliceUUID string) (timeSlice bludgeon.TimeSlice, err error) {
+func (m *mysql) TimeSliceRead(timeSliceUUID string) (slice bludgeon.TimeSlice, err error) {
 	m.RLock()
 	defer m.RUnlock()
 
 	var row *sql.Row
 	var query string
-	var tx *sql.Tx
 
-	if tx, err = m.db.Begin(); err != nil {
-		return
-	}
-	defer tx.Rollback()
-	//query rows for timer, this should only return a single element because timerID should be a primary column
-	query = fmt.Sprintf("SELECT slice_uuid, slice_start, slice_finish, slice_archived, COALESCE(slice_elapsed_time,0) FROM %s WHERE slice_uuid = ?", TableSlice)
-	row = tx.QueryRow(query, timeSliceUUID)
+	//query the slice attributes, also get teh timer_uuid via an inner join with the timer table
+	// because a slice is dependent on a timer, this column can never be NULL (it's also a foreign
+	// key)
+	query = fmt.Sprintf(`SELECT slice_uuid, timer_uuid, slice_start, slice_finish, slice_archived, COALESCE(slice_elapsed_time,0)
+		FROM %s	INNER JOIN %s ON %s.timer_id=%s.timer_id
+		WHERE slice_uuid=?`,
+		TableSlice, TableTimer, TableSlice, TableTimer)
+	row = m.db.QueryRow(query, timeSliceUUID)
 	if err = row.Scan(
-		&timeSlice.UUID,
-		&timeSlice.Start,
-		&timeSlice.Finish,
-		&timeSlice.Archived,
-		&timeSlice.ElapsedTime,
+		&slice.UUID,
+		&slice.TimerUUID,
+		&slice.Start,
+		&slice.Finish,
+		&slice.Archived,
+		&slice.ElapsedTime,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			err = errors.Wrapf(err, ErrTimeSliceNotFoundf, timeSliceUUID)
+			err = errors.Errorf(ErrTimeSliceNotFoundf, timeSliceUUID)
 		}
 
 		return
-	}
-	//TODO: add associated timer uuid
-	query = fmt.Sprintf(`SELECT timer_uuid FROM %s 
-		INNER JOIN %s ON %s.timer_id=%s.timer_id 
-		INNER JOIN %s ON %s.slice_id=%s.slice_id WHERE slice_uuid=?`,
-		TableTimer,
-		TableTimerSlice, TableTimer, TableTimerSlice,
-		TableSlice, TableSlice, TableTimerSlice,
-	)
-	row = tx.QueryRow(query, timeSlice.UUID)
-	if err = row.Scan(&timeSlice.TimerUUID); err != nil {
-		if err != sql.ErrNoRows {
-			return
-		}
-		err = nil
 	}
 
 	return
 }
 
 //MetaTimeSliceWrite
-func (m *mysql) TimeSliceWrite(timeSliceUUID string, timeSlice bludgeon.TimeSlice) (err error) {
+func (m *mysql) TimeSliceWrite(sliceUUID string, slice bludgeon.TimeSlice) (err error) {
 	m.RLock()
 	defer m.RUnlock()
 
 	var result sql.Result
 	var query string
-	var tx *sql.Tx
 
-	if tx, err = m.db.Begin(); err != nil {
-		return
-	}
-	defer tx.Rollback()
-	query = fmt.Sprintf(`INSERT INTO %s (slice_uuid, slice_start, slice_finish, slice_archived) VALUES(?, ?, ?, ?)
-		ON DUPLICATE KEY
-		UPDATE slice_start=?, slice_finish=?, slice_archived=?`, TableSlice)
-	if result, err = tx.Exec(query, timeSliceUUID, timeSlice.Start, timeSlice.Finish, timeSlice.Archived,
-		timeSlice.Start, timeSlice.Finish, timeSlice.Archived); err != nil {
+	query = fmt.Sprintf(`INSERT INTO %s (slice_uuid, slice_start, slice_finish, slice_archived, timer_id) 
+		VALUES(?, ?, ?, ?, (SELECT timer_id FROM %s WHERE timer_uuid="%s"))
+			ON DUPLICATE KEY
+		UPDATE slice_start=VALUES(slice_start), slice_finish=(slice_finish), slice_archived=VALUES(slice_archived)`,
+		TableSlice, TableTimer, slice.TimerUUID)
+	if result, err = m.db.Exec(query, sliceUUID, slice.Start, slice.Finish, slice.Archived); err != nil {
 		return
 	}
 	if err = rowsAffected(result, ErrUpdateFailed); err != nil {
 		return
 	}
-	if timeSlice.TimerUUID != "" {
-		query = fmt.Sprintf(`INSERT INTO %s (timer_id, slice_id) values((%s),(%s))
-			ON DUPLICATE KEY UPDATE timer_id=timer_id, slice_id=slice_id`,
-			TableTimerSlice,
-			fmt.Sprintf("SELECT timer_id FROM %s WHERE timer_uuid=\"%s\"", TableTimer, timeSlice.TimerUUID),
-			fmt.Sprintf("SELECT slice_id FROM %s WHERE slice_uuid=\"%s\"", TableSlice, timeSlice.UUID),
-		)
-		if _, err = tx.Exec(query); err != nil {
-			return
-		}
-	}
-	//TODO: get the elapsed time
-	err = tx.Commit()
 
 	return
 }
@@ -336,12 +317,6 @@ func (m *mysql) TimeSliceDelete(timeSliceUUID string) (err error) {
 		return
 	}
 	defer tx.Rollback()
-	//TODO: delete the association for timerID
-	query = fmt.Sprintf("DELETE FROM %s WHERE slice_id=(SELECT slice_id FROM %s WHERE slice_uuid=?)", TableTimerSlice, TableSlice)
-	if _, err = tx.Exec(query, timeSliceUUID); err != nil {
-		return
-	}
-	//TODO: add code to handle active slice
 	query = fmt.Sprintf("DELETE FROM %s WHERE slice_id=(SELECT slice_id FROM %s WHERE slice_uuid=?)", TableTimerSliceActive, TableSlice)
 	if _, err = tx.Exec(query, timeSliceUUID); err != nil {
 		return
@@ -350,11 +325,9 @@ func (m *mysql) TimeSliceDelete(timeSliceUUID string) (err error) {
 	if result, err = tx.Exec(query, timeSliceUUID); err != nil {
 		return
 	}
-	//ensure that rows were affected
 	if err = rowsAffected(result, ErrDeleteFailed); err != nil {
 		return
 	}
-	//TODO: add code to update elapsed time?
 	err = tx.Commit()
 
 	return

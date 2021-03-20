@@ -254,12 +254,12 @@ func TestIntSliceTimer(t *testing.T) {
 		// EmployeeID:  0,
 	}
 	sliceWrite := bludgeon.TimeSlice{
-		UUID:      sliceUUID,
-		TimerUUID: timerUUID,
-		Start:     tNow.UnixNano(),
-		Finish:    tNow.Add(5 * time.Second).UnixNano(),
-		// ElapsedTime: 0,
-		Archived: true,
+		UUID:        sliceUUID,
+		TimerUUID:   timerUUID,
+		Start:       tNow.UnixNano(),
+		Finish:      tNow.Add(5 * time.Second).UnixNano(),
+		ElapsedTime: tNow.Add(5*time.Second).UnixNano() - tNow.UnixNano(),
+		Archived:    true,
 	}
 	db := mysql.NewMetaMySQL()
 	err = db.Initialize(validConfig)
@@ -288,13 +288,13 @@ func TestIntTimerActiveSlice(t *testing.T) {
 	timerWrite := bludgeon.Timer{
 		UUID: timerUUID,
 		// ActiveSliceUUID: "",
-		Comment: "This is a test comment",
-		Start:   tNow.UnixNano(),
-		Finish:  tNow.Add(5 * time.Second).UnixNano(),
-		// ElapsedTime: 0,
-		Completed: true,
-		Archived:  false,
-		Billed:    true,
+		Comment:     "This is a test comment",
+		Start:       tNow.UnixNano(),
+		Finish:      tNow.Add(10 * time.Second).UnixNano(),
+		ElapsedTime: tNow.Add(5*time.Second).UnixNano() - tNow.UnixNano(),
+		Completed:   true,
+		Archived:    false,
+		Billed:      true,
 		// EmployeeID:  0,
 	}
 	sliceWrite := bludgeon.TimeSlice{
@@ -321,3 +321,8 @@ func TestIntTimerActiveSlice(t *testing.T) {
 	err = db.Shutdown()
 	assert.Nil(t, err)
 }
+
+//TODO: write test for deleting a timer
+//TODO: write test for calculating elapsed time on
+// an active time slice
+//
