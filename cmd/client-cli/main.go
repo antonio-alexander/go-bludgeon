@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
-	cli "github.com/antonio-alexander/go-bludgeon/bludgeon/cli"
-	client "github.com/antonio-alexander/go-bludgeon/bludgeon/client"
 	config "github.com/antonio-alexander/go-bludgeon/bludgeon/config"
-	json "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/json"
 	api "github.com/antonio-alexander/go-bludgeon/bludgeon/rest/api"
+	client "github.com/antonio-alexander/go-bludgeon/internal/client"
+	cli "github.com/antonio-alexander/go-bludgeon/internal/client/cli"
+	bludgeon "github.com/antonio-alexander/go-bludgeon/internal/common"
+	json "github.com/antonio-alexander/go-bludgeon/internal/meta/json"
 
 	"github.com/pkg/errors"
 )
