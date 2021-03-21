@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS slice (
     slice_start BIGINT NOT NULL,
     slice_finish BIGINT,
     slice_archived BOOLEAN,
-    slice_elapsed_time BIGINT AS (slice_finish-slice_start),
+    slice_elapsed_time BIGINT AS (if((slice_finish-slice_start)>0, 
+        slice_finish-slice_start, 0)),
 
     PRIMARY KEY (slice_id),
     FOREIGN KEY (timer_id)

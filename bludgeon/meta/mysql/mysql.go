@@ -48,20 +48,19 @@ func (m *mysql) Initialize(element interface{}) (err error) {
 
 	var config Configuration
 
-	//attempt to cast element into configuration
+	//Attempt to cast the configuration, create a data source
+	// open the connection and then attempt to ping the database
+	// to verify connectivity
 	if config, err = castConfiguration(element); err != nil {
 		return
 	}
-	//connect
 	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=%t",
 		config.Username, config.Password, config.Hostname, config.Port, config.Database, config.ParseTime)
 	//[username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
 	//user:password@tcp(localhost:5555)/dbname?charset=utf8
-	//create a connection to the database
 	if m.db, err = sql.Open("mysql", dataSourceName); err != nil {
 		return
 	}
-	//attempt to ping the database to verify valid connectivity
 	err = m.db.Ping()
 
 	return
@@ -79,6 +78,7 @@ func (m *mysql) Shutdown() (err error) {
 		err = m.db.Close()
 	}
 	//set internal configuration to defaults
+	m.config.Default()
 	//set internal pointers to nil
 
 	return
@@ -317,7 +317,8 @@ func (m *mysql) TimeSliceDelete(timeSliceUUID string) (err error) {
 		return
 	}
 	defer tx.Rollback()
-	query = fmt.Sprintf("DELETE FROM %s WHERE slice_id=(SELECT slice_id FROM %s WHERE slice_uuid=?)", TableTimerSliceActive, TableSlice)
+	query = fmt.Sprintf("DELETE FROM %s WHERE slice_id=(SELECT slice_id FROM %s WHERE slice_uuid=?)",
+		TableTimerSliceActive, TableSlice)
 	if _, err = tx.Exec(query, timeSliceUUID); err != nil {
 		return
 	}
