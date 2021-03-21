@@ -6,7 +6,8 @@ import (
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
 	client "github.com/antonio-alexander/go-bludgeon/bludgeon/client/config"
 	metajson "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/json/config"
-	metamysql "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/mysql/config"
+
+	// metamysql "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/mysql"
 	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest/config"
 	server "github.com/antonio-alexander/go-bludgeon/bludgeon/server/config"
 )
@@ -18,7 +19,7 @@ func DefaultClient(directory string, c *Client) {
 		c.Meta = make(map[bludgeon.MetaType]json.RawMessage)
 	}
 	c.Meta[bludgeon.MetaTypeJSON], _ = json.Marshal(metajson.Default(directory))
-	c.Meta[bludgeon.MetaTypeMySQL], _ = json.Marshal(metamysql.Default())
+	// c.Meta[bludgeon.MetaTypeMySQL], _ = json.Marshal(metamysql.Default())
 	c.RemoteType = DefaultRemoteType
 	if c.Remote == nil {
 		c.Remote = make(map[bludgeon.RemoteType]json.RawMessage)
@@ -35,7 +36,7 @@ func DefaultServer(directory string, s *Server) {
 		s.Meta = make(map[bludgeon.MetaType]json.RawMessage)
 	}
 	s.Meta[bludgeon.MetaTypeJSON], _ = json.Marshal(metajson.Default(directory))
-	s.Meta[bludgeon.MetaTypeMySQL], _ = json.Marshal(metamysql.Default())
+	// s.Meta[bludgeon.MetaTypeMySQL], _ = json.Marshal(metamysql.Default())
 	s.Rest = rest.Default()
 	s.Server = server.Default()
 }

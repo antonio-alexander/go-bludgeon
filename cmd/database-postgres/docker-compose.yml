@@ -1,0 +1,19 @@
+version: "3"
+services:
+  bludgeon_database:
+    container_name: "bludgeon_database"
+    image: bludgeon_db-postgres:latest
+    restart: "always"
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - "5432:5432"
+    volumes:
+      - bludgeon-database-postgres:/var/lib/postgres
+    environment:
+      POSTGRES_USER: bludgeon
+      POSTGRES_DB: bludgeon
+      POSTGRES_PASSWORD: bludgeon
+volumes:
+  bludgeon-database-postgres:

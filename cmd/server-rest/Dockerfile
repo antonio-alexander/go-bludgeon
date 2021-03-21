@@ -9,7 +9,7 @@
 FROM golang:1.14.1-alpine3.11 AS builder
 
 # set the working directory to cmd, so we can build easily
-WORKDIR /go/src/github.com/antonio-alexander/go-bludgeon/cmd/bludgeon-server-rest
+WORKDIR /go/src/github.com/antonio-alexander/go-bludgeon/cmd/server-rest
 
 # set environment
 ENV GOPATH=/go PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
@@ -29,7 +29,9 @@ RUN \
     && go get github.com/go-delve/delve/cmd/dlv 
 
 # build the executable
-RUN go build -gcflags "all=-N -l"  -o /app/bludgeon_server \
+RUN \
+    go get -d ./... && \
+    go build -gcflags "all=-N -l"  -o /app/bludgeon_server \
     && chmod +x /app/bludgeon_server
 
 # build from a clean container (without golang)

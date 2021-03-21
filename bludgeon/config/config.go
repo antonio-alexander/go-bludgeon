@@ -8,7 +8,7 @@ import (
 	bludgeon "github.com/antonio-alexander/go-bludgeon/bludgeon"
 	client "github.com/antonio-alexander/go-bludgeon/bludgeon/client/config"
 	metajson "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/json/config"
-	metamysql "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/mysql/config"
+	metamysql "github.com/antonio-alexander/go-bludgeon/bludgeon/meta/mysql"
 	rest "github.com/antonio-alexander/go-bludgeon/bludgeon/rest/config"
 	server "github.com/antonio-alexander/go-bludgeon/bludgeon/server/config"
 
@@ -140,7 +140,7 @@ func fromEnv(pwd string, envs map[string]string, config interface{}) (err error)
 			if err = json.Unmarshal(raw, &conf); err != nil {
 				return
 			}
-			if err = metamysql.FromEnv(pwd, envs, &conf); err != nil {
+			if err = conf.FromEnv(pwd, envs); err != nil {
 				return
 			}
 			if c.Meta[bludgeon.MetaTypeJSON], err = json.Marshal(conf); err != nil {
@@ -209,7 +209,7 @@ func fromEnv(pwd string, envs map[string]string, config interface{}) (err error)
 			if err = json.Unmarshal(raw, &conf); err != nil {
 				return
 			}
-			if err = metamysql.FromEnv(pwd, envs, &conf); err != nil {
+			if err = conf.FromEnv(pwd, envs); err != nil {
 				return
 			}
 			if c.Meta[bludgeon.MetaTypeJSON], err = json.Marshal(conf); err != nil {
