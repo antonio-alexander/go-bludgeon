@@ -11,8 +11,10 @@ func castConfiguration(element interface{}) (c Configuration, err error) {
 		err = json.Unmarshal(v, &c)
 	case Configuration:
 		c = v
+	case *Configuration:
+		c = *v
 	default:
-		err = fmt.Errorf("Unsupported type: %t", element)
+		err = fmt.Errorf("unsupported type: %t", element)
 	}
 
 	return

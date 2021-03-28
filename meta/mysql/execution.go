@@ -2,8 +2,25 @@ package metamysql
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 )
+
+func castConfiguration(element interface{}) (c Configuration, err error) {
+	switch v := element.(type) {
+	case json.RawMessage:
+		err = json.Unmarshal(v, &c)
+	case *Configuration:
+		c = *v
+	case Configuration:
+		c = v
+	default:
+		err = fmt.Errorf("unsupported type: %t", element)
+	}
+
+	return
+}
 
 //rowsAffected can be used to return a pre-determined error via errorString in the event
 // no rows are affected; this function assumes that in the event no error is returned and
@@ -19,14 +36,6 @@ func rowsAffected(result sql.Result, errorString string) (err error) {
 	if n <= 0 {
 		err = errors.New(errorString)
 	}
-
-	return
-}
-
-//lastInsertID will return the last id after an insert operation or an error if present
-func lastInsertID(result sql.Result) (id int64, err error) {
-	//get the last inserted id
-	id, err = result.LastInsertId()
 
 	return
 }

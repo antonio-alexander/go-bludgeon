@@ -1,8 +1,6 @@
 package metamysql
 
 import (
-	"encoding/json"
-	"fmt"
 	"time"
 )
 
@@ -18,21 +16,6 @@ const (
 	DefaultParseTime      bool          = true
 	DefaultDriver         string        = "mysql"
 )
-
-func castConfiguration(element interface{}) (c Configuration, err error) {
-	switch v := element.(type) {
-	case json.RawMessage:
-		err = json.Unmarshal(v, &c)
-	case *Configuration:
-		c = *v
-	case Configuration:
-		c = v
-	default:
-		err = fmt.Errorf("Unsupported type: %t", element)
-	}
-
-	return
-}
 
 //Configuration is a struct that contains al lthe possible configuration for supported database drivers
 type Configuration struct {
@@ -84,8 +67,6 @@ func (c *Configuration) Default() {
 	c.ParseTime = DefaultParseTime
 }
 
-func (c *Configuration) FromEnv(pwd string, envs map[string]string) (err error) {
+func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
 	//TODO: add functionality
-
-	return
 }

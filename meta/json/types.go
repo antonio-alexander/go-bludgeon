@@ -6,8 +6,8 @@ import (
 
 //error constants
 const (
-	ErrTimerNotFoundf     string = "Timer with id, \"%s\", not found locally"
-	ErrTimeSliceNotFoundf string = "TimeSlice with id, \"%s\", not found locally"
+	ErrTimerNotFoundf     string = "timer with id, \"%s\", not found locally"
+	ErrTimeSliceNotFoundf string = "timeSlice with id, \"%s\", not found locally"
 )
 
 //SerializedData provides a struct that describes the representation

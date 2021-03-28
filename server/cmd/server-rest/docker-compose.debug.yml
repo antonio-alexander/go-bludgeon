@@ -1,0 +1,12 @@
+version: "3"
+services:
+  bludgeon_server_debug:
+    container_name: "bludgeon_server_debug"
+    image: bludgeon_server-rest:latest-debug
+    restart: "always"
+    build:
+      context: ../../../
+      dockerfile: ./server/cmd/server-rest/Dockerfile.Debug
+    ports:
+      - "8080:8080"
+    # environment:

@@ -25,26 +25,24 @@ type Configuration struct {
 	File string
 }
 
-func Default(directory string) Configuration {
-	return Configuration{
-		File: filepath.Join(directory, DefaultFile),
-	}
+func (c *Configuration) Default(pwd string) {
+	c.File = filepath.Join(pwd, DefaultFile)
 }
 
-func Validate(config *Configuration) (err error) {
+func (c *Configuration) Validate() (err error) {
 	//check if the file is empty
-	if config.File == "" {
+	if c.File == "" {
 		err = errors.New(ErrFileEmpty)
+
+		return
 	}
 
 	return
 }
 
-func FromEnv(pwd string, envs map[string]string, config *Configuration) (err error) {
+func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
 	//get the file from the file environmental variable
 	if file, ok := envs[EnvNameFile]; ok {
-		config.File = file
+		c.File = file
 	}
-
-	return
 }

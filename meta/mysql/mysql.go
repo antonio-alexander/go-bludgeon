@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/antonio-alexander/go-bludgeon/common"
 
@@ -12,8 +11,6 @@ import (
 
 	_ "github.com/go-sql-driver/mysql" //import for driver support
 )
-
-const timeout time.Duration = 5 * time.Second
 
 type mysql struct {
 	sync.RWMutex                 //mutex for threadsafe functionality
@@ -48,6 +45,11 @@ func (m *mysql) Initialize(element interface{}) (err error) {
 
 	var config Configuration
 
+	if m.started {
+		err = errors.New(ErrStarted)
+
+		return
+	}
 	//Attempt to cast the configuration, create a data source
 	// open the connection and then attempt to ping the database
 	// to verify connectivity
@@ -61,7 +63,10 @@ func (m *mysql) Initialize(element interface{}) (err error) {
 	if m.db, err = sql.Open("mysql", dataSourceName); err != nil {
 		return
 	}
-	err = m.db.Ping()
+	if err = m.db.Ping(); err != nil {
+		return
+	}
+	m.started = true
 
 	return
 }
@@ -71,6 +76,11 @@ func (m *mysql) Shutdown() (err error) {
 	m.Lock()
 	defer m.Unlock()
 
+	if !m.started {
+		err = errors.New(ErrNotStarted)
+
+		return
+	}
 	close(m.stopper)
 	m.Wait()
 	//only close if it's nil
@@ -80,6 +90,7 @@ func (m *mysql) Shutdown() (err error) {
 	//set internal configuration to defaults
 	m.config.Default()
 	//set internal pointers to nil
+	m.started = false
 
 	return
 }
@@ -253,12 +264,11 @@ func (m *mysql) TimeSliceRead(timeSliceUUID string) (slice common.TimeSlice, err
 	defer m.RUnlock()
 
 	var row *sql.Row
-	var query string
 
 	//query the slice attributes, also get teh timer_uuid via an inner join with the timer table
 	// because a slice is dependent on a timer, this column can never be NULL (it's also a foreign
 	// key)
-	query = fmt.Sprintf(`SELECT slice_uuid, timer_uuid, slice_start, slice_finish, slice_archived, COALESCE(slice_elapsed_time,0)
+	query := fmt.Sprintf(`SELECT slice_uuid, timer_uuid, slice_start, slice_finish, slice_archived, COALESCE(slice_elapsed_time,0)
 		FROM %s	INNER JOIN %s ON %s.timer_id=%s.timer_id
 		WHERE slice_uuid=?`,
 		TableSlice, TableTimer, TableSlice, TableTimer)
@@ -287,9 +297,8 @@ func (m *mysql) TimeSliceWrite(sliceUUID string, slice common.TimeSlice) (err er
 	defer m.RUnlock()
 
 	var result sql.Result
-	var query string
 
-	query = fmt.Sprintf(`INSERT INTO %s (slice_uuid, slice_start, slice_finish, slice_archived, timer_id) 
+	query := fmt.Sprintf(`INSERT INTO %s (slice_uuid, slice_start, slice_finish, slice_archived, timer_id) 
 		VALUES(?, ?, ?, ?, (SELECT timer_id FROM %s WHERE timer_uuid="%s"))
 			ON DUPLICATE KEY
 		UPDATE slice_start=VALUES(slice_start), slice_finish=(slice_finish), slice_archived=VALUES(slice_archived)`,

@@ -1,83 +1,111 @@
 package config
 
 import (
-	"time"
+	"encoding/json"
+	"io/fs"
+	"io/ioutil"
 
 	"github.com/antonio-alexander/go-bludgeon/common"
+	"github.com/pkg/errors"
 
 	metajson "github.com/antonio-alexander/go-bludgeon/meta/json"
 	metamysql "github.com/antonio-alexander/go-bludgeon/meta/mysql"
 )
 
+const (
+	EnvNameRemoteType string = "BLUDGEON_REMOTE_TYPE"
+	EnvNameMetaType   string = "BLUDGEON_META_TYPE"
+)
+
+const (
+	DefaultConfigPath string            = "bludgeon_server_config.json"
+	DefaultMetaType   common.MetaType   = common.MetaTypeJSON
+	DefaultRemoteType common.RemoteType = common.RemoteTypeRest
+)
+
+const (
+	ErrRemoteTypeEmpty string = "remote type empty"
+	ErrMetaTypeEmpty   string = "meta type empty"
+)
+
 type Configuration struct {
 	RemoteType common.RemoteType
-	Remote     struct {
-		Rest Rest
-	}
-	MetaType common.MetaType
-	Meta     struct {
-		MySQL metamysql.Configuration
-		JSON  metajson.Configuration
+	RemoteRest *Rest
+	MetaType   common.MetaType
+	MetaMySQL  *metamysql.Configuration
+	MetaJSON   *metajson.Configuration
+}
+
+func New() *Configuration {
+	return &Configuration{
+		RemoteRest: &Rest{},
+		MetaMySQL:  &metamysql.Configuration{},
+		MetaJSON:   &metajson.Configuration{},
 	}
 }
 
-type Rest struct {
-	Address string        `json:"Address"`
-	Port    string        `json:"Port"`
-	Timeout time.Duration `json:"Timeout"`
+func (c *Configuration) Read(configFile string) (err error) {
+	var bytes []byte
+
+	if bytes, err = ioutil.ReadFile(configFile); err != nil {
+		return
+	}
+	err = json.Unmarshal(bytes, c)
+
+	return
 }
 
-// func Default() Configuration {
-// 	return Configuration{
-// 		Address: DefaultAddress,
-// 		Port:    DefaultPort,
-// 		Timeout: DefaultTimeout,
-// 	}
-// }
+func (c *Configuration) Write(configFile string) (err error) {
+	var bytes []byte
 
-// func FromEnv(pwd string, envs map[string]string, c *Configuration) (err error) {
-// 	//Get the address from the environment, then the port
-// 	// then the timeout
-// 	if address, ok := envs[EnvNameAddress]; ok {
-// 		c.Address = address
-// 	}
-// 	if port, ok := envs[EnvNamePort]; ok {
-// 		c.Port = port
-// 	}
-// 	if timeoutString, ok := envs[EnvNameTimeout]; ok {
-// 		if timeoutInt, err := strconv.Atoi(timeoutString); err == nil {
-// 			if timeout := time.Duration(timeoutInt) * time.Second; timeout > 0 {
-// 				c.Timeout = timeout
-// 			}
-// 		}
-// 	}
+	if bytes, err = json.Marshal(&c); err != nil {
+		return
+	}
+	err = ioutil.WriteFile(configFile, bytes, fs.FileMode(0644))
 
-// 	return
-// }
+	return
+}
 
-// func Validate(c *Configuration) (err error) {
-// 	//validate that the address isn't empty
-// 	// check if the port is empty, and then ensure
-// 	// that the port is an integer, finally
-// 	// check if the timeout is lte 0
-// 	if c.Address == "" {
-// 		err = errors.New(ErrAddressEmpty)
+func (c *Configuration) Default(pwd string) {
+	c.RemoteType = DefaultRemoteType
+	c.RemoteRest.Default()
+	c.MetaType = DefaultMetaType
+	c.MetaJSON.Default(pwd)
+	c.MetaMySQL.Default()
+}
 
-// 		return
-// 	}
-// 	if c.Port == "" {
-// 		err = errors.New(ErrPortEmpty)
+func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
+	if remoteType, ok := envs[EnvNameRemoteType]; ok {
+		c.RemoteType = common.AtoRemoteType(remoteType)
+	}
+	if metaType, ok := envs[EnvNameMetaType]; ok {
+		c.MetaType = common.AtoMetaType(metaType)
+	}
+	c.RemoteRest.FromEnv(pwd, envs)
+	c.MetaJSON.FromEnv(pwd, envs)
+	c.MetaMySQL.FromEnv(pwd, envs)
+}
 
-// 		return
-// 	}
-// 	if _, e := strconv.Atoi(c.Port); e != nil {
-// 		err = errors.Errorf(ErrPortBadf, c.Port)
+func (c *Configuration) Validate() (err error) {
+	if c.MetaType == "" {
+		err = errors.New(ErrMetaTypeEmpty)
 
-// 		return
-// 	}
-// 	if c.Timeout <= 0 {
-// 		err = errors.Errorf(ErrTimeoutBadf, c.Timeout)
-// 	}
+		return
+	}
+	if c.RemoteType == "" {
+		err = errors.New(ErrRemoteTypeEmpty)
 
-// 	return
-// }
+		return
+	}
+	if err = c.RemoteRest.Validate(); err != nil {
+		return
+	}
+	if err = c.MetaJSON.Validate(); err != nil {
+		return
+	}
+	if err = c.MetaMySQL.Validate(); err != nil {
+		return
+	}
+
+	return
+}

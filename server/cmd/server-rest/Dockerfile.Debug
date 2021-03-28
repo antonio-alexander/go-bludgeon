@@ -13,10 +13,21 @@ FROM golang:1.16.2-alpine3.13 AS builder
 WORKDIR /build
 
 # set environment
-ENV CGO_ENABLED=0
+ENV GOPATH=/go PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 
 # copy current directory into the gopath
-COPY . .
+COPY . /build
+
+# build/install delve
+RUN \
+    apk add --no-cache ca-certificates \
+    dpkg \
+    gcc \
+    git \
+    musl-dev \
+    && mkdir -p "$GOPATH/src" "$GOPATH/bin" \
+    && chmod -R 777 "$GOPATH" \
+    && go get github.com/go-delve/delve/cmd/dlv 
 
 # build the executable
 RUN \
@@ -33,6 +44,7 @@ WORKDIR /app
 
 # copy delve and the app
 COPY --from=builder /app/bludgeon_server /app/bludgeon_server
+COPY --from=builder /go/bin/dlv /bin/
 
-# use this to just run the server
-ENTRYPOINT /app/bludgeon_server
+# use this to run delve with the executable
+CMD dlv exec /app/bludgeon_server --headless --listen=":2345" --log --api-version=2 --check-go-version=false

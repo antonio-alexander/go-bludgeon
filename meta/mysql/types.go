@@ -12,15 +12,17 @@ const (
 
 //error constants
 const (
-	ErrTimerNotFoundf     string = "Timer with id, \"%s\", not found locally"
-	ErrTimeSliceNotFoundf string = "TimeSlice with id, \"%s\", not found locally"
-	ErrTimerIsArchivedf   string = "Timer with id, \"%s\", is archived"
-	ErrNotImplemented     string = "Not implemented"
-	ErrDatabaseNil        string = "Internal database pointer is nil"
-	ErrDatabaseNotNil     string = "Internal database pointer is not nil, reconnect or close to connect"
-	ErrUpdateFailed       string = "Update failed, no rows affected"
-	ErrDeleteFailed       string = "Delete failed, id not found"
-	ErrQueryFailed        string = "Query: \"%s\", failed"
+	ErrTimerNotFoundf     string = "timer with id, \"%s\", not found locally"
+	ErrTimeSliceNotFoundf string = "timeSlice with id, \"%s\", not found locally"
+	ErrTimerIsArchivedf   string = "timer with id, \"%s\", is archived"
+	ErrNotImplemented     string = "not implemented"
+	ErrDatabaseNil        string = "internal database pointer is nil"
+	ErrDatabaseNotNil     string = "internal database pointer is not nil, reconnect or close to connect"
+	ErrUpdateFailed       string = "update failed, no rows affected"
+	ErrDeleteFailed       string = "delete failed, id not found"
+	ErrQueryFailed        string = "query: \"%s\", failed"
+	ErrStarted            string = "already started"
+	ErrNotStarted         string = "not started"
 )
 
 //query constants
