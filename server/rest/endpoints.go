@@ -1,4 +1,4 @@
-package bludgeonrestendpoints
+package rest
 
 import (
 	"encoding/json"
@@ -6,46 +6,13 @@ import (
 	"net/http"
 	"time"
 
-	bludgeon "github.com/antonio-alexander/go-bludgeon/internal/common"
-	rest "github.com/antonio-alexander/go-bludgeon/internal/common/rest"
+	common "github.com/antonio-alexander/go-bludgeon/common"
 
 	"github.com/pkg/errors"
 )
 
-//BuildRoutes will create all the routes and their functions to execute when received
-func BuildRoutes(logger bludgeon.Logger, functional interface{}) (routes []rest.HandleFuncConfig) {
-	//REVIEW: in the future when we add tokens, we'll need to create some way to check tokens for
-	// certain functions, we may need to implement varratics to add support for tokens for the
-	// server actions, may not be able to re-use the existing endpoints
-
-	//get the routes for the functional timer, and then the timeslice
-	if f, ok := functional.(bludgeon.FunctionalTimer); ok {
-		routes = append(routes, []rest.HandleFuncConfig{
-			{Route: rest.RouteTimerCreate, Method: POST, HandleFx: TimerCreate(logger, f)},
-			{Route: rest.RouteTimerRead, Method: POST, HandleFx: TimerRead(logger, f)},
-			{Route: rest.RouteTimerUpdate, Method: POST, HandleFx: TimerUpdate(logger, f)},
-			{Route: rest.RouteTimerDelete, Method: POST, HandleFx: TimerDelete(logger, f)},
-			{Route: rest.RouteTimerStart, Method: POST, HandleFx: TimerStart(logger, f)},
-			{Route: rest.RouteTimerPause, Method: POST, HandleFx: TimerPause(logger, f)},
-			{Route: rest.RouteTimerSubmit, Method: POST, HandleFx: TimerSubmit(logger, f)},
-		}...)
-	}
-	if f, ok := functional.(bludgeon.FunctionalTimeSlice); ok {
-		routes = append(routes, []rest.HandleFuncConfig{
-			{Route: rest.RouteTimeSliceRead, Method: POST, HandleFx: TimeSliceRead(logger, f)},
-		}...)
-	}
-	if f, ok := functional.(bludgeon.FunctionalManage); ok {
-		routes = append(routes, []rest.HandleFuncConfig{
-			{Route: rest.RouteStop, Method: POST, HandleFx: Stop(logger, f)},
-		}...)
-	}
-
-	return
-}
-
 //Stop
-func Stop(l bludgeon.Logger, f bludgeon.FunctionalManage) func(http.ResponseWriter, *http.Request) {
+func Stop(l common.Logger, f common.FunctionalManage) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var err error
 
@@ -59,9 +26,9 @@ func Stop(l bludgeon.Logger, f bludgeon.FunctionalManage) func(http.ResponseWrit
 }
 
 //TimerCreate
-func TimerCreate(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
+func TimerCreate(l common.Logger, f common.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var timer bludgeon.Timer
+		var timer common.Timer
 		var bytes []byte
 		var err error
 
@@ -77,10 +44,10 @@ func TimerCreate(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respon
 }
 
 //TimerRead
-func TimerRead(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
+func TimerRead(l common.Logger, f common.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract rest.Contract
-		var timer bludgeon.Timer
+		var contract common.Contract
+		var timer common.Timer
 		var bytes []byte
 		var err error
 
@@ -101,10 +68,10 @@ func TimerRead(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Response
 }
 
 //TimerUpdate
-func TimerUpdate(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
+func TimerUpdate(l common.Logger, f common.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract rest.Contract
-		var timer bludgeon.Timer
+		var contract common.Contract
+		var timer common.Timer
 		var bytes []byte
 		var err error
 
@@ -125,9 +92,9 @@ func TimerUpdate(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respon
 }
 
 //TimerDelete
-func TimerDelete(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
+func TimerDelete(l common.Logger, f common.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract rest.Contract
+		var contract common.Contract
 		var bytes []byte
 		var err error
 
@@ -146,10 +113,10 @@ func TimerDelete(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respon
 }
 
 //TimerStart
-func TimerStart(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
+func TimerStart(l common.Logger, f common.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract rest.Contract
-		var timer bludgeon.Timer
+		var contract common.Contract
+		var timer common.Timer
 		var bytes []byte
 		var err error
 
@@ -170,10 +137,10 @@ func TimerStart(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respons
 }
 
 //TimerPause
-func TimerPause(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
+func TimerPause(l common.Logger, f common.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract rest.Contract
-		var timer bludgeon.Timer
+		var contract common.Contract
+		var timer common.Timer
 		var bytes []byte
 		var err error
 
@@ -194,10 +161,10 @@ func TimerPause(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respons
 }
 
 //TimerSubmit
-func TimerSubmit(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
+func TimerSubmit(l common.Logger, f common.FunctionalTimer) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var contract rest.Contract
-		var timer bludgeon.Timer
+		var contract common.Contract
+		var timer common.Timer
 		var bytes []byte
 		var err error
 
@@ -218,10 +185,10 @@ func TimerSubmit(l bludgeon.Logger, f bludgeon.FunctionalTimer) func(http.Respon
 }
 
 //TimeSliceRead
-func TimeSliceRead(l bludgeon.Logger, f bludgeon.FunctionalTimeSlice) func(http.ResponseWriter, *http.Request) {
+func TimeSliceRead(l common.Logger, f common.FunctionalTimeSlice) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		var timeSlice bludgeon.TimeSlice
-		var contract rest.Contract
+		var timeSlice common.TimeSlice
+		var contract common.Contract
 		var bytes []byte
 		var err error
 

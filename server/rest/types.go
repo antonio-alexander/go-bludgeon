@@ -1,7 +1,16 @@
-package bludgeonrestconfig
+package rest
 
 import (
+	"net/http"
 	"time"
+)
+
+//endpoint constants
+const (
+	GET    = http.MethodGet
+	PUT    = http.MethodPut
+	POST   = http.MethodPost
+	DELETE = http.MethodDelete
 )
 
 //errors
@@ -10,6 +19,8 @@ const (
 	ErrPortEmpty    string = "Port is empty"
 	ErrPortBadf     string = "Port is a non-integer: %s"
 	ErrTimeoutBadf  string = "Timeout is lte to 0: %v"
+	ErrStarted      string = "server started"
+	ErrNotStarted   string = "server not started"
 )
 
 //environmental variables
@@ -25,10 +36,3 @@ const (
 	DefaultPort    string        = "8080"
 	DefaultTimeout time.Duration = 5 * time.Second
 )
-
-//Configuration
-type Configuration struct {
-	Address string        `json:"Address"`
-	Port    string        `json:"Port"`
-	Timeout time.Duration `json:"Timeout"`
-}

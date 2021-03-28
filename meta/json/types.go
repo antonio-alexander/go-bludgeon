@@ -1,4 +1,4 @@
-package json
+package metajson
 
 import (
 	common "github.com/antonio-alexander/go-bludgeon/common"

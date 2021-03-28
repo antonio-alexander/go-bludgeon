@@ -171,20 +171,14 @@ type Options struct {
 }
 
 type Logger interface {
-	//Println
-	Println(v ...interface{})
-
-	//Printf
-	Printf(format string, v ...interface{})
-
-	//Print
-	Print(v ...interface{})
-
 	//Error
-	Error(err error)
+	Error(err error, v ...interface{})
 
-	//Errorf
-	Errorf(format string, v ...interface{})
+	//Info
+	Info(format string, v ...interface{})
+
+	//Debug
+	Debug(format string, v ...interface{})
 }
 
 type FunctionalOwner interface {

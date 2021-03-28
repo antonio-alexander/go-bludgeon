@@ -5,17 +5,18 @@
 # the bludgeon-server hosted in a docker container
 # 
 ##########################################################
+
 # build from alpine container with golang
-FROM golang:1.14.1-alpine3.11 AS builder
+FROM golang:1.16.2-alpine3.13 AS builder
 
 # set the working directory to cmd, so we can build easily
-WORKDIR /go/src/github.com/antonio-alexander/go-bludgeon/cmd/server-rest
+WORKDIR /build
 
 # set environment
 ENV GOPATH=/go PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 
 # copy current directory into the gopath
-COPY . "$GOPATH"/src/github.com/antonio-alexander/go-bludgeon/
+COPY . /build
 
 # build/install delve
 RUN \
@@ -30,9 +31,10 @@ RUN \
 
 # build the executable
 RUN \
-    go get -d ./... && \
-    go build -gcflags "all=-N -l"  -o /app/bludgeon_server \
-    && chmod +x /app/bludgeon_server
+    go mod get ./... && \
+    mkdir -p /app && \
+    go build -gcflags "all=-N -l"  -o /app/bludgeon_server && \
+    chmod +x /app/bludgeon_server
 
 # build from a clean container (without golang)
 FROM alpine:latest

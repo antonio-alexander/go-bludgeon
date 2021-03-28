@@ -1,16 +1,8 @@
-package restserver
+package server
 
 import (
 	"net/http"
 	"time"
-)
-
-//endpoint constants
-const (
-	GET    = http.MethodGet
-	PUT    = http.MethodPut
-	POST   = http.MethodPost
-	DELETE = http.MethodDelete
 )
 
 var (
@@ -22,6 +14,18 @@ const (
 	// when shutting down the rest server
 	DefaultShutdownTimeout = 10 * time.Second
 )
+
+type log interface {
+	Printf(format string, v ...interface{})
+	Print(v ...interface{})
+	Println(v ...interface{})
+	Fatal(v ...interface{})
+	Fatalf(format string, v ...interface{})
+	Fatalln(v ...interface{})
+	Panic(v ...interface{})
+	Panicf(format string, v ...interface{})
+	Panicln(v ...interface{})
+}
 
 type HandleFuncConfig struct {
 	Route    string

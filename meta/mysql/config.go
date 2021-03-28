@@ -1,4 +1,4 @@
-package bludgeonmetamysql
+package metamysql
 
 import (
 	"encoding/json"

@@ -1,35 +1,35 @@
-package server
+package rest
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 
-	common "github.com/antonio-alexander/go-bludgeon/internal/common"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
+	config "github.com/antonio-alexander/go-bludgeon/server/config"
 )
 
 type server struct {
 	sync.RWMutex                 //mutex for threadsafe operations
 	sync.WaitGroup               //waitgroup to track go routines
+	common.Logger                //
 	started        bool          //whether or not the business logic has starting
-	config         Configuration //configuration
+	config         config.Rest   //configuration
 	stopper        chan struct{} //stopper to stop goRoutines
 	chExternal     chan struct{}
 	tokens         map[string]common.Token //map of tokens
-	logError       *log.Logger
-	log            *log.Logger
-	meta           interface { //storage interface
+	server         rest.Server             //
+	meta           interface {             //storage interface
 		common.MetaTimer
 		common.MetaTimeSlice
 	}
 }
 
-func NewServer(log, logError *log.Logger, meta interface {
+func New(logger common.Logger, meta interface {
 	common.MetaTimer
 	common.MetaTimeSlice
 }) interface {
-	common.Logger
 	Owner
 	Manage
 	common.FunctionalTimer
@@ -42,40 +42,10 @@ func NewServer(log, logError *log.Logger, meta interface {
 	}
 	//populate client pointer
 	return &server{
-		meta:     meta,
-		log:      log,
-		logError: logError,
-		tokens:   make(map[string]common.Token),
-	}
-}
-
-func (s *server) Println(v ...interface{}) {
-	if s.log != nil {
-		s.log.Println(v...)
-	}
-}
-
-func (s *server) Printf(format string, v ...interface{}) {
-	if s.log != nil {
-		s.log.Printf(format, v...)
-	}
-}
-
-func (s *server) Print(v ...interface{}) {
-	if s.log != nil {
-		s.log.Print(v...)
-	}
-}
-
-func (s *server) Error(err error) {
-	if s.logError != nil {
-		s.logError.Println(err)
-	}
-}
-
-func (s *server) Errorf(format string, v ...interface{}) {
-	if s.logError != nil {
-		s.logError.Printf(format, v...)
+		meta:   meta,
+		Logger: logger,
+		tokens: make(map[string]common.Token),
+		server: rest.New(logger),
 	}
 }
 
@@ -86,6 +56,7 @@ func (s *server) launchPurge() {
 		defer s.Done()
 
 		tPurge := time.NewTicker(30 * time.Second)
+		defer tPurge.Stop()
 		close(started)
 		for {
 			select {
@@ -99,6 +70,27 @@ func (s *server) launchPurge() {
 		}
 	}()
 	<-started
+}
+
+//buildRoutes will create all the routes and their functions to execute when received
+func (s *server) buildRoutes() []rest.HandleFuncConfig {
+	//REVIEW: in the future when we add tokens, we'll need to create some way to check tokens for
+	// certain functions, we may need to implement varratics to add support for tokens for the
+	// server actions, may not be able to re-use the existing endpoints
+	return []rest.HandleFuncConfig{
+		//timer
+		{Route: common.RouteTimerCreate, Method: POST, HandleFx: TimerCreate(s, s)},
+		{Route: common.RouteTimerRead, Method: POST, HandleFx: TimerRead(s, s)},
+		{Route: common.RouteTimerUpdate, Method: POST, HandleFx: TimerUpdate(s, s)},
+		{Route: common.RouteTimerDelete, Method: POST, HandleFx: TimerDelete(s, s)},
+		{Route: common.RouteTimerStart, Method: POST, HandleFx: TimerStart(s, s)},
+		{Route: common.RouteTimerPause, Method: POST, HandleFx: TimerPause(s, s)},
+		{Route: common.RouteTimerSubmit, Method: POST, HandleFx: TimerSubmit(s, s)},
+		//time slice
+		{Route: common.RouteTimeSliceRead, Method: POST, HandleFx: TimeSliceRead(s, s)},
+		//route stop
+		{Route: common.RouteStop, Method: POST, HandleFx: Stop(s, s)},
+	}
 }
 
 type Owner interface {
@@ -121,9 +113,10 @@ func (s *server) Close() {
 	// attempt to serialize what's remaining
 
 	//set internal configuration to default
-	s.config = Configuration{}
+	s.config = config.Rest{}
 	//set internal pointers to nil
 	s.meta = nil
+	s.server = nil
 }
 
 //Serialize
@@ -144,31 +137,32 @@ func (s *server) Deserialize(bytes []byte) (err error) {
 
 type Manage interface {
 	//
-	Start(config Configuration) (chExternal <-chan struct{}, err error)
+	Start(config config.Rest) (chExternal <-chan struct{}, err error)
 
 	//
 	Stop() (err error)
 }
 
-func (s *server) Start(config Configuration) (chExternal <-chan struct{}, err error) {
+func (s *server) Start(config config.Rest) (chExternal <-chan struct{}, err error) {
 	s.Lock()
 	defer s.Unlock()
 
-	//check if already started
+	//check if already started, store configuration, create stopper,
+	// slaunch go routines, set started to true
 	if s.started {
 		err = errors.New(ErrStarted)
 
 		return
 	}
-	//store configuration
 	s.config = config
-	//create stopper
 	s.stopper = make(chan struct{})
 	s.chExternal = make(chan struct{})
 	chExternal = s.chExternal
-	//launch go routines
+	routes := s.buildRoutes()
+	if err = s.server.BuildRoutes(routes); err != nil {
+		return
+	}
 	s.launchPurge()
-	//set started to true
 	s.started = true
 
 	return
@@ -179,16 +173,17 @@ func (s *server) Stop() (err error) {
 	defer s.Unlock()
 
 	//check if not started
+	//close the stopper
+	//set started flag to false
 	if !s.started {
 		err = errors.New(ErrNotStarted)
 
 		return
 	}
-	//close the stopper
+	s.server.Stop()
 	close(s.stopper)
 	s.Wait()
 	close(s.chExternal)
-	//set started flag to false
 	s.started = false
 
 	return

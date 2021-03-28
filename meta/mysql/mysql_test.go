@@ -1,4 +1,4 @@
-package bludgeonmetamysql_test
+package metamysql_test
 
 //--------------------------------------------------------------------------------------------
 // database_test.go contains all the tests to verify functionality of the bludgeon-database
@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	common "github.com/antonio-alexander/go-bludgeon/common"
-	mysql "github.com/antonio-alexander/go-bludgeon/meta/mysql"
+	"github.com/antonio-alexander/go-bludgeon/common"
+	metamysql "github.com/antonio-alexander/go-bludgeon/meta/mysql"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -33,19 +33,19 @@ const (
 )
 
 var (
-	validConfig   *mysql.Configuration
-	defaultConfig *mysql.Configuration
+	validConfig   *metamysql.Configuration
+	defaultConfig *metamysql.Configuration
 )
 
 func init() {
 	//TODO: setup variables from environment?
-	defaultConfig = &mysql.Configuration{}
+	defaultConfig = &metamysql.Configuration{}
 	defaultConfig.Default()
-	validConfig = &mysql.Configuration{
-		Hostname:       mysql.DefaultHostname,
-		Port:           mysql.DefaultPort,
-		Username:       mysql.DefaultUsername,
-		Password:       mysql.DefaultPassword,
+	validConfig = &metamysql.Configuration{
+		Hostname:       metamysql.DefaultHostname,
+		Port:           metamysql.DefaultPort,
+		Username:       metamysql.DefaultUsername,
+		Password:       metamysql.DefaultPassword,
 		Database:       TestDatabaseName,
 		ConnectTimeout: 10 * time.Second,
 		QueryTimeout:   30 * time.Second,
@@ -94,7 +94,7 @@ func TestIntInitializeShutdown(t *testing.T) {
 	//Notes:
 	//Verification:
 
-	db := mysql.NewMetaMySQL()
+	db := metamysql.NewMetaMySQL()
 	err := db.Initialize(validConfig)
 	assert.Nil(t, err)
 	err = db.Shutdown()
@@ -121,7 +121,7 @@ func TestIntTimerReadWrite(t *testing.T) {
 		Billed:    true,
 		// EmployeeID:  0,
 	}
-	db := mysql.NewMetaMySQL()
+	db := metamysql.NewMetaMySQL()
 	err = db.Initialize(validConfig)
 	assert.Nil(t, err)
 	err = db.TimerWrite(uuid, timerWrite)
@@ -153,7 +153,7 @@ func TestIntDelete(t *testing.T) {
 		Billed:    true,
 		// EmployeeID:  0,
 	}
-	db := mysql.NewMetaMySQL()
+	db := metamysql.NewMetaMySQL()
 	err = db.Initialize(validConfig)
 	assert.Nil(t, err)
 	err = db.TimerWrite(uuid, timerWrite)
@@ -165,7 +165,7 @@ func TestIntDelete(t *testing.T) {
 	assert.Nil(t, err)
 	_, err = db.TimerRead(uuid)
 	assert.NotNil(t, err)
-	assert.Equal(t, fmt.Sprintf(mysql.ErrTimerNotFoundf, uuid), err.Error())
+	assert.Equal(t, fmt.Sprintf(metamysql.ErrTimerNotFoundf, uuid), err.Error())
 	err = db.Shutdown()
 	assert.Nil(t, err)
 }
@@ -201,7 +201,7 @@ func TestIntSliceReadWrite(t *testing.T) {
 		// ElapsedTime: 0,
 		Archived: true,
 	}
-	db := mysql.NewMetaMySQL()
+	db := metamysql.NewMetaMySQL()
 	err = db.Initialize(validConfig)
 	assert.Nil(t, err)
 	err = db.TimerWrite(timerUUID, timerWrite)
@@ -245,7 +245,7 @@ func TestIntSliceDelete(t *testing.T) {
 		// ElapsedTime: tNow.Add(5*time.Second).UnixNano() - tNow.UnixNano(),
 		Archived: true,
 	}
-	db := mysql.NewMetaMySQL()
+	db := metamysql.NewMetaMySQL()
 	err = db.Initialize(validConfig)
 	assert.Nil(t, err)
 	err = db.TimerWrite(timerUUID, timerWrite)
@@ -259,7 +259,7 @@ func TestIntSliceDelete(t *testing.T) {
 	assert.Nil(t, err)
 	_, err = db.TimerRead(sliceUUID)
 	assert.NotNil(t, err)
-	assert.Equal(t, fmt.Sprintf(mysql.ErrTimerNotFoundf, sliceUUID), err.Error())
+	assert.Equal(t, fmt.Sprintf(metamysql.ErrTimerNotFoundf, sliceUUID), err.Error())
 	err = db.Shutdown()
 	assert.Nil(t, err)
 }
@@ -294,7 +294,7 @@ func TestIntSliceTimer(t *testing.T) {
 		ElapsedTime: tNow.Add(5*time.Second).UnixNano() - tNow.UnixNano(),
 		Archived:    true,
 	}
-	db := mysql.NewMetaMySQL()
+	db := metamysql.NewMetaMySQL()
 	err = db.Initialize(validConfig)
 	assert.Nil(t, err)
 	err = db.TimerWrite(timerUUID, timerWrite)
@@ -338,7 +338,7 @@ func TestIntTimerActiveSlice(t *testing.T) {
 		// ElapsedTime: 0,
 		Archived: true,
 	}
-	db := mysql.NewMetaMySQL()
+	db := metamysql.NewMetaMySQL()
 	err = db.Initialize(validConfig)
 	assert.Nil(t, err)
 	err = db.TimerWrite(timerUUID, timerWrite)

@@ -1,9 +1,7 @@
-package bludgeonrestendpoints
+package rest
 
 import (
 	"net/http"
-
-	bludgeon "github.com/antonio-alexander/go-bludgeon/internal/common"
 )
 
 func handleResponse(writer http.ResponseWriter, errIn error, bytes []byte) (err error) {
@@ -20,8 +18,8 @@ func handleResponse(writer http.ResponseWriter, errIn error, bytes []byte) (err 
 	return
 }
 
-func getToken(request *http.Request) (token bludgeon.Token, err error) {
-	//TODO: get token from request
+// func getToken(request *http.Request) (token common.Token, err error) {
+// 	//TODO: get token from request
 
-	return
-}
+// 	return
+// }

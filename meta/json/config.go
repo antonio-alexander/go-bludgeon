@@ -1,4 +1,4 @@
-package json
+package metajson
 
 import (
 	"path/filepath"

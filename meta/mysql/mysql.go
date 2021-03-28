@@ -1,4 +1,4 @@
-package bludgeonmetamysql
+package metamysql
 
 import (
 	"database/sql"
@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	common "github.com/antonio-alexander/go-bludgeon/common"
+	"github.com/antonio-alexander/go-bludgeon/common"
 
 	"github.com/pkg/errors"
 
