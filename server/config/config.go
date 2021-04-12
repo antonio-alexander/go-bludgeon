@@ -18,7 +18,8 @@ const (
 )
 
 const (
-	DefaultConfigPath string            = "bludgeon_server_config.json"
+	DefaultConfigFile string            = "bludgeon_server_config.json"
+	DefaultConfigPath string            = "config"
 	DefaultMetaType   common.MetaType   = common.MetaTypeJSON
 	DefaultRemoteType common.RemoteType = common.RemoteTypeRest
 )
@@ -58,7 +59,8 @@ func (c *Configuration) Read(configFile string) (err error) {
 func (c *Configuration) Write(configFile string) (err error) {
 	var bytes []byte
 
-	if bytes, err = json.Marshal(&c); err != nil {
+	//REVIEW: do we need to ensure that the path exists?
+	if bytes, err = json.MarshalIndent(&c, "", "  "); err != nil {
 		return
 	}
 	err = ioutil.WriteFile(configFile, bytes, fs.FileMode(0644))

@@ -1,4 +1,4 @@
-package metamysql_test
+package metajson_test
 
 //--------------------------------------------------------------------------------------------
 // database_test.go contains all the tests to verify functionality of the bludgeon-database
@@ -6,10 +6,10 @@ package metamysql_test
 //--------------------------------------------------------------------------------------------
 
 import (
+	"os"
 	"testing"
-	"time"
 
-	metamysql "github.com/antonio-alexander/go-bludgeon/meta/mysql"
+	metajson "github.com/antonio-alexander/go-bludgeon/meta/json"
 	tests "github.com/antonio-alexander/go-bludgeon/meta/tests"
 )
 
@@ -22,31 +22,20 @@ import (
 //
 //--------------------------------------------------------------------------------------------------
 
-const (
-	TestDatabaseName string = "bludgeon"
-	rootUsername     string = "root"
-	bludgeonUsername string = "bludgeon"
-	testCaseMap      string = "Test case: %s"
-)
+const ()
 
 var (
-	validConfig   *metamysql.Configuration
-	defaultConfig *metamysql.Configuration
+	validConfig   *metajson.Configuration
+	defaultConfig *metajson.Configuration
 )
 
 func init() {
 	//TODO: setup variables from environment?
-	defaultConfig = &metamysql.Configuration{}
-	defaultConfig.Default()
-	validConfig = &metamysql.Configuration{
-		Hostname:       metamysql.DefaultHostname,
-		Port:           metamysql.DefaultPort,
-		Username:       metamysql.DefaultUsername,
-		Password:       metamysql.DefaultPassword,
-		Database:       TestDatabaseName,
-		ConnectTimeout: 10 * time.Second,
-		QueryTimeout:   30 * time.Second,
-		ParseTime:      false,
+	pwd, _ := os.Getwd()
+	defaultConfig = &metajson.Configuration{}
+	defaultConfig.Default(pwd)
+	validConfig = &metajson.Configuration{
+		File: metajson.DefaultFile,
 	}
 }
 
@@ -91,8 +80,8 @@ func TestIntInitializeShutdown(t *testing.T) {
 	//Notes:
 	//Verification:
 
-	db := metamysql.NewMetaMySQL()
-	tests.TestIntInitializeShutdown(t, db, validConfig)
+	json := metajson.NewMetaJSON()
+	tests.TestIntInitializeShutdown(t, json, validConfig)
 }
 
 func TestIntTimerReadWrite(t *testing.T) {
@@ -100,8 +89,8 @@ func TestIntTimerReadWrite(t *testing.T) {
 	//Notes:
 	//Verification:
 
-	db := metamysql.NewMetaMySQL()
-	tests.TestIntTimerReadWrite(t, db, validConfig)
+	json := metajson.NewMetaJSON()
+	tests.TestIntTimerReadWrite(t, json, validConfig)
 }
 
 func TestIntDelete(t *testing.T) {
@@ -109,8 +98,8 @@ func TestIntDelete(t *testing.T) {
 	//Notes:
 	//Verification:
 
-	db := metamysql.NewMetaMySQL()
-	tests.TestIntDelete(t, db, validConfig)
+	json := metajson.NewMetaJSON()
+	tests.TestIntDelete(t, json, validConfig)
 }
 
 func TestIntSliceReadWrite(t *testing.T) {
@@ -118,8 +107,8 @@ func TestIntSliceReadWrite(t *testing.T) {
 	//Notes:
 	//Verification:
 
-	db := metamysql.NewMetaMySQL()
-	tests.TestIntSliceReadWrite(t, db, validConfig)
+	json := metajson.NewMetaJSON()
+	tests.TestIntSliceReadWrite(t, json, validConfig)
 }
 
 func TestIntSliceDelete(t *testing.T) {
@@ -127,8 +116,8 @@ func TestIntSliceDelete(t *testing.T) {
 	//Notes:
 	//Verification:
 
-	db := metamysql.NewMetaMySQL()
-	tests.TestIntSliceDelete(t, db, validConfig)
+	json := metajson.NewMetaJSON()
+	tests.TestIntSliceDelete(t, json, validConfig)
 }
 
 func TestIntSliceTimer(t *testing.T) {
@@ -136,8 +125,8 @@ func TestIntSliceTimer(t *testing.T) {
 	//Notes:
 	//Verification:
 
-	db := metamysql.NewMetaMySQL()
-	tests.TestIntSliceTimer(t, db, validConfig)
+	json := metajson.NewMetaJSON()
+	tests.TestIntSliceTimer(t, json, validConfig)
 }
 
 func TestIntTimerActiveSlice(t *testing.T) {
@@ -145,11 +134,10 @@ func TestIntTimerActiveSlice(t *testing.T) {
 	//Notes:
 	//Verification:
 
-	db := metamysql.NewMetaMySQL()
-	tests.TestIntTimerActiveSlice(t, db, validConfig)
+	json := metajson.NewMetaJSON()
+	tests.TestIntTimerActiveSlice(t, json, validConfig)
 }
 
 //TODO: write test for deleting a timer
 //TODO: write test for calculating elapsed time on
 // an active time slice
-//

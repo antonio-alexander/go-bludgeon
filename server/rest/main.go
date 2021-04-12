@@ -15,7 +15,7 @@ import (
 )
 
 func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os.Signal) (err error) {
-	var configPath = filepath.Join(pwd, config.DefaultConfigPath)
+	var configFile = filepath.Join(pwd, config.DefaultConfigPath, config.DefaultConfigFile)
 	var chExternal <-chan struct{}
 	var meta interface {
 		common.MetaTimer
@@ -23,13 +23,17 @@ func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os
 		common.MetaOwner
 	}
 
-	logger := logger.New()
+	logger := logger.New("bludgeon-server")
 	config := config.New()
 	config.Default(pwd)
-	if err = config.Read(configPath); err != nil {
-		logger.Error(err)
-		logger.Info("Attempting to read config from env")
+	if err = config.Read(configFile); err != nil {
+		logger.Error(errors.Wrap(err, "error attempting to read config"))
 		config.FromEnv(pwd, envs)
+		if err := config.Write(configFile); err != nil {
+			logger.Error(errors.Wrap(err, "error attempting to write config"))
+		} else {
+			logger.Info("Created config file using environment")
+		}
 	}
 	switch config.MetaType {
 	case common.MetaTypeJSON:

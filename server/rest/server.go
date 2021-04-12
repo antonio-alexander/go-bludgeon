@@ -35,8 +35,7 @@ func New(logger common.Logger, meta interface {
 	common.FunctionalTimer
 	common.FunctionalTimeSlice
 } {
-	//REVIEW: should add cases to confirm that meta/remote aren't nil since
-	// basic functionality won't work?
+
 	if meta == nil {
 		panic("meta is nil")
 	}
