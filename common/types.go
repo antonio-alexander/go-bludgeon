@@ -23,18 +23,18 @@ const (
 
 //error constants
 const (
-	ErrBadProjectID        string = "ProjectID is invalid or missing"
-	ErrBadEmployeeID       string = "EmployeeID is invalid or missing"
-	ErrBadTaskID           string = "TaskID is invalid or missing"
-	ErrBadClientID         string = "ClientID is invalid or missing"
-	ErrBadTimerID          string = "TimerID is invalid or missing"
-	ErrBadUnitID           string = "UnitID is invalid or missing"
-	ErrBadEmployeeIDTaskID string = "EmployeeID and/or TaskID is invalid or mising"
-	ErrBadClientIDUnitID   string = "ClientID and/or UnitID is invalid or missing"
-	ErrTimerNotFoundf      string = "Timer with id, \"%s\" not found"
-	ErrTimeSliceNotFoundf  string = "TimeSlice with id, \"%s\" not found"
-	ErrTimerIsArchivedf    string = "Timer with id, \"%s\", is archived"
-	ErrNoActiveTimeSlicef  string = "Timer with id, \"%s\", has no active slice"
+	ErrBadProjectID        string = "projectID is invalid or missing"
+	ErrBadEmployeeID       string = "employeeID is invalid or missing"
+	ErrBadTaskID           string = "taskID is invalid or missing"
+	ErrBadClientID         string = "clientID is invalid or missing"
+	ErrBadTimerID          string = "timerID is invalid or missing"
+	ErrBadUnitID           string = "unitID is invalid or missing"
+	ErrBadEmployeeIDTaskID string = "employeeID and/or TaskID is invalid or mising"
+	ErrBadClientIDUnitID   string = "clientID and/or UnitID is invalid or missing"
+	ErrTimerNotFoundf      string = "timer with id, \"%s\" not found"
+	ErrTimeSliceNotFoundf  string = "timeSlice with id, \"%s\" not found"
+	ErrTimerIsArchivedf    string = "timer with id, \"%s\", is archived"
+	ErrNoActiveTimeSlicef  string = "timer with id, \"%s\", has no active slice"
 )
 
 //header constants
@@ -127,11 +127,11 @@ func (t TaskState) String() string {
 }
 
 type Task struct {
-	ID          int64     `json:"TaskID,omit_empty"`
-	ProjectID   int64     `json:"ProjectID,omit_empty"`
-	Description string    `json:"Description,omit_empty"`
-	State       TaskState `json:"State,omit_empty"`
-	Budget      int64     `json:"Budget,omit_empty"`
+	ID          int64     `json:"TaskID,omitempty"`
+	ProjectID   int64     `json:"ProjectID,omitempty"`
+	Description string    `json:"Description,omitempty"`
+	State       TaskState `json:"State,omitempty"`
+	Budget      int64     `json:"Budget,omitempty"`
 }
 
 func (t *Task) String() string {
@@ -140,9 +140,9 @@ func (t *Task) String() string {
 }
 
 type Project struct {
-	ID          int64  `json:"ProjectID,omit_empty"`
-	ClientID    int64  `json:"ClientId,omit_empty"`
-	Description string `json:"Descrition,omit_empty"`
+	ID          int64  `json:"ProjectID,omitempty"`
+	ClientID    int64  `json:"ClientId,omitempty"`
+	Description string `json:"Descrition,omitempty"`
 }
 
 func (p *Project) String() string {
@@ -152,22 +152,22 @@ func (p *Project) String() string {
 }
 
 type Employee struct {
-	ID        int64  `json:"EmployeeID,omit_empty"`
-	FirstName string `json:"FirstName,omit_empty"`
-	LastName  string `json:"LastName,omit_empty"`
+	ID        int64  `json:"EmployeeID,omitempty"`
+	FirstName string `json:"FirstName,omitempty"`
+	LastName  string `json:"LastName,omitempty"`
 }
 
 type Client struct {
-	ID   int64  `json:"ClientID,omit_empty"`
-	Name string `json:"Name,omit_empty"`
+	ID   int64  `json:"ClientID,omitempty"`
+	Name string `json:"Name,omitempty"`
 }
 
 type Options struct {
-	EmployeeID int64  `json:"EmployeeID,omit_empty"`
-	ClientID   int64  `json:"ClientID,omit_empty"`
-	TimerID    int64  `json:"TimerID,omit_empty"`
-	ProjectID  int64  `json:"ProjectID,omit_empty"`
-	Token      string `json:"TokenID,omit_empty"`
+	EmployeeID int64  `json:"EmployeeID,omitempty"`
+	ClientID   int64  `json:"ClientID,omitempty"`
+	TimerID    int64  `json:"TimerID,omitempty"`
+	ProjectID  int64  `json:"ProjectID,omitempty"`
+	Token      string `json:"TokenID,omitempty"`
 }
 
 type Logger interface {
@@ -181,49 +181,6 @@ type Logger interface {
 	Debug(format string, v ...interface{})
 }
 
-type FunctionalOwner interface {
-	//Initialize
-	Initialize(config interface{}) (err error)
-
-	//Shutdown
-	Shutdown() (err error)
-}
-
-type FunctionalManage interface {
-	//
-	Stop() (err error)
-}
-
-//FunctionalTimer
-type FunctionalTimer interface {
-	//TimerCreate
-	TimerCreate() (timer Timer, err error)
-
-	//TimerRead
-	TimerRead(id string) (timer Timer, err error)
-
-	//TimerUpdate
-	TimerUpdate(timerIn Timer) (timerOut Timer, err error)
-
-	//TimerDelete
-	TimerDelete(id string) (err error)
-
-	//TimerStart
-	TimerStart(timerID string, startTime time.Time) (timer Timer, err error)
-
-	//TimerPause
-	TimerPause(timerID string, pauseTime time.Time) (timer Timer, err error)
-
-	//TimerSubmit
-	TimerSubmit(timerID string, finishTime time.Time) (timer Timer, err error)
-}
-
-//FunctionalTimeSlice
-type FunctionalTimeSlice interface {
-	//TimeSliceRead
-	TimeSliceRead(id string) (timeSlice TimeSlice, err error)
-}
-
 func AtoMetaType(s string) MetaType {
 	switch strings.ToLower(s) {
 	case "json":
@@ -232,22 +189,6 @@ func AtoMetaType(s string) MetaType {
 		return MetaTypeMySQL
 	default:
 		return MetaTypeInvalid
-	}
-}
-
-type RemoteType string
-
-const (
-	RemoteTypeInvalid RemoteType = "invalid"
-	RemoteTypeRest    RemoteType = "rest"
-)
-
-func AtoRemoteType(s string) RemoteType {
-	switch strings.ToLower(s) {
-	case "rest":
-		return RemoteTypeRest
-	default:
-		return RemoteTypeInvalid
 	}
 }
 

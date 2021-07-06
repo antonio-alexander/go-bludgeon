@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"strings"
 
-	rest "github.com/antonio-alexander/go-bludgeon/server/rest"
+	"github.com/antonio-alexander/go-bludgeon/server"
 )
 
 func main() {
@@ -23,8 +23,10 @@ func main() {
 	chSignalInt := make(chan os.Signal, 1)
 	signal.Notify(chSignalInt, os.Interrupt)
 	//execute the client main for cli
-	if err := rest.Main(pwd, args, envs, chSignalInt); err != nil {
-		os.Stderr.WriteString(err.Error() + "\n")
+	if errs := server.Main(pwd, args, envs, chSignalInt); len(errs) > 0 {
+		for _, err := range errs {
+			os.Stderr.WriteString(err.Error() + "\n")
+		}
 		os.Exit(1)
 	}
 	close(chSignalInt)

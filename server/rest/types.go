@@ -14,6 +14,15 @@ const (
 
 //errors
 const (
-	ErrStarted    string = "server started"
-	ErrNotStarted string = "server not started"
+	ErrStarted    string = "rest server started"
+	ErrNotStarted string = "rest server not started"
 )
+
+type Owner interface {
+	Close()
+}
+
+type Manage interface {
+	Start(config Configuration) (err error)
+	Stop() (err error)
+}

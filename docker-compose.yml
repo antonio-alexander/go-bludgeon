@@ -5,8 +5,8 @@ services:
     image: bludgeon_db:latest
     restart: "always"
     build:
-      context: ./database-mysql
-      dockerfile: ./Dockerfile
+      context: ./meta
+      dockerfile: ./meta/cmd/database-mysql/Dockerfile
     ports:
       - "3306:3306"
     volumes:

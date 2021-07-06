@@ -1,4 +1,4 @@
-package config
+package rest
 
 import (
 	"strconv"
@@ -13,8 +13,6 @@ const (
 	ErrPortEmpty    string = "Port is empty"
 	ErrPortBadf     string = "Port is a non-integer: %s"
 	ErrTimeoutBadf  string = "Timeout is lte to 0: %v"
-	ErrStarted      string = "server started"
-	ErrNotStarted   string = "server not started"
 )
 
 //environmental variables
@@ -31,19 +29,19 @@ const (
 	DefaultTimeout time.Duration = 5 * time.Second
 )
 
-type Rest struct {
+type Configuration struct {
 	Address string        `json:"Address"`
 	Port    string        `json:"Port"`
 	Timeout time.Duration `json:"Timeout"`
 }
 
-func (r *Rest) Default() {
+func (r *Configuration) Default() {
 	r.Address = DefaultAddress
 	r.Port = DefaultPort
 	r.Timeout = DefaultTimeout
 }
 
-func (r *Rest) FromEnv(pwd string, envs map[string]string) {
+func (r *Configuration) FromEnv(pwd string, envs map[string]string) {
 	//Get the address from the environment, then the port
 	// then the timeout
 	if address, ok := envs[EnvNameRestAddress]; ok {
@@ -61,7 +59,7 @@ func (r *Rest) FromEnv(pwd string, envs map[string]string) {
 	}
 }
 
-func (r *Rest) Validate() (err error) {
+func (r *Configuration) Validate() (err error) {
 	//validate that the address isn't empty
 	// check if the port is empty, and then ensure
 	// that the port is an integer, finally

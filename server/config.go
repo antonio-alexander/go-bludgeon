@@ -1,15 +1,17 @@
-package config
+package server
 
 import (
 	"encoding/json"
 	"io/fs"
 	"io/ioutil"
 
-	"github.com/antonio-alexander/go-bludgeon/common"
-	"github.com/pkg/errors"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	rest "github.com/antonio-alexander/go-bludgeon/server/rest"
 
 	metajson "github.com/antonio-alexander/go-bludgeon/meta/json"
 	metamysql "github.com/antonio-alexander/go-bludgeon/meta/mysql"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -18,30 +20,39 @@ const (
 )
 
 const (
-	DefaultConfigFile string            = "bludgeon_server_config.json"
-	DefaultConfigPath string            = "config"
-	DefaultMetaType   common.MetaType   = common.MetaTypeJSON
-	DefaultRemoteType common.RemoteType = common.RemoteTypeRest
+	DefaultConfigFile string          = "bludgeon_server_config.json"
+	DefaultConfigPath string          = "config"
+	DefaultMetaType   common.MetaType = common.MetaTypeJSON
 )
 
 const (
-	ErrRemoteTypeEmpty string = "remote type empty"
-	ErrMetaTypeEmpty   string = "meta type empty"
+	ErrMetaTypeEmpty string = "meta type empty"
 )
 
-type Configuration struct {
-	RemoteType common.RemoteType
-	RemoteRest *Rest
-	MetaType   common.MetaType
-	MetaMySQL  *metamysql.Configuration
-	MetaJSON   *metajson.Configuration
+type Server struct {
+	Rest *rest.Configuration `json:"rest"`
 }
 
-func New() *Configuration {
+type Meta struct {
+	MySQL *metamysql.Configuration `json:"mysql"`
+	JSON  *metajson.Configuration  `json:"json"`
+}
+
+type Configuration struct {
+	MetaType common.MetaType `json:"meta_type"`
+	Server   Server          `json:"server"`
+	Meta     Meta            `json:"meta"`
+}
+
+func NewConfiguration() *Configuration {
 	return &Configuration{
-		RemoteRest: &Rest{},
-		MetaMySQL:  &metamysql.Configuration{},
-		MetaJSON:   &metajson.Configuration{},
+		Server: Server{
+			Rest: &rest.Configuration{},
+		},
+		Meta: Meta{
+			MySQL: &metamysql.Configuration{},
+			JSON:  &metajson.Configuration{},
+		},
 	}
 }
 
@@ -69,23 +80,19 @@ func (c *Configuration) Write(configFile string) (err error) {
 }
 
 func (c *Configuration) Default(pwd string) {
-	c.RemoteType = DefaultRemoteType
-	c.RemoteRest.Default()
+	c.Server.Rest.Default()
 	c.MetaType = DefaultMetaType
-	c.MetaJSON.Default(pwd)
-	c.MetaMySQL.Default()
+	c.Meta.JSON.Default(pwd)
+	c.Meta.MySQL.Default()
 }
 
 func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
-	if remoteType, ok := envs[EnvNameRemoteType]; ok {
-		c.RemoteType = common.AtoRemoteType(remoteType)
-	}
 	if metaType, ok := envs[EnvNameMetaType]; ok {
 		c.MetaType = common.AtoMetaType(metaType)
 	}
-	c.RemoteRest.FromEnv(pwd, envs)
-	c.MetaJSON.FromEnv(pwd, envs)
-	c.MetaMySQL.FromEnv(pwd, envs)
+	c.Server.Rest.FromEnv(pwd, envs)
+	c.Meta.JSON.FromEnv(pwd, envs)
+	c.Meta.MySQL.FromEnv(pwd, envs)
 }
 
 func (c *Configuration) Validate() (err error) {
@@ -94,18 +101,13 @@ func (c *Configuration) Validate() (err error) {
 
 		return
 	}
-	if c.RemoteType == "" {
-		err = errors.New(ErrRemoteTypeEmpty)
-
+	if err = c.Server.Rest.Validate(); err != nil {
 		return
 	}
-	if err = c.RemoteRest.Validate(); err != nil {
+	if err = c.Meta.JSON.Validate(); err != nil {
 		return
 	}
-	if err = c.MetaJSON.Validate(); err != nil {
-		return
-	}
-	if err = c.MetaMySQL.Validate(); err != nil {
+	if err = c.Meta.MySQL.Validate(); err != nil {
 		return
 	}
 

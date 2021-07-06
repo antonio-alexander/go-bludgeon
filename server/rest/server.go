@@ -1,49 +1,38 @@
 package rest
 
 import (
-	"errors"
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
 	"sync"
 	"time"
 
 	common "github.com/antonio-alexander/go-bludgeon/common"
 	rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
-	config "github.com/antonio-alexander/go-bludgeon/server/config"
+	logic "github.com/antonio-alexander/go-bludgeon/logic"
+
+	"github.com/pkg/errors"
 )
 
 type server struct {
 	sync.RWMutex                 //mutex for threadsafe operations
 	sync.WaitGroup               //waitgroup to track go routines
+	logic.Logic                  //
 	common.Logger                //
-	started        bool          //whether or not the business logic has starting
-	config         config.Rest   //configuration
+	config         Configuration //configuration
 	stopper        chan struct{} //stopper to stop goRoutines
-	chExternal     chan struct{}
-	tokens         map[string]common.Token //map of tokens
-	server         rest.Server             //
-	meta           interface {             //storage interface
-		common.MetaTimer
-		common.MetaTimeSlice
-	}
+	server         rest.Server   //
+	started        bool          //whether or not the business logic has starting
 }
 
-func New(logger common.Logger, meta interface {
-	common.MetaTimer
-	common.MetaTimeSlice
-}) interface {
+func New(logger common.Logger, logic logic.Logic) interface {
 	Owner
 	Manage
-	common.FunctionalTimer
-	common.FunctionalTimeSlice
+	logic.Logic
 } {
-
-	if meta == nil {
-		panic("meta is nil")
-	}
-	//populate client pointer
 	return &server{
-		meta:   meta,
+		Logic:  logic,
 		Logger: logger,
-		tokens: make(map[string]common.Token),
 		server: rest.New(logger),
 	}
 }
@@ -71,6 +60,189 @@ func (s *server) launchPurge() {
 	<-started
 }
 
+//TimerCreate
+func (s *server) endpointTimerCreate() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var timer common.Timer
+		var bytes []byte
+		var err error
+
+		//attempt to execute the timer create
+		if timer, err = s.TimerCreate(); err == nil {
+			bytes, err = json.Marshal(timer)
+		}
+		//handle errors
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error(errors.Wrap(err, "TimerCreate"))
+		}
+	}
+}
+
+//TimerRead
+func (s *server) endpointTimerRead() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var contract common.Contract
+		var timer common.Timer
+		var bytes []byte
+		var err error
+
+		//read bytes from request
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			if err = json.Unmarshal(bytes, &contract); err == nil {
+				//attempt to execute the timer create
+				if timer, err = s.TimerRead(contract.ID); err == nil {
+					bytes, err = json.Marshal(timer)
+				}
+			}
+		}
+		//handle errors
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error(errors.Wrap(err, "TimerRead"))
+		}
+	}
+}
+
+//TimerUpdate
+func (s *server) endpointTimerUpdate() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var contract common.Contract
+		var timer common.Timer
+		var bytes []byte
+		var err error
+
+		//read bytes from request
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			if err = json.Unmarshal(bytes, &contract); err == nil {
+				//attempt to execute the timer create
+				if timer, err = s.TimerUpdate(contract.Timer); err == nil {
+					bytes, err = json.Marshal(&timer)
+				}
+			}
+		}
+		//handle errors
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error(errors.Wrap(err, "TimerUpdate"))
+		}
+	}
+}
+
+//TimerDelete
+func (s *server) endpointTimerDelete() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var contract common.Contract
+		var bytes []byte
+		var err error
+
+		//read bytes from request
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			if err = json.Unmarshal(bytes, &contract); err == nil {
+				//attempt to execute the timer create
+				err = s.TimerDelete(contract.ID)
+			}
+		}
+		//handle errors
+		if err = handleResponse(writer, err, nil); err != nil {
+			s.Error(errors.Wrap(err, "TimerDelete"))
+		}
+	}
+}
+
+//TimerStart
+func (s *server) endpointTimerStart() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var contract common.Contract
+		var timer common.Timer
+		var bytes []byte
+		var err error
+
+		//read bytes from request
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			if err = json.Unmarshal(bytes, &contract); err == nil {
+				//attempt to execute the timer create
+				if timer, err = s.TimerStart(contract.ID, time.Unix(0, contract.StartTime)); err == nil {
+					bytes, err = json.Marshal(&timer)
+				}
+			}
+		}
+		//handle errors
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error(errors.Wrap(err, "TimerStart"))
+		}
+	}
+}
+
+//TimerPause
+func (s *server) endpointTimerPause() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var contract common.Contract
+		var timer common.Timer
+		var bytes []byte
+		var err error
+
+		//read bytes from request
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			if err = json.Unmarshal(bytes, &contract); err == nil {
+				//attempt to execute the timer create
+				if timer, err = s.TimerPause(contract.ID, time.Unix(0, contract.PauseTime)); err == nil {
+					bytes, err = json.Marshal(&timer)
+				}
+			}
+		}
+		//handle errors
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error(errors.Wrap(err, "TimerPause"))
+		}
+	}
+}
+
+//TimerSubmit
+func (s *server) endpointTimerSubmit() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var contract common.Contract
+		var timer common.Timer
+		var bytes []byte
+		var err error
+
+		//read bytes from request
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			if err = json.Unmarshal(bytes, &contract); err == nil {
+				//attempt to execute the timer create
+				if timer, err = s.TimerSubmit(contract.ID, time.Unix(0, contract.FinishTime)); err == nil {
+					bytes, err = json.Marshal(&timer)
+				}
+			}
+		}
+		//handle errors
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error(errors.Wrap(err, "TimerSubmit"))
+		}
+	}
+}
+
+//TimeSliceRead
+func (s *server) endpointTimeSliceRead() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var timeSlice common.TimeSlice
+		var contract common.Contract
+		var bytes []byte
+		var err error
+
+		//read bytes from request
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			if err = json.Unmarshal(bytes, &contract); err == nil {
+				//attempt to execute the timer create
+				if timeSlice, err = s.TimeSliceRead(contract.ID); err == nil {
+					bytes, err = json.Marshal(timeSlice)
+				}
+			}
+		}
+		//handle errors
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error(errors.Wrap(err, "TimeSliceRead"))
+		}
+	}
+}
+
 //buildRoutes will create all the routes and their functions to execute when received
 func (s *server) buildRoutes() []rest.HandleFuncConfig {
 	//REVIEW: in the future when we add tokens, we'll need to create some way to check tokens for
@@ -78,29 +250,16 @@ func (s *server) buildRoutes() []rest.HandleFuncConfig {
 	// server actions, may not be able to re-use the existing endpoints
 	return []rest.HandleFuncConfig{
 		//timer
-		{Route: common.RouteTimerCreate, Method: POST, HandleFx: TimerCreate(s, s)},
-		{Route: common.RouteTimerRead, Method: POST, HandleFx: TimerRead(s, s)},
-		{Route: common.RouteTimerUpdate, Method: POST, HandleFx: TimerUpdate(s, s)},
-		{Route: common.RouteTimerDelete, Method: POST, HandleFx: TimerDelete(s, s)},
-		{Route: common.RouteTimerStart, Method: POST, HandleFx: TimerStart(s, s)},
-		{Route: common.RouteTimerPause, Method: POST, HandleFx: TimerPause(s, s)},
-		{Route: common.RouteTimerSubmit, Method: POST, HandleFx: TimerSubmit(s, s)},
+		{Route: common.RouteTimerCreate, Method: POST, HandleFx: s.endpointTimerCreate()},
+		{Route: common.RouteTimerRead, Method: POST, HandleFx: s.endpointTimerRead()},
+		{Route: common.RouteTimerUpdate, Method: POST, HandleFx: s.endpointTimerUpdate()},
+		{Route: common.RouteTimerDelete, Method: POST, HandleFx: s.endpointTimerDelete()},
+		{Route: common.RouteTimerStart, Method: POST, HandleFx: s.endpointTimerStart()},
+		{Route: common.RouteTimerPause, Method: POST, HandleFx: s.endpointTimerPause()},
+		{Route: common.RouteTimerSubmit, Method: POST, HandleFx: s.endpointTimerSubmit()},
 		//time slice
-		{Route: common.RouteTimeSliceRead, Method: POST, HandleFx: TimeSliceRead(s, s)},
-		//route stop
-		{Route: common.RouteStop, Method: POST, HandleFx: Stop(s, s)},
+		{Route: common.RouteTimeSliceRead, Method: POST, HandleFx: s.endpointTimeSliceRead()},
 	}
-}
-
-type Owner interface {
-	//Close
-	Close()
-
-	//Serialize
-	Serialize() (bytes []byte, err error)
-
-	//Deserialize
-	Deserialize(bytes []byte) (err error)
 }
 
 func (s *server) Close() {
@@ -112,51 +271,23 @@ func (s *server) Close() {
 	// attempt to serialize what's remaining
 
 	//set internal configuration to default
-	s.config = config.Rest{}
+	s.config = Configuration{}
 	//set internal pointers to nil
-	s.meta = nil
 	s.server = nil
+	s.Logic = nil
 }
 
-//Serialize
-func (s *server) Serialize() (bytes []byte, err error) {
-	s.RLock()
-	defer s.RUnlock()
-
-	return
-}
-
-//Deserialize
-func (s *server) Deserialize(bytes []byte) (err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	return
-}
-
-type Manage interface {
-	//
-	Start(config config.Rest) (chExternal <-chan struct{}, err error)
-
-	//
-	Stop() (err error)
-}
-
-func (s *server) Start(config config.Rest) (chExternal <-chan struct{}, err error) {
+func (s *server) Start(conf Configuration) (err error) {
 	s.Lock()
 	defer s.Unlock()
 
 	//check if already started, store configuration, create stopper,
-	// slaunch go routines, set started to true
+	// slaunch go routineet started to true
 	if s.started {
-		err = errors.New(ErrStarted)
-
-		return
+		return errors.New(ErrStarted)
 	}
-	s.config = config
+	s.config = conf
 	s.stopper = make(chan struct{})
-	s.chExternal = make(chan struct{})
-	chExternal = s.chExternal
 	routes := s.buildRoutes()
 	if err = s.server.BuildRoutes(routes); err != nil {
 		return
@@ -182,173 +313,7 @@ func (s *server) Stop() (err error) {
 	s.server.Stop()
 	close(s.stopper)
 	s.Wait()
-	close(s.chExternal)
 	s.started = false
 
 	return
 }
-
-var _ common.FunctionalTimer = &server{}
-
-//
-func (s *server) TimerCreate() (timer common.Timer, err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//create the timer
-	timer, err = common.TimerCreate(s.meta)
-
-	return
-}
-
-//
-func (s *server) TimerRead(id string) (timer common.Timer, err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//read the timer
-	timer, err = common.TimerRead(id, s.meta)
-
-	return
-}
-
-//
-func (s *server) TimerUpdate(t common.Timer) (timer common.Timer, err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//update the timer
-	timer, err = common.TimerUpdate(t, s.meta)
-
-	return
-}
-
-//
-func (s *server) TimerDelete(id string) (err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//delete the timer
-	err = common.TimerDelete(id, s.meta)
-
-	return
-}
-
-func (s *server) TimerStart(id string, startTime time.Time) (timer common.Timer, err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//start the timer
-	timer, err = common.TimerStart(id, startTime, s.meta)
-
-	return
-}
-
-func (s *server) TimerPause(id string, pauseTime time.Time) (timer common.Timer, err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//pause the time
-	timer, err = common.TimerPause(id, pauseTime, s.meta)
-
-	return
-}
-
-func (s *server) TimerSubmit(id string, submitTime time.Time) (timer common.Timer, err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//submit timer
-	timer, err = common.TimerSubmit(id, submitTime, s.meta)
-
-	return
-}
-
-var _ common.FunctionalTimeSlice = &server{}
-
-func (s *server) TimeSliceRead(timeSliceID string) (timeSlice common.TimeSlice, err error) {
-	s.Lock()
-	defer s.Unlock()
-
-	//read the time slice
-	timeSlice, err = common.TimeSliceRead(timeSliceID, s.meta)
-
-	return
-}
-
-// type Token interface {
-// 	//Generate creates a token, outputs a token
-// 	Generate() string
-
-// 	//Verify will check if a token exists
-// 	Verify(tokenID string) bool
-
-// 	//Purge deletes tokens that are as old as wait
-// 	Purge()
-
-// 	//Delete will remove a token
-// 	Delete(token string) (deleted bool)
-// }
-
-// //Generate creates a token, outputs a token
-// func (s *server) TokenGenerate() string {
-// 	s.Lock()
-// 	defer s.Unlock()
-
-// 	b := make([]byte, 8)
-// 	var t common.Token
-
-// 	for {
-// 		rand.Read(b) //generate token
-// 		token := fmt.Sprintf("%x-%x-%x-%x", b[0:2], b[2:4], b[4:6], b[6:8])
-
-// 		if _, ok := s.tokens[token]; !ok {
-// 			t.Token = token
-// 			t.Time = time.Now().UnixNano()
-// 			s.tokens[token] = t
-
-// 			return t.Token
-// 		}
-// 	}
-// }
-
-// //Verify will check if a token exists
-// func (s *server) TokenVerify(tokenID string) (valid bool) {
-// 	s.RLock()
-// 	defer s.RUnlock()
-
-// 	if token, ok := s.tokens[tokenID]; ok {
-// 		if (time.Now().UnixNano() - token.Time) > s.config.TokenWait/int64(time.Nanosecond) {
-// 			delete(s.tokens, tokenID)
-// 		} else {
-// 			valid = true
-// 		}
-// 	}
-
-// 	return
-// }
-
-// //Purge deletes tokens that are as old as wait
-// func (s *server) TokenPurge() {
-// 	s.Lock()
-// 	defer s.Unlock()
-
-// 	for key, token := range s.tokens {
-// 		if time.Now().UnixNano()-token.Time > s.config.TokenWait {
-// 			delete(s.tokens, key)
-// 		}
-// 	}
-// }
-
-// //Delete will remove a token
-// func (s *server) TokenDelete(token string) (deleted bool) {
-// 	s.Lock()
-// 	defer s.Unlock()
-
-// 	if _, ok := s.tokens[token]; ok {
-// 		delete(s.tokens, token)
-// 		deleted = true
-// 	}
-
-// 	return
-// }

@@ -63,10 +63,10 @@ const (
 
 //Contract
 type Contract struct {
-	ID         string    `json:"ID,omit_empty"`
-	StartTime  int64     `json:"StartTime,omit_empty"`
-	PauseTime  int64     `json:"PauseTime,omit_empty"`
-	FinishTime int64     `json:"FinishTime,omit_empty"`
-	Timer      Timer     `json:"Timer,omit_empty"`
-	TimeSlice  TimeSlice `json:"TimeSlice,omit_empty"`
+	ID         string    `json:"ID,omitempty"`
+	StartTime  int64     `json:"StartTime,omitempty"`
+	PauseTime  int64     `json:"PauseTime,omitempty"`
+	FinishTime int64     `json:"FinishTime,omitempty"`
+	Timer      Timer     `json:"Timer,omitempty"`
+	TimeSlice  TimeSlice `json:"TimeSlice,omitempty"`
 }
