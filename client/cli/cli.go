@@ -3,7 +3,9 @@ package bludgeonclientcli
 import (
 	"flag"
 
-	common "github.com/antonio-alexander/go-bludgeon/common"
+	client "github.com/antonio-alexander/go-bludgeon/client"
+	data "github.com/antonio-alexander/go-bludgeon/data"
+	meta "github.com/antonio-alexander/go-bludgeon/meta"
 )
 
 func Parse(pwd string, args []string, envs map[string]string) (o Options, err error) {
@@ -14,7 +16,7 @@ func Parse(pwd string, args []string, envs map[string]string) (o Options, err er
 	//options
 	flagSet.StringVar(&o.Command, ArgCommand, DefaultCommand, UsageCommand)
 	flagSet.StringVar(&objectType, ArgObjectType, DefaultObjectType, UsageObjectType)
-	flagSet.StringVar(&remoteType, ArgRemoteType, DefaultRemoteType, UsageRemoteType)
+	flagSet.StringVar(&remoteType, ArgClientType, DefaultClientType, UsageClientType)
 	flagSet.StringVar(&metaType, ArgMetaType, DefaultMetaType, UsageMetaType)
 	//timer
 	flagSet.StringVar(&o.Timer.UUID, ArgTimerID, DefaultTimerID, UsageTimerID)
@@ -25,9 +27,9 @@ func Parse(pwd string, args []string, envs map[string]string) (o Options, err er
 	if err = flagSet.Parse(args); err != nil {
 		return
 	}
-	o.ObjectType = common.AtoObjectType(objectType)
-	o.MetaType = common.AtoMetaType(metaType)
-	o.RemoteType = common.AtoRemoteType(remoteType)
+	o.ObjectType = data.AtoObjectType(objectType)
+	o.MetaType = meta.AtoType(metaType)
+	o.ClientType = client.AtoType(remoteType)
 
 	return
 }

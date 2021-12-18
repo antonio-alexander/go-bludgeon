@@ -3,7 +3,7 @@ package logic
 import (
 	"time"
 
-	common "github.com/antonio-alexander/go-bludgeon/common"
+	data "github.com/antonio-alexander/go-bludgeon/data"
 )
 
 type Functional interface {
@@ -12,12 +12,12 @@ type Functional interface {
 }
 
 type Logic interface {
-	TimerCreate() (timer common.Timer, err error)
-	TimerRead(id string) (timer common.Timer, err error)
-	TimerUpdate(t common.Timer) (timer common.Timer, err error)
+	TimerCreate() (timer data.Timer, err error)
+	TimerRead(id string) (timer data.Timer, err error)
+	TimerUpdate(t data.Timer) (timer data.Timer, err error)
 	TimerDelete(timerID string) (err error)
-	TimerStart(id string, startTime time.Time) (timer common.Timer, err error)
-	TimerPause(timerID string, pauseTime time.Time) (timer common.Timer, err error)
-	TimerSubmit(timerID string, submitTime time.Time) (timer common.Timer, err error)
-	TimeSliceRead(timeSliceID string) (timeSlice common.TimeSlice, err error)
+	TimerStart(id string, startTime time.Time) (timer data.Timer, err error)
+	TimerPause(timerID string, pauseTime time.Time) (timer data.Timer, err error)
+	TimerSubmit(timerID string, submitTime time.Time) (timer data.Timer, err error)
+	TimeSliceRead(timeSliceID string) (timeSlice data.TimeSlice, err error)
 }

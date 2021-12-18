@@ -1,0 +1,82 @@
+version: "3"
+services:
+  bludgeon-database-postgres:
+    container_name: "bludgeon-database-postgres"
+    hostname: "bludgeon-database-postgres"
+    image: bludgeon_db-postgres:latest
+    restart: "always"
+    build:
+      context: ./meta/database-postgres
+      dockerfile: ./Dockerfile
+    ports:
+      - "5432:5432"
+    volumes:
+      - bludgeon-database-postgres:/var/lib/postgres
+    environment:
+      POSTGRES_USER: bludgeon
+      POSTGRES_DB: bludgeon
+      POSTGRES_PASSWORD: bludgeon
+
+  bludgeon-database-mysql:
+    container_name: "bludgeon-database-mysql"
+    hostname: "bludgeon-database-mysql"
+    image: bludgeon_db-mysql:latest
+    restart: "always"
+    build:
+      context: ./meta/database-mysql
+      dockerfile: ./Dockerfile
+    ports:
+      - "3306:3306"
+    volumes:
+      - bludgeon-database-mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: bludgeon
+      MYSQL_DATABASE: bludgeon
+      MYSQL_USER: bludgeon
+      MYSQL_PASSWORD: bludgeon
+
+  bludgeon-server:
+    container_name: "bludgeon-server"
+    hostname: "bludgeon-server"
+    image: bludgeon_server:latest
+    restart: "always"
+    build:
+      context: ./server
+      dockerfile: ./server-rest/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - bludgeon-server-data:/app/data
+    environment:
+      # - BLUDGEON_REST_ADDRESS=""
+      - BLUDGEON_REST_PORT=8080
+      - BLUDGEON_META_TYPE=json
+      - BLUDGEON_META_JSON_FILE=/app/data/blugeon.json
+      - DATABASE_ADDRESS=bludgeon_database
+      - DATABASE_PORT=3306
+
+# bludgeon_client:
+#     container_name: "bludgeon_client"
+#     restart: "always"
+#     build:
+#       context: ../
+#       dockerfile: ./client_rest/Dockerfile
+#     ports:
+#       - "8081:8081"
+#     volumes:
+#       - client-data: /app/data
+#       - client-config: /app/config
+#     environment:
+#       - BLUDGEON_REST_ADDRESS=""
+#       - BLUDGEON_REST_PORT="8080"
+#       - BLUDGEON_META_TYPE="json"
+#       - BLUDGEON_META_JSON_FILE="/data/blugeon.json"
+#       - DATABASE_ADDRESS="bludgeon_database"
+#       - DATABASE_PORT="3306"
+
+volumes:
+  bludgeon-server-data: null
+  bludgeon-database-mysql: null
+  bludgeon-database-postgres: null
+    # - bludgeon_client-data
+    # - bludgeon_client-config

@@ -30,7 +30,11 @@ const (
 	TableTimer            string = "timer"
 	TableSlice            string = "slice"
 	TableTimerSliceActive string = "timer_slice_active"
-	// TableProject          string = "project"
-	// TableClient           string = "client"
-	// TableEmployee         string = "employee"
+	TableProject          string = "project"
+	TableClient           string = "client"
+	TableEmployee         string = "employee"
 )
+
+type Owner interface {
+	Initialize(config *Configuration) (err error)
+}

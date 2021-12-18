@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/antonio-alexander/go-bludgeon/common"
+	"github.com/antonio-alexander/go-bludgeon/data"
+	"github.com/antonio-alexander/go-bludgeon/meta"
 
 	"github.com/pkg/errors"
 
@@ -13,18 +14,19 @@ import (
 )
 
 type mysql struct {
-	sync.RWMutex                 //mutex for threadsafe functionality
-	sync.WaitGroup               //waitgroup to manage goroutines
-	started        bool          //whether or not started
-	config         Configuration //configuration
-	stopper        chan struct{} //stopper for go routines
-	db             *sql.DB       //pointer to the database
+	sync.RWMutex                  //mutex for threadsafe functionality
+	sync.WaitGroup                //waitgroup to manage goroutines
+	started        bool           //whether or not started
+	config         *Configuration //configuration
+	stopper        chan struct{}  //stopper for go routines
+	*sql.DB                       //pointer to the database
 }
 
-func NewMetaMySQL() interface {
-	common.MetaOwner
-	common.MetaTimer
-	common.MetaTimeSlice
+func New() interface {
+	Owner
+	meta.Owner
+	meta.Timer
+	meta.TimeSlice
 } {
 	config := &Configuration{}
 	config.Default()
@@ -32,38 +34,33 @@ func NewMetaMySQL() interface {
 	//create mysql pointer
 	return &mysql{
 		stopper: make(chan struct{}),
-		config:  *config,
+		config:  config,
 	}
 }
 
-//ensure that mysql implements Owner
-var _ common.MetaOwner = &mysql{}
-
-func (m *mysql) Initialize(element interface{}) (err error) {
+func (m *mysql) Initialize(config *Configuration) (err error) {
 	m.Lock()
 	defer m.Unlock()
-
-	var config Configuration
 
 	if m.started {
 		err = errors.New(ErrStarted)
 
 		return
 	}
-	//Attempt to cast the configuration, create a data source
-	// open the connection and then attempt to ping the database
-	// to verify connectivity
-	if config, err = castConfiguration(element); err != nil {
+	if config == nil {
+		return errors.New("configuration is nil")
+	}
+	if err = config.Validate(); err != nil {
 		return
 	}
 	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=%t",
 		config.Username, config.Password, config.Hostname, config.Port, config.Database, config.ParseTime)
 	//[username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
 	//user:password@tcp(localhost:5555)/dbname?charset=utf8
-	if m.db, err = sql.Open("mysql", dataSourceName); err != nil {
+	if m.DB, err = sql.Open("mysql", dataSourceName); err != nil {
 		return
 	}
-	if err = m.db.Ping(); err != nil {
+	if err = m.DB.Ping(); err != nil {
 		return
 	}
 	m.started = true
@@ -84,8 +81,8 @@ func (m *mysql) Shutdown() (err error) {
 	close(m.stopper)
 	m.Wait()
 	//only close if it's nil
-	if m.db != nil {
-		err = m.db.Close()
+	if m.DB != nil {
+		err = m.DB.Close()
 	}
 	//set internal configuration to defaults
 	m.config.Default()
@@ -95,11 +92,8 @@ func (m *mysql) Shutdown() (err error) {
 	return
 }
 
-//ensure that mysql implements common.MetaMetaTimer
-var _ common.MetaTimer = &mysql{}
-
 //MetaTimerRead
-func (m *mysql) TimerRead(timerUUID string) (timer common.Timer, err error) {
+func (m *mysql) TimerRead(timerUUID string) (timer data.Timer, err error) {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -114,7 +108,7 @@ func (m *mysql) TimerRead(timerUUID string) (timer common.Timer, err error) {
 	// (1) Query standalone attributes from the timer table
 	// (2) Query any active timeslice
 	// (3) Query elapsed time
-	if tx, err = m.db.Begin(); err != nil {
+	if tx, err = m.DB.Begin(); err != nil {
 		return
 	}
 	defer tx.Rollback()
@@ -163,7 +157,7 @@ func (m *mysql) TimerRead(timerUUID string) (timer common.Timer, err error) {
 }
 
 //MetaTimerWrite
-func (m *mysql) TimerWrite(timerUUID string, timer common.Timer) (err error) {
+func (m *mysql) TimerWrite(timerUUID string, timer data.Timer) (err error) {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -174,7 +168,7 @@ func (m *mysql) TimerWrite(timerUUID string, timer common.Timer) (err error) {
 	//Start a transaction, then do the following:
 	// (1) Attempt to upsert the standalone timer attributes
 	// (2) Set or unset the active timeslice as provided
-	if tx, err = m.db.Begin(); err != nil {
+	if tx, err = m.DB.Begin(); err != nil {
 		return
 	}
 	defer tx.Rollback()
@@ -229,7 +223,7 @@ func (m *mysql) TimerDelete(timerUUID string) (err error) {
 	// (1) Delete the timer from the timer table
 	// (2) Delete any associated slices
 	// (3) Delete
-	if tx, err = m.db.Begin(); err != nil {
+	if tx, err = m.DB.Begin(); err != nil {
 		return
 	}
 	defer tx.Rollback()
@@ -255,11 +249,8 @@ func (m *mysql) TimerDelete(timerUUID string) (err error) {
 	return
 }
 
-//ensure that mysql implements common.MetaMetaTimer
-var _ common.MetaTimeSlice = &mysql{}
-
 //MetaTimeSliceRead
-func (m *mysql) TimeSliceRead(timeSliceUUID string) (slice common.TimeSlice, err error) {
+func (m *mysql) TimeSliceRead(timeSliceUUID string) (slice data.TimeSlice, err error) {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -272,7 +263,7 @@ func (m *mysql) TimeSliceRead(timeSliceUUID string) (slice common.TimeSlice, err
 		FROM %s	INNER JOIN %s ON %s.timer_id=%s.timer_id
 		WHERE slice_uuid=?`,
 		TableSlice, TableTimer, TableSlice, TableTimer)
-	row = m.db.QueryRow(query, timeSliceUUID)
+	row = m.DB.QueryRow(query, timeSliceUUID)
 	if err = row.Scan(
 		&slice.UUID,
 		&slice.TimerUUID,
@@ -292,7 +283,7 @@ func (m *mysql) TimeSliceRead(timeSliceUUID string) (slice common.TimeSlice, err
 }
 
 //MetaTimeSliceWrite
-func (m *mysql) TimeSliceWrite(sliceUUID string, slice common.TimeSlice) (err error) {
+func (m *mysql) TimeSliceWrite(sliceUUID string, slice data.TimeSlice) (err error) {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -303,7 +294,7 @@ func (m *mysql) TimeSliceWrite(sliceUUID string, slice common.TimeSlice) (err er
 			ON DUPLICATE KEY
 		UPDATE slice_start=VALUES(slice_start), slice_finish=(slice_finish), slice_archived=VALUES(slice_archived)`,
 		TableSlice, TableTimer, slice.TimerUUID)
-	if result, err = m.db.Exec(query, sliceUUID, slice.Start, slice.Finish, slice.Archived); err != nil {
+	if result, err = m.DB.Exec(query, sliceUUID, slice.Start, slice.Finish, slice.Archived); err != nil {
 		return
 	}
 	if err = rowsAffected(result, ErrUpdateFailed); err != nil {
@@ -322,7 +313,7 @@ func (m *mysql) TimeSliceDelete(timeSliceUUID string) (err error) {
 	var query string
 	var tx *sql.Tx
 
-	if tx, err = m.db.Begin(); err != nil {
+	if tx, err = m.DB.Begin(); err != nil {
 		return
 	}
 	defer tx.Rollback()

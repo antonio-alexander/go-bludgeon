@@ -12,14 +12,9 @@ func handleResponse(writer http.ResponseWriter, errIn error, bytes []byte) (err 
 
 		return
 	}
+	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	//if no error, write bytes
 	_, err = writer.Write(bytes)
 
 	return
 }
-
-// func getToken(request *http.Request) (token common.Token, err error) {
-// 	//TODO: get token from request
-
-// 	return
-// }

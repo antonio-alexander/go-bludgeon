@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/antonio-alexander/go-bludgeon/common"
+	"github.com/antonio-alexander/go-bludgeon/data"
 
 	"github.com/gorilla/mux"
 )
@@ -14,7 +14,7 @@ import (
 type server struct {
 	sync.RWMutex
 	sync.WaitGroup
-	common.Logger
+	data.Logger
 	router  *mux.Router
 	server  *http.Server
 	started bool
@@ -27,7 +27,7 @@ type Server interface {
 	Stop()
 }
 
-func New(logger common.Logger) Server {
+func New(logger data.Logger) Server {
 	return &server{
 		router: mux.NewRouter(),
 		Logger: logger,

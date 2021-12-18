@@ -5,7 +5,8 @@ import (
 	"sync"
 	"time"
 
-	common "github.com/antonio-alexander/go-bludgeon/common"
+	data "github.com/antonio-alexander/go-bludgeon/data"
+	meta "github.com/antonio-alexander/go-bludgeon/meta"
 )
 
 //REVIEW: as coded, this would be most efficient if there was no mutex, needing a mutex
@@ -15,20 +16,20 @@ import (
 type logic struct {
 	sync.WaitGroup
 	sync.RWMutex
-	common.Logger
+	data.Logger
 	meta interface {
-		common.MetaTimer
-		common.MetaTimeSlice
+		meta.Timer
+		meta.TimeSlice
 	}
 	stopper chan struct{}
-	chCache <-chan common.CacheData
+	chCache <-chan data.CacheData
 	started bool
 }
 
-func New(logger common.Logger,
+func New(logger data.Logger,
 	meta interface {
-		common.MetaTimer
-		common.MetaTimeSlice
+		meta.Timer
+		meta.TimeSlice
 	}) interface {
 	Logic
 	Functional
@@ -47,7 +48,7 @@ func (l *logic) Start() (err error) {
 		return
 	}
 	l.stopper = make(chan struct{})
-	l.chCache = make(<-chan common.CacheData)
+	l.chCache = make(<-chan data.CacheData)
 	l.launchCache()
 	l.started = true
 
@@ -96,11 +97,11 @@ func (l *logic) launchCache() {
 	<-started
 }
 
-func (l *logic) TimerCreate() (timer common.Timer, err error) {
+func (l *logic) TimerCreate() (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
-	if timer.UUID, err = common.GenerateID(); err != nil {
+	if timer.UUID, err = data.GenerateID(); err != nil {
 		return
 	}
 	err = l.meta.TimerWrite(timer.UUID, timer)
@@ -108,11 +109,11 @@ func (l *logic) TimerCreate() (timer common.Timer, err error) {
 	return
 }
 
-func (l *logic) TimerRead(id string) (timer common.Timer, err error) {
+func (l *logic) TimerRead(id string) (timer data.Timer, err error) {
 	l.RLock()
 	defer l.RUnlock()
 
-	var timeSlice common.TimeSlice
+	var timeSlice data.TimeSlice
 
 	//attempt to read the timer
 	if timer, err = l.meta.TimerRead(id); err != nil {
@@ -131,7 +132,7 @@ func (l *logic) TimerRead(id string) (timer common.Timer, err error) {
 	return
 }
 
-func (l *logic) TimerUpdate(t common.Timer) (timer common.Timer, err error) {
+func (l *logic) TimerUpdate(t data.Timer) (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -161,11 +162,11 @@ func (l *logic) TimerDelete(timerID string) (err error) {
 	return
 }
 
-func (l *logic) TimerStart(id string, startTime time.Time) (timer common.Timer, err error) {
+func (l *logic) TimerStart(id string, startTime time.Time) (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
-	var timeSlice common.TimeSlice
+	var timeSlice data.TimeSlice
 
 	//attempt to read the timer
 	if timer, err = l.meta.TimerRead(id); err != nil {
@@ -173,7 +174,7 @@ func (l *logic) TimerStart(id string, startTime time.Time) (timer common.Timer, 
 	}
 	//check if timer is archived
 	if timer.Archived {
-		err = fmt.Errorf(common.ErrTimerIsArchivedf, timer.UUID)
+		err = fmt.Errorf(data.ErrTimerIsArchivedf, timer.UUID)
 
 		return
 	}
@@ -191,7 +192,7 @@ func (l *logic) TimerStart(id string, startTime time.Time) (timer common.Timer, 
 		}
 	} else {
 		//generate the time slice id
-		if timeSlice.UUID, err = common.GenerateID(); err != nil {
+		if timeSlice.UUID, err = data.GenerateID(); err != nil {
 			return
 		}
 		//update the time slice's timer ID
@@ -221,11 +222,11 @@ func (l *logic) TimerStart(id string, startTime time.Time) (timer common.Timer, 
 	return
 }
 
-func (l *logic) TimerPause(timerID string, pauseTime time.Time) (timer common.Timer, err error) {
+func (l *logic) TimerPause(timerID string, pauseTime time.Time) (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
-	var timeSlice common.TimeSlice
+	var timeSlice data.TimeSlice
 
 	//if the given timer exists, when we pause the timer, we will
 	// grab the active time slice, set the finish time to now
@@ -242,7 +243,7 @@ func (l *logic) TimerPause(timerID string, pauseTime time.Time) (timer common.Ti
 	if timer.ActiveSliceUUID == "" {
 		//REVIEW: would it make more sense to output an error that says
 		// unable to pause a timer that isn't in progress?
-		err = fmt.Errorf(common.ErrNoActiveTimeSlicef, timer.UUID)
+		err = fmt.Errorf(data.ErrNoActiveTimeSlicef, timer.UUID)
 
 		return
 	}
@@ -273,11 +274,11 @@ func (l *logic) TimerPause(timerID string, pauseTime time.Time) (timer common.Ti
 	return
 }
 
-func (l *logic) TimerSubmit(timerID string, submitTime time.Time) (timer common.Timer, err error) {
+func (l *logic) TimerSubmit(timerID string, submitTime time.Time) (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
-	var timeSlice common.TimeSlice
+	var timeSlice data.TimeSlice
 
 	//when the timer is submitted, the stop time is updated, the active
 	// time slice is completed with the current time and the timer is
@@ -321,7 +322,7 @@ func (l *logic) TimerSubmit(timerID string, submitTime time.Time) (timer common.
 	return
 }
 
-func (l *logic) TimeSliceRead(timeSliceID string) (timeSlice common.TimeSlice, err error) {
+func (l *logic) TimeSliceRead(timeSliceID string) (timeSlice data.TimeSlice, err error) {
 	l.RLock()
 	defer l.RUnlock()
 

@@ -27,3 +27,6 @@ cmd/**/config/*
 #vs_code stuff
 __debug_bin
 .vscode/*
+
+#data
+meta/file/data/*.json

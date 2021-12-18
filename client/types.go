@@ -1,23 +1,27 @@
 package client
 
-import (
-	"time"
+import "strings"
+
+type Type string
+
+//task states
+const (
+	TypeInvalid Type = "invalid"
+	TypeRest    Type = "rest"
 )
 
-//SerializedData
-type SerializedData struct {
-	//
+func (m Type) String() string {
+	switch m {
+	default:
+		return "invalid"
+	}
 }
 
-//error constants
-const (
-	ErrStarted    string = "client started"
-	ErrNotStarted string = "client not started"
-)
-
-type CommandData struct {
-	ID         string
-	StartTime  time.Time
-	FinishTime time.Time
-	PauseTime  time.Time
+func AtoType(s string) Type {
+	switch strings.ToLower(s) {
+	default:
+		return TypeInvalid
+	case "rest":
+		return TypeRest
+	}
 }

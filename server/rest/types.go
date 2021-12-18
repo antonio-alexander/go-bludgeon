@@ -19,10 +19,5 @@ const (
 )
 
 type Owner interface {
-	Close()
-}
-
-type Manage interface {
-	Start(config Configuration) (err error)
-	Stop() (err error)
+	Start(config *Configuration) (err error)
 }
