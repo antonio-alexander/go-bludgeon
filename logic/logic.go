@@ -17,10 +17,8 @@ type logic struct {
 	sync.WaitGroup
 	sync.RWMutex
 	data.Logger
-	meta interface {
-		meta.Timer
-		meta.TimeSlice
-	}
+	meta.Timer
+	meta.TimeSlice
 	stopper chan struct{}
 	chCache <-chan data.CacheData
 	started bool
@@ -35,8 +33,9 @@ func New(logger data.Logger,
 	Functional
 } {
 	return &logic{
-		meta:   meta,
-		Logger: logger,
+		Timer:     meta,
+		TimeSlice: meta,
+		Logger:    logger,
 	}
 }
 
@@ -54,10 +53,14 @@ func (l *logic) Start() (err error) {
 
 	return
 }
+
 func (l *logic) Stop() (err error) {
 	l.Lock()
 	defer l.Unlock()
 
+	if !l.started {
+		return
+	}
 	close(l.stopper)
 	l.Wait()
 	l.started = false
@@ -65,7 +68,6 @@ func (l *logic) Stop() (err error) {
 	return
 }
 
-//LaunchCache
 func (l *logic) launchCache() {
 	//create channel to block until go routine enters business logic
 	started := make(chan struct{})
@@ -86,7 +88,7 @@ func (l *logic) launchCache() {
 		for {
 			select {
 			//periodically attempt to execute business logic
-			//signal to store cached operations
+			// signal to store cached operations
 			case <-l.chCache:
 			case <-l.stopper:
 				return
@@ -104,7 +106,10 @@ func (l *logic) TimerCreate() (timer data.Timer, err error) {
 	if timer.UUID, err = data.GenerateID(); err != nil {
 		return
 	}
-	err = l.meta.TimerWrite(timer.UUID, timer)
+	if err = l.Timer.TimerWrite(timer.UUID, timer); err != nil {
+		return
+	}
+	l.Debug("created timer with ID %s", timer.UUID)
 
 	return
 }
@@ -115,19 +120,16 @@ func (l *logic) TimerRead(id string) (timer data.Timer, err error) {
 
 	var timeSlice data.TimeSlice
 
-	//attempt to read the timer
-	if timer, err = l.meta.TimerRead(id); err != nil {
+	if timer, err = l.Timer.TimerRead(id); err != nil {
 		return
 	}
-	//attempt to get the activeSlice if it exists
 	if timer.ActiveSliceUUID != "" {
-		//read the time slice to store in meta if remote
-		if timeSlice, err = l.meta.TimeSliceRead(timer.ActiveSliceUUID); err != nil {
+		if timeSlice, err = l.TimeSlice.TimeSliceRead(timer.ActiveSliceUUID); err != nil {
 			return
 		}
-		//update elapsed time in realtime if there is an active timeslice
 		timer.ElapsedTime += (time.Now().UnixNano() - timeSlice.Start)
 	}
+	l.Debug("read timer with ID %s", timer.UUID)
 
 	return
 }
@@ -136,17 +138,18 @@ func (l *logic) TimerUpdate(t data.Timer) (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
-	//get the current timer
-	if timer, err = l.meta.TimerRead(t.UUID); err != nil {
+	//TODO: this function should be deprecated and replaced with
+	// functions that edit properties instead
+	if timer, err = l.Timer.TimerRead(t.UUID); err != nil {
 		return
 	}
-	//update only the items that have changed
-	// update the comment
 	if t.Comment != "" {
 		timer.Comment = t.Comment
 	}
-	//store the timeslice
-	err = l.meta.TimerWrite(timer.UUID, timer)
+	if err = l.Timer.TimerWrite(timer.UUID, timer); err != nil {
+		return
+	}
+	l.Debug("updated timer with ID %s", timer.UUID)
 
 	return
 }
@@ -155,9 +158,10 @@ func (l *logic) TimerDelete(timerID string) (err error) {
 	l.Lock()
 	defer l.Unlock()
 
-	if err = l.meta.TimerDelete(timerID); err != nil {
+	if err = l.Timer.TimerDelete(timerID); err != nil {
 		return
 	}
+	l.Debug("deleted timer with ID %s", timerID)
 
 	return
 }
@@ -168,56 +172,41 @@ func (l *logic) TimerStart(id string, startTime time.Time) (timer data.Timer, er
 
 	var timeSlice data.TimeSlice
 
-	//attempt to read the timer
-	if timer, err = l.meta.TimerRead(id); err != nil {
+	//to start the timer, we need to first read it
+	// and then set the active time slice, then update
+	// the timer
+	if timer, err = l.Timer.TimerRead(id); err != nil {
 		return
 	}
-	//check if timer is archived
 	if timer.Archived {
-		err = fmt.Errorf(data.ErrTimerIsArchivedf, timer.UUID)
-
-		return
+		return data.Timer{}, fmt.Errorf(data.ErrTimerIsArchivedf, timer.UUID)
 	}
-	//check if the timer start is empty
 	if timer.Start == 0 {
-		//set the start time to now
 		timer.Start = startTime.UnixNano()
 	}
-	//check if there's an active slice
 	if timer.ActiveSliceUUID != "" {
-		//read the active slice (e.g. resume the timer so you don't lose the slice if it was
-		// stopped ungracefully)
-		if timeSlice, err = l.meta.TimeSliceRead(timer.ActiveSliceUUID); err != nil {
+		if timeSlice, err = l.TimeSlice.TimeSliceRead(timer.ActiveSliceUUID); err != nil {
 			return
 		}
 	} else {
-		//generate the time slice id
 		if timeSlice.UUID, err = data.GenerateID(); err != nil {
 			return
 		}
-		//update the time slice's timer ID
 		timeSlice.TimerUUID = timer.UUID
-		//store the timeslice
-		if err = l.meta.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
-			//TODO: store the meta error
+		if err = l.TimeSlice.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
 			return
 		}
-		//set the start time
 		timeSlice.Start = startTime.UnixNano()
 	}
-	//store the timeSlice
 	timer.ActiveSliceUUID = timeSlice.UUID
-	//store the time slice
-	if err = l.meta.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
-		//TODO: store meta error
+	if err = l.TimeSlice.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
 		return
 	}
-	//store the timer
-	if err = l.meta.TimerWrite(timer.UUID, timer); err != nil {
-		//TODO: store meta error
+	if err = l.Timer.TimerWrite(timer.UUID, timer); err != nil {
 		return
 	}
 	//REVIEW: if we create a GUID, we will need some way to overwrite the cached operation
+	l.Debug("started timer with ID %s", timer.UUID)
 
 	return
 }
@@ -232,14 +221,9 @@ func (l *logic) TimerPause(timerID string, pauseTime time.Time) (timer data.Time
 	// grab the active time slice, set the finish time to now
 	// set the active slice value to -1 update the elapsed time,
 	// add all the timers that aren't archived together
-
-	//attempt to read the timer
-	if timer, err = l.meta.TimerRead(timerID); err != nil {
+	if timer, err = l.Timer.TimerRead(timerID); err != nil {
 		return
 	}
-	//check if there's an active slice, if there is, do nothing
-	// if there isn't, generate an error since a paused timer
-	// should be in-progress (noted by an active slice)
 	if timer.ActiveSliceUUID == "" {
 		//REVIEW: would it make more sense to output an error that says
 		// unable to pause a timer that isn't in progress?
@@ -247,29 +231,21 @@ func (l *logic) TimerPause(timerID string, pauseTime time.Time) (timer data.Time
 
 		return
 	}
-	//read the active time slice
-	if timeSlice, err = l.meta.TimeSliceRead(timer.ActiveSliceUUID); err != nil {
+	if timeSlice, err = l.TimeSlice.TimeSliceRead(timer.ActiveSliceUUID); err != nil {
 		return
 	}
-	//set the finish time
 	timeSlice.Finish = pauseTime.UnixNano()
-	//calculate the elapsed time
 	timeSlice.ElapsedTime = timeSlice.Finish - timeSlice.Start
-	//set archived to true
 	timeSlice.Archived = true
-	//calculate elapsed time
 	timer.ElapsedTime = timer.ElapsedTime + timeSlice.ElapsedTime
-	//update the timeslice
-	if err = l.meta.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
+	if err = l.TimeSlice.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
 		return
 	}
-	//update the timer, remove its time slice and update the elapsed time
-	//set the activeSliceUUID to empty
 	timer.ActiveSliceUUID = ""
-	//update the timer
-	if err = l.meta.TimerWrite(timer.UUID, timer); err != nil {
+	if err = l.Timer.TimerWrite(timer.UUID, timer); err != nil {
 		return
 	}
+	l.Debug("paused timer with ID %s", timer.UUID)
 
 	return
 }
@@ -285,39 +261,28 @@ func (l *logic) TimerSubmit(timerID string, submitTime time.Time) (timer data.Ti
 	// set to "submitted" so any changes to it after the fact are known as
 	// changes that shouldn't involve the time slices (and that they're now
 	// invalid)
-	if timer, err = l.meta.TimerRead(timerID); err != nil {
+	if timer, err = l.Timer.TimerRead(timerID); err != nil {
 		return
 	}
-	//check if there's an active slice, if there is,
 	if timer.ActiveSliceUUID != "" {
-		//read the active time slice
-		if timeSlice, err = l.meta.TimeSliceRead(timer.ActiveSliceUUID); err != nil {
+		if timeSlice, err = l.TimeSlice.TimeSliceRead(timer.ActiveSliceUUID); err != nil {
 			return
 		}
-		//set the finish time
 		timeSlice.Finish = submitTime.UnixNano()
-		//calculate the elapsed time
 		timeSlice.ElapsedTime = timeSlice.Finish - timeSlice.Start
-		//set archived to true
 		timeSlice.Archived = true
-		//update the timer, remove its time slice and update the elapsed time
-		//set the activeSliceUUID to empty
 		timer.ActiveSliceUUID = ""
 	}
-	//set finish time
 	timer.Finish = submitTime.UnixNano()
-	//calculate elapsed time
 	timer.ElapsedTime = timer.ElapsedTime + timeSlice.ElapsedTime
-	//set completed
 	timer.Completed = true
-	//update the timeslice
-	if err = l.meta.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
+	if err = l.TimeSlice.TimeSliceWrite(timeSlice.UUID, timeSlice); err != nil {
 		return
 	}
-	//update the timer
-	if err = l.meta.TimerWrite(timer.UUID, timer); err != nil {
+	if err = l.Timer.TimerWrite(timer.UUID, timer); err != nil {
 		return
 	}
+	l.Debug("submitted timer with ID %s", timer.UUID)
 
 	return
 }
@@ -326,5 +291,10 @@ func (l *logic) TimeSliceRead(timeSliceID string) (timeSlice data.TimeSlice, err
 	l.RLock()
 	defer l.RUnlock()
 
-	return l.meta.TimeSliceRead(timeSliceID)
+	if timeSlice, err = l.TimeSlice.TimeSliceRead(timeSliceID); err != nil {
+		return
+	}
+	l.Debug("read time slice with ID %s", timeSliceID)
+
+	return
 }

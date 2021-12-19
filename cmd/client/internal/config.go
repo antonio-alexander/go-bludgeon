@@ -7,6 +7,7 @@ import (
 	"time"
 
 	client "github.com/antonio-alexander/go-bludgeon/client"
+	rest "github.com/antonio-alexander/go-bludgeon/client/rest"
 	meta "github.com/antonio-alexander/go-bludgeon/meta"
 	metafile "github.com/antonio-alexander/go-bludgeon/meta/file"
 )
@@ -14,9 +15,9 @@ import (
 //data constants
 const (
 	fileMode                  os.FileMode   = 0644
-	ErrUnsupportedConfigf     string        = "Unsupported Type: %T"
-	ErrMetaNotFoundf          string        = "Meta not found: %s"
-	ErrRemoteNotFoundf        string        = "Meta not found: %s"
+	ErrUnsupportedConfigf     string        = "unsupported Type: %T"
+	ErrMetaNotFoundf          string        = "meta not found: %s"
+	ErrRemoteNotFoundf        string        = "meta not found: %s"
 	EnvNameBludgeonMetaType   string        = "BLUDGEON_META_TYPE"
 	EnvNameBludgeonClientType string        = "BLUDGEON_REMOTE_TYPE"
 	EnvNameBludgeonAddress    string        = "BLUDGEON_ADDRESS"
@@ -30,19 +31,13 @@ const (
 )
 
 type Meta struct {
-	Type meta.Type `json:"MetaType"`
+	Type meta.Type
 	File *metafile.Configuration
 }
 
 type Client struct {
 	Type client.Type
-	Rest *ClientRest
-}
-
-type ClientRest struct {
-	Address string
-	Port    string
-	Timeout time.Duration
+	Rest *rest.Configuration
 }
 
 type Configuration struct {
@@ -54,7 +49,7 @@ func NewConfiguration() *Configuration {
 	return &Configuration{
 		Client: Client{
 			Type: "",
-			Rest: &ClientRest{},
+			Rest: &rest.Configuration{},
 		},
 		Meta: Meta{
 			Type: "",
@@ -72,11 +67,8 @@ func (c *Configuration) Default(pwd string) {
 }
 
 func (c *Configuration) FromEnv(pwd string, envs map[string]string) (err error) {
-	if metaType, ok := envs[EnvNameBludgeonMetaType]; ok {
-		c.Meta.Type = meta.AtoType(metaType)
-	}
-	if remoteType, ok := envs[EnvNameBludgeonClientType]; ok {
-		c.Client.Type = client.AtoType(remoteType)
+	if clientType, ok := envs[EnvNameBludgeonClientType]; ok {
+		c.Client.Type = client.AtoType(clientType)
 	}
 	//TODO: add code to get address from env
 	//TODO: add code to get port from env
@@ -90,44 +82,25 @@ func (c *Configuration) Validate() (err error) {
 	return
 }
 
-func (c *Configuration) Read(configPath, pwd string, envs map[string]string) (err error) {
-	var bytes []byte
-	var exists bool
-
-	//check if configPath exists, then swtich on the input
-	// maintain the pointer for configuration, if config file
-	// exists, read from it, otherwise, populate the defaults
-	// then attempt to read from the environment and then
-	// validate the configuration. In the event the provided
-	// configuration is not a supported type, output an error
-	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
-		exists = true
-	}
-	if !exists {
+func (c *Configuration) Read(configPath, pwd string, envs map[string]string) error {
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		c.Default(pwd)
-		if err = c.FromEnv(pwd, envs); err != nil {
-			return
-		}
-	} else {
-		if bytes, err = ioutil.ReadFile(configPath); err != nil {
-			return
-		}
-		if err = json.Unmarshal(bytes, &c); err != nil {
-			return
-		}
+		return c.FromEnv(pwd, envs)
 	}
-	err = c.Validate()
-
-	return
+	bytes, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(bytes, &c); err != nil {
+		return err
+	}
+	return c.Validate()
 }
 
-func (c *Configuration) Write(configPath string) (err error) {
-	var bytes []byte
-
-	if bytes, err = json.MarshalIndent(&c, "", "    "); err != nil {
-		return
+func (c *Configuration) Write(configPath string) error {
+	bytes, err := json.MarshalIndent(&c, "", "    ")
+	if err != nil {
+		return err
 	}
-	err = ioutil.WriteFile(configPath, bytes, fileMode)
-
-	return
+	return ioutil.WriteFile(configPath, bytes, fileMode)
 }

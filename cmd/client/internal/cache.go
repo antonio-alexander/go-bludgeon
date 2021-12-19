@@ -6,44 +6,38 @@ import (
 	"os"
 )
 
-type Cache struct {
+type cache struct {
 	TimerID string `json:"TimerID"`
 }
 
-func CacheRead(file string) (cache Cache, err error) {
-	var bytes []byte
-
-	//check if file exists
-	if _, err = os.Stat(file); os.IsNotExist(err) {
-		//load default configuration
-		cache = CacheDefault()
-		//write the default configuration
-		err = CacheWrite(file, cache)
-	} else {
-		//file exists
-		if bytes, err = ioutil.ReadFile(file); err != nil {
-			return
+func (c *cache) Read(file string) error {
+	if _, err := os.Stat(file); os.IsNotExist(err) {
+		c.Default()
+		if err = c.Write(file); err != nil {
+			return err
 		}
-		err = json.Unmarshal(bytes, &cache)
+		return nil
 	}
-	return
+	bytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	cache := &cache{}
+	if err = json.Unmarshal(bytes, &cache); err != nil {
+		return err
+	}
+	c.TimerID = cache.TimerID
+	return nil
 }
 
-func CacheWrite(file string, cache Cache) (err error) {
-	var bytes []byte
-
-	//marshal config into bytes
-	if bytes, err = json.MarshalIndent(&cache, "", "    "); err != nil {
-		return
+func (c *cache) Write(file string) error {
+	bytes, err := json.MarshalIndent(c, "", "    ")
+	if err != nil {
+		return err
 	}
-	//write configuration
-	err = ioutil.WriteFile(file, bytes, 0644)
-
-	return
+	return ioutil.WriteFile(file, bytes, 0644)
 }
 
-func CacheDefault() (c Cache) {
+func (c *cache) Default() {
 	c.TimerID = ""
-
-	return
 }

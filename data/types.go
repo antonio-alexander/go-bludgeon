@@ -169,13 +169,8 @@ type Options struct {
 }
 
 type Logger interface {
-	//Error
-	Error(err error, v ...interface{})
-
-	//Info
+	Error(format string, v ...interface{})
 	Info(format string, v ...interface{})
-
-	//Debug
 	Debug(format string, v ...interface{})
 }
 

@@ -1,29 +1,32 @@
 package rest
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sync"
 	"time"
 
 	data "github.com/antonio-alexander/go-bludgeon/data"
-	rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 	logic "github.com/antonio-alexander/go-bludgeon/logic"
 	server "github.com/antonio-alexander/go-bludgeon/server"
 
+	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 )
 
 type restServer struct {
-	sync.RWMutex                 //mutex for threadsafe operations
-	sync.WaitGroup               //waitgroup to track go routines
-	logic.Logic                  //
-	data.Logger                  //
-	config         Configuration //configuration
-	stopper        chan struct{} //stopper to stop goRoutines
-	server         rest.Server   //
-	started        bool          //whether or not the business logic has starting
+	sync.RWMutex
+	sync.WaitGroup
+	logic.Logic
+	data.Logger
+	config  Configuration
+	router  *mux.Router
+	server  *http.Server
+	stopper chan struct{}
+	started bool
 }
 
 func New(logger data.Logger, logic logic.Logic) interface {
@@ -31,27 +34,39 @@ func New(logger data.Logger, logic logic.Logic) interface {
 	server.Owner
 	logic.Logic
 } {
+	router := mux.NewRouter()
 	return &restServer{
 		Logic:  logic,
 		Logger: logger,
-		server: rest.New(logger),
+		router: router,
+		server: &http.Server{
+			Handler: router,
+		},
 	}
 }
 
-//TimerCreate
+func (s *restServer) handleResponse(writer http.ResponseWriter, errIn error, bytes []byte) error {
+	if errIn != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		_, err := writer.Write([]byte(errIn.Error()))
+		return err
+	}
+	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, err := writer.Write(bytes)
+	return err
+}
+
 func (s *restServer) endpointTimerCreate() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var timer data.Timer
 		var bytes []byte
 		var err error
 
-		//attempt to execute the timer create
 		if timer, err = s.TimerCreate(); err == nil {
 			bytes, err = json.Marshal(timer)
 		}
-		//handle errors
-		if err = handleResponse(writer, err, bytes); err != nil {
-			s.Error(errors.Wrap(err, "TimerCreate"))
+		if err = s.handleResponse(writer, err, bytes); err != nil {
+			s.Error("timer create -  %s", err)
 		}
 	}
 }
@@ -63,23 +78,19 @@ func (s *restServer) endpointTimerRead() func(http.ResponseWriter, *http.Request
 		var bytes []byte
 		var err error
 
-		//read bytes from request
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &contract); err == nil {
-				//attempt to execute the timer create
 				if timer, err = s.TimerRead(contract.ID); err == nil {
 					bytes, err = json.Marshal(timer)
 				}
 			}
 		}
-		//handle errors
-		if err = handleResponse(writer, err, bytes); err != nil {
-			s.Error(errors.Wrap(err, "TimerRead"))
+		if err = s.handleResponse(writer, err, bytes); err != nil {
+			s.Error("timer read -  %s", err)
 		}
 	}
 }
 
-//TimerUpdate
 func (s *restServer) endpointTimerUpdate() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var contract data.Contract
@@ -87,55 +98,47 @@ func (s *restServer) endpointTimerUpdate() func(http.ResponseWriter, *http.Reque
 		var bytes []byte
 		var err error
 
-		//read bytes from request
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &contract); err == nil {
-				//attempt to execute the timer create
 				if timer, err = s.TimerUpdate(contract.Timer); err == nil {
 					bytes, err = json.Marshal(&timer)
 				}
 			}
 		}
-		//handle errors
-		if err = handleResponse(writer, err, bytes); err != nil {
-			s.Error(errors.Wrap(err, "TimerUpdate"))
+		if err = s.handleResponse(writer, err, bytes); err != nil {
+			s.Error("timer update -  %s", err)
 		}
 	}
 }
 
-//TimerDelete
 func (s *restServer) endpointTimerDelete() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var contract data.Contract
 		var bytes []byte
 		var err error
 
-		//read bytes from request
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &contract); err == nil {
-				//attempt to execute the timer create
 				err = s.TimerDelete(contract.ID)
 			}
 		}
-		//handle errors
-		if err = handleResponse(writer, err, nil); err != nil {
-			s.Error(errors.Wrap(err, "TimerDelete"))
+		if err = s.handleResponse(writer, err, nil); err != nil {
+			s.Error("timer delete -  %s", err)
 		}
 	}
 }
 
-//TimerStart
 func (s *restServer) endpointTimerStart() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var contract data.Contract
-		var timeStart time.Time
 		var timer data.Timer
 		var bytes []byte
 		var err error
 
-		//read bytes from request
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &contract); err == nil {
+				var timeStart time.Time
+
 				if contract.StartTime > 0 {
 					timeStart = time.Unix(0, contract.StartTime)
 				} else {
@@ -146,25 +149,23 @@ func (s *restServer) endpointTimerStart() func(http.ResponseWriter, *http.Reques
 				}
 			}
 		}
-		//handle errors
-		if err = handleResponse(writer, err, bytes); err != nil {
-			s.Error(errors.Wrap(err, "TimerStart"))
+		if err = s.handleResponse(writer, err, bytes); err != nil {
+			s.Error("timer start -  %s", err)
 		}
 	}
 }
 
-//TimerPause
 func (s *restServer) endpointTimerPause() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var contract data.Contract
-		var pauseTime time.Time
 		var timer data.Timer
 		var bytes []byte
 		var err error
 
-		//read bytes from request
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &contract); err == nil {
+				var pauseTime time.Time
+
 				if contract.PauseTime > 0 {
 					pauseTime = time.Unix(0, contract.PauseTime)
 				} else {
@@ -175,25 +176,23 @@ func (s *restServer) endpointTimerPause() func(http.ResponseWriter, *http.Reques
 				}
 			}
 		}
-		//handle errors
-		if err = handleResponse(writer, err, bytes); err != nil {
-			s.Error(errors.Wrap(err, "TimerPause"))
+		if err = s.handleResponse(writer, err, bytes); err != nil {
+			s.Error("timer pause -  %s", err)
 		}
 	}
 }
 
-//TimerSubmit
 func (s *restServer) endpointTimerSubmit() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var contract data.Contract
-		var finishTime time.Time
 		var timer data.Timer
 		var bytes []byte
 		var err error
 
-		//read bytes from request
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &contract); err == nil {
+				var finishTime time.Time
+
 				if contract.FinishTime > 0 {
 					finishTime = time.Unix(0, contract.FinishTime)
 				} else {
@@ -204,14 +203,12 @@ func (s *restServer) endpointTimerSubmit() func(http.ResponseWriter, *http.Reque
 				}
 			}
 		}
-		//handle errors
-		if err = handleResponse(writer, err, bytes); err != nil {
-			s.Error(errors.Wrap(err, "TimerSubmit"))
+		if err = s.handleResponse(writer, err, bytes); err != nil {
+			s.Error("timer submit -  %s", err)
 		}
 	}
 }
 
-//TimeSliceRead
 func (s *restServer) endpointTimeSliceRead() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var timeSlice data.TimeSlice
@@ -219,25 +216,21 @@ func (s *restServer) endpointTimeSliceRead() func(http.ResponseWriter, *http.Req
 		var bytes []byte
 		var err error
 
-		//read bytes from request
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &contract); err == nil {
-				//attempt to execute the timer create
 				if timeSlice, err = s.TimeSliceRead(contract.ID); err == nil {
 					bytes, err = json.Marshal(timeSlice)
 				}
 			}
 		}
-		//handle errors
-		if err = handleResponse(writer, err, bytes); err != nil {
-			s.Error(errors.Wrap(err, "TimeSliceRead"))
+		if err = s.handleResponse(writer, err, bytes); err != nil {
+			s.Error("time slice read -  %s", err)
 		}
 	}
 }
 
-//buildRoutes will create all the routes and their functions to execute when received
-func (s *restServer) BuildRoutes() error {
-	routes := []rest.HandleFuncConfig{
+func (s *restServer) buildRoutes() {
+	for _, route := range []handleFuncConfig{
 		//timer
 		{Route: data.RouteTimerCreate, Method: POST, HandleFx: s.endpointTimerCreate()},
 		{Route: data.RouteTimerRead, Method: POST, HandleFx: s.endpointTimerRead()},
@@ -248,8 +241,27 @@ func (s *restServer) BuildRoutes() error {
 		{Route: data.RouteTimerSubmit, Method: POST, HandleFx: s.endpointTimerSubmit()},
 		//time slice
 		{Route: data.RouteTimeSliceRead, Method: POST, HandleFx: s.endpointTimeSliceRead()},
+	} {
+		s.router.HandleFunc(route.Route, route.HandleFx).Methods(route.Method)
 	}
-	return s.server.BuildRoutes(routes)
+}
+
+func (s *restServer) launchServer() {
+	started := make(chan struct{})
+	s.Add(1)
+	go func() {
+		defer s.Done()
+
+		close(started)
+		if err := s.server.ListenAndServe(); err != nil {
+			if err != http.ErrServerClosed {
+				s.Debug("Httpserver: ListenAndServe() error: %s", err)
+			}
+		}
+		//REVIEW: Do we need to account for a situation where the rest server kills itself
+		// unexepctedly?
+	}()
+	<-started
 }
 
 func (s *restServer) Start(config *Configuration) (err error) {
@@ -260,33 +272,30 @@ func (s *restServer) Start(config *Configuration) (err error) {
 		return errors.New(ErrStarted)
 	}
 	s.config = *config
-	if err = s.BuildRoutes(); err != nil {
-		return
-	}
+	s.buildRoutes()
 	s.stopper = make(chan struct{})
-	if err = s.server.Start(s.config.Address, s.config.Port); err != nil {
-		return
-	}
+	s.server.Addr = fmt.Sprintf("%s:%s", s.config.Address, s.config.Port)
+	s.launchServer()
 	s.started = true
-	s.Info("bludgeon server started, listening on %s:%s", s.config.Address, s.config.Port)
+	s.Info("started, listening on %s:%s", s.config.Address, s.config.Port)
 
 	return
 }
 
-func (s *restServer) Stop() (err error) {
+func (s *restServer) Stop() {
 	s.Lock()
 	defer s.Unlock()
 
 	if !s.started {
-		err = errors.New(ErrNotStarted)
-
 		return
 	}
-	s.server.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), ConfigShutdownTimeout)
+	defer cancel()
+	if err := s.server.Shutdown(ctx); err != nil {
+		s.Error("shutting down - %s", err)
+	}
 	close(s.stopper)
 	s.Wait()
 	s.started = false
-	s.Info("bludgeon server stopped")
-
-	return
+	s.Info("stopped")
 }

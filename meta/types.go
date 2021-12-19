@@ -41,7 +41,7 @@ func (m Type) String() string {
 
 func AtoType(s string) Type {
 	switch strings.ToLower(s) {
-	case "json":
+	case "file":
 		return TypeFile
 	case "mysql":
 		return TypeMySQL

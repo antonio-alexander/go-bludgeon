@@ -1,11 +1,12 @@
-package restapi
+package rest
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"sync"
 	"time"
 
 	data "github.com/antonio-alexander/go-bludgeon/data"
@@ -13,239 +14,195 @@ import (
 )
 
 type rest struct {
-	sync.RWMutex
-	address string
-	port    string
+	*http.Client
+	config Configuration
 }
 
-func New(address, port string) interface {
+func New(config Configuration) interface {
 	logic.Logic
 } {
 	return &rest{
-		address: address,
-		port:    port,
+		config: config,
+		Client: &http.Client{
+			Timeout: config.Timeout,
+		},
 	}
 }
 
-func (r *rest) TimerCreate() (timer data.Timer, err error) {
-	var response *http.Response
-	var bytes []byte
-
-	//create uri
-	uri := fmt.Sprintf(URIf, r.address, r.port, data.RouteTimerCreate)
-	//execute request and get response
-	if response, err = doRequest(uri, POST, nil); err != nil {
-		return
+//doRequest
+func (r *rest) doRequest(uri, method string, data []byte) ([]byte, error) {
+	request, err := http.NewRequest(method, uri, bytes.NewBuffer(data))
+	if err != nil {
+		return nil, err
 	}
-	//get bytes from response
-	if bytes, err = ioutil.ReadAll(response.Body); err != nil {
-		return
+	response, err := r.Do(request)
+	if err != nil {
+		return nil, err
 	}
-	//close the response body
-	response.Body.Close()
-	//attempt to unmarshal json
-	err = json.Unmarshal(bytes, &timer)
+	data, err = ioutil.ReadAll(response.Body)
+	defer response.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode != http.StatusOK {
+		if len(data) > 0 {
+			return nil, errors.New(string(data))
+		}
+		return nil, fmt.Errorf("failure: %d", response.StatusCode)
+	}
+	return data, nil
+}
 
-	return
+func (r *rest) TimerCreate() (data.Timer, error) {
+	var timer data.Timer
+
+	uri := fmt.Sprintf(URIf, r.config.Address, r.config.Port, data.RouteTimerCreate)
+	bytes, err := r.doRequest(uri, POST, nil)
+	if err != nil {
+		return data.Timer{}, err
+	}
+	if err = json.Unmarshal(bytes, &timer); err != nil {
+		return data.Timer{}, err
+	}
+	return timer, nil
 }
 
 //TimerRead
-func (r *rest) TimerRead(id string) (timer data.Timer, err error) {
-	var response *http.Response
-	var bytes []byte
-	var contract data.Contract
+func (r *rest) TimerRead(id string) (data.Timer, error) {
+	var timer data.Timer
 
-	//store id in contract
-	contract.ID = id
-	//marshal contract
-	if bytes, err = json.Marshal(&contract); err != nil {
-		return
+	uri := fmt.Sprintf(URIf, r.config.Address, r.config.Port, data.RouteTimerRead)
+	bytes, err := json.Marshal(&data.Contract{
+		ID: id,
+	})
+	if err != nil {
+		return data.Timer{}, err
 	}
-	//create uri
-	uri := fmt.Sprintf(URIf, r.address, r.port, data.RouteTimerRead)
-	//execute request and get response
-	if response, err = doRequest(uri, POST, bytes); err != nil {
-		return
+	bytes, err = r.doRequest(uri, POST, bytes)
+	if err != nil {
+		return data.Timer{}, err
 	}
-	//get bytes from response
-	if bytes, err = ioutil.ReadAll(response.Body); err != nil {
-		return
+	if err = json.Unmarshal(bytes, &timer); err != nil {
+		return data.Timer{}, err
 	}
-	//close the response body
-	response.Body.Close()
-	//attempt to unmarshal json
-	err = json.Unmarshal(bytes, &timer)
 
-	return
+	return timer, nil
 }
 
 //
-func (r *rest) TimerUpdate(t data.Timer) (timer data.Timer, err error) {
-	var bytes []byte
-	var contract data.Contract
-	var response *http.Response
-
-	//store id in contract
-	contract.Timer = t
-	//marshal contract
-	if bytes, err = json.Marshal(&contract); err != nil {
-		return
+func (r *rest) TimerUpdate(t data.Timer) (data.Timer, error) {
+	bytes, err := json.Marshal(&data.Contract{
+		Timer: t,
+	})
+	if err != nil {
+		return data.Timer{}, err
 	}
-	//create uri
-	uri := fmt.Sprintf(URIf, r.address, r.port, data.RouteTimerUpdate)
-	//execute request and get response
-	if response, err = doRequest(uri, POST, bytes); err != nil {
-		return
+	uri := fmt.Sprintf(URIf, r.config.Address, r.config.Port, data.RouteTimerUpdate)
+	bytes, err = r.doRequest(uri, POST, bytes)
+	if err != nil {
+		return data.Timer{}, err
 	}
-	//get bytes from response
-	if bytes, err = ioutil.ReadAll(response.Body); err != nil {
-		return
+	timer := data.Timer{}
+	if err = json.Unmarshal(bytes, &timer); err != nil {
+		return data.Timer{}, err
 	}
-	//close the response body
-	response.Body.Close()
-	//attempt to unmarshal json
-	err = json.Unmarshal(bytes, &timer)
-
-	return
+	return timer, nil
 }
 
 //
-func (r *rest) TimerDelete(id string) (err error) {
-	var bytes []byte
-	var contract data.Contract
-
-	//store id in contract
-	contract.ID = id
-	//marshal contract
-	if bytes, err = json.Marshal(&contract); err != nil {
-		return
+func (r *rest) TimerDelete(id string) error {
+	bytes, err := json.Marshal(&data.Contract{
+		ID: id,
+	})
+	if err != nil {
+		return err
 	}
-	//create uri
-	uri := fmt.Sprintf(URIf, r.address, r.port, data.RouteTimerDelete)
-	//execute request and get response
-	_, err = doRequest(uri, POST, bytes)
-
-	return
+	uri := fmt.Sprintf(URIf, r.config.Address, r.config.Port, data.RouteTimerDelete)
+	if _, err = r.doRequest(uri, POST, bytes); err != nil {
+		return err
+	}
+	return nil
 }
 
 //
-func (r *rest) TimerStart(timerID string, startTime time.Time) (timer data.Timer, err error) {
-	var contract data.Contract
-	var response *http.Response
-	var bytes []byte
+func (r *rest) TimerStart(timerID string, startTime time.Time) (data.Timer, error) {
+	var timer data.Timer
 
-	//store id in contract
-	contract.ID = timerID
-	contract.StartTime = startTime.UnixNano()
-	//marshal contract
-	if bytes, err = json.Marshal(&contract); err != nil {
-		return
+	bytes, err := json.Marshal(&data.Contract{
+		ID:        timerID,
+		StartTime: startTime.UnixNano(),
+	})
+	if err != nil {
+		return data.Timer{}, err
 	}
-	//create uri
-	uri := fmt.Sprintf(URIf, r.address, r.port, data.RouteTimerStart)
-	//execute request and get response
-	if response, err = doRequest(uri, POST, bytes); err != nil {
-		return
+	uri := fmt.Sprintf(URIf, r.config.Address, r.config.Port, data.RouteTimerStart)
+	bytes, err = r.doRequest(uri, POST, bytes)
+	if err != nil {
+		return data.Timer{}, err
 	}
-	//get bytes from response
-	if bytes, err = ioutil.ReadAll(response.Body); err != nil {
-		return
+	if err = json.Unmarshal(bytes, &timer); err != nil {
+		return data.Timer{}, err
 	}
-	//close the response body
-	response.Body.Close()
-	//attempt to unmarshal json
-	err = json.Unmarshal(bytes, &timer)
-
-	return
+	return timer, nil
 }
 
 //
-func (r *rest) TimerPause(timerID string, pauseTime time.Time) (timer data.Timer, err error) {
-	var contract data.Contract
-	var response *http.Response
-	var bytes []byte
+func (r *rest) TimerPause(timerID string, pauseTime time.Time) (data.Timer, error) {
+	var timer data.Timer
 
-	//store id in contract
-	contract.ID = timerID
-	contract.PauseTime = pauseTime.UnixNano()
-	//marshal contract
-	if bytes, err = json.Marshal(&contract); err != nil {
-		return
+	bytes, err := json.Marshal(&data.Contract{
+		ID:        timerID,
+		PauseTime: pauseTime.UnixNano(),
+	})
+	if err != nil {
+		return data.Timer{}, err
 	}
-	//create uri
-	uri := fmt.Sprintf(URIf, r.address, r.port, data.RouteTimerPause)
-	//execute request and get response
-	if response, err = doRequest(uri, POST, bytes); err != nil {
-		return
+	uri := fmt.Sprintf(URIf, r.config.Address, r.config.Port, data.RouteTimerPause)
+	if bytes, err = r.doRequest(uri, POST, bytes); err != nil {
+		return data.Timer{}, err
 	}
-	//get bytes from response
-	if bytes, err = ioutil.ReadAll(response.Body); err != nil {
-		return
+	if err = json.Unmarshal(bytes, &timer); err != nil {
+		return data.Timer{}, err
 	}
-	//close the response body
-	response.Body.Close()
-	//attempt to unmarshal json
-	err = json.Unmarshal(bytes, &timer)
-
-	return
+	return timer, nil
 }
 
 //
-func (r *rest) TimerSubmit(timerID string, finishTime time.Time) (timer data.Timer, err error) {
-	var contract data.Contract
-	var response *http.Response
-	var bytes []byte
+func (r *rest) TimerSubmit(timerID string, finishTime time.Time) (data.Timer, error) {
+	var timer data.Timer
 
-	//store id in contract
-	contract.ID = timerID
-	contract.FinishTime = finishTime.UnixNano()
-	//marshal contract
-	if bytes, err = json.Marshal(&contract); err != nil {
-		return
+	bytes, err := json.Marshal(&data.Contract{
+		ID:         timerID,
+		FinishTime: finishTime.UnixNano(),
+	})
+	if err != nil {
+		return data.Timer{}, err
 	}
-	//create uri
-	uri := fmt.Sprintf(URIf, r.address, r.port, data.RouteTimerSubmit)
-	//execute request and get response
-	if response, err = doRequest(uri, POST, bytes); err != nil {
-		return
+	uri := fmt.Sprintf(URIf, r.config.Address, r.config.Port, data.RouteTimerSubmit)
+	if bytes, err = r.doRequest(uri, POST, bytes); err != nil {
+		return data.Timer{}, err
 	}
-	//get bytes from response
-	if bytes, err = ioutil.ReadAll(response.Body); err != nil {
-		return
+	if err = json.Unmarshal(bytes, &timer); err != nil {
+		return data.Timer{}, err
 	}
-	//close the response body
-	response.Body.Close()
-	//attempt to unmarshal json
-	err = json.Unmarshal(bytes, &timer)
-
-	return
+	return timer, nil
 }
 
-func (r *rest) TimeSliceRead(id string) (timeSlice data.TimeSlice, err error) {
-	var response *http.Response
-	var bytes []byte
-	var contract data.Contract
+func (r *rest) TimeSliceRead(id string) (data.TimeSlice, error) {
+	var timeSlice data.TimeSlice
 
-	//set timeslice id
-	contract.ID = id
-	//marshal contract
-	if bytes, err = json.Marshal(&contract); err != nil {
-		return
+	bytes, err := json.Marshal(&data.Contract{
+		ID: id,
+	})
+	if err != nil {
+		return data.TimeSlice{}, err
 	}
-	//create uri
-	uri := fmt.Sprintf(URIf, r.address, r.port, data.RouteTimeSliceRead)
-	//execute request and get response
-	if response, err = doRequest(uri, POST, bytes); err != nil {
-		return
+	uri := fmt.Sprintf(URIf, r.config.Address, r.config.Port, data.RouteTimeSliceRead)
+	if bytes, err = r.doRequest(uri, POST, bytes); err != nil {
+		return data.TimeSlice{}, err
 	}
-	//get bytes from response
-	if bytes, err = ioutil.ReadAll(response.Body); err != nil {
-		return
+	if err = json.Unmarshal(bytes, &timeSlice); err != nil {
+		return data.TimeSlice{}, err
 	}
-	//close the response body
-	response.Body.Close()
-	//attempt to unmarshal json
-	err = json.Unmarshal(bytes, &timeSlice)
-
-	return
+	return timeSlice, nil
 }

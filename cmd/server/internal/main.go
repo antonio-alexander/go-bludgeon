@@ -58,7 +58,7 @@ func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os
 	config.Default(pwd)
 	configFile := filepath.Join(pwd, DefaultConfigPath, DefaultConfigFile)
 	if err := config.Read(configFile); err != nil {
-		logger.Error(errors.Wrap(err, "error attempting to read config"))
+		logger.Error("failed to read config - %v", err)
 		config.FromEnv(pwd, envs)
 	}
 	meta, err := getMeta(config)
@@ -71,8 +71,6 @@ func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os
 		return err
 	}
 	<-chSignalInt
-	if err := server.Stop(); err != nil {
-		return err
-	}
+	server.Stop()
 	return nil
 }

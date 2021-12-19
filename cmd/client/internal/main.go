@@ -1,81 +1,98 @@
 package client
 
 import (
-	"fmt"
+	"encoding/json"
 	"strings"
 	"time"
 
 	client "github.com/antonio-alexander/go-bludgeon/client"
-	clientcli "github.com/antonio-alexander/go-bludgeon/client/cli"
-	clientrest "github.com/antonio-alexander/go-bludgeon/client/rest"
+	cli "github.com/antonio-alexander/go-bludgeon/client/cli"
+	rest "github.com/antonio-alexander/go-bludgeon/client/rest"
 	data "github.com/antonio-alexander/go-bludgeon/data"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 	logic "github.com/antonio-alexander/go-bludgeon/logic"
 
 	"github.com/pkg/errors"
 )
 
-func Main(pwd string, args []string, envs map[string]string) (err error) {
-	var options clientcli.Options
-	var cacheFile string
-	var cache Cache
-	var remote logic.Logic
-
-	//
-	config := NewConfiguration()
-	if _, cacheFile, err = Files(pwd, &config); err != nil {
-		return
-	}
-	if options, err = clientcli.Parse(pwd, args, envs); err != nil {
-		return
-	}
-	if cache, err = CacheRead(cacheFile); err != nil {
-		return
-	}
-	if options.Timer.UUID == "" {
-		options.Timer.UUID = cache.TimerID
-	}
-	if err = config.Read("", pwd, envs); err != nil {
-		return
-	}
-	switch config.Client.Type {
-	default:
-		return errors.Errorf("Unsupported client: %s", config.Client.Type)
-	case client.TypeRest:
-		remote = clientrest.New(config.Client.Rest.Address, config.Client.Rest.Port)
-	}
+func execute(client logic.Logic, options cli.Options, logger data.Logger) (err error) {
 	switch options.ObjectType {
 	default:
-		return errors.Errorf("Unsupported object: %s", options.ObjectType)
+		return errors.Errorf("unsupported object: %s", options.ObjectType)
 	case data.ObjectTypeTimer:
 		var timer data.Timer
 
 		switch strings.ToLower(options.Command) {
 		default:
-			err = errors.Errorf("Unsupported command: %s", options.Command)
+			return errors.Errorf("unsupported command: %s", options.Command)
 		case "create":
-			timer, err = remote.TimerCreate()
+			if timer, err = client.TimerCreate(); err != nil {
+				return
+			}
 		case "read":
-			timer, err = remote.TimerRead(options.Timer.UUID)
+			if timer, err = client.TimerRead(options.Timer.UUID); err != nil {
+				return
+			}
 		case "update":
-			timer, err = remote.TimerUpdate(options.Timer)
+			if timer, err = client.TimerUpdate(options.Timer); err != nil {
+				return
+			}
 		case "delete":
-			err = remote.TimerDelete(options.Timer.UUID)
+			return client.TimerDelete(options.Timer.UUID)
 		case "start":
-			timer, err = remote.TimerStart(options.Timer.UUID, time.Unix(0, options.Timer.Start))
+			if timer, err = client.TimerStart(options.Timer.UUID, time.Unix(0, options.Timer.Start)); err != nil {
+				return
+			}
 		case "pause":
 			//REVIEW: i don't think this works
-			timer, err = remote.TimerPause(options.Timer.UUID, time.Unix(0, options.Timer.Finish))
+			if timer, err = client.TimerPause(options.Timer.UUID, time.Unix(0, options.Timer.Finish)); err != nil {
+				return
+			}
 		case "submit":
-			timer, err = remote.TimerSubmit(options.Timer.UUID, time.Unix(0, options.Timer.Finish))
-		}
-		if err == nil {
-			switch strings.ToLower(options.Command) {
-			default:
-				fmt.Println(timer)
-			case "delete":
+			if timer, err = client.TimerSubmit(options.Timer.UUID, time.Unix(0, options.Timer.Finish)); err != nil {
+				return
 			}
 		}
+		bytes, _ := json.MarshalIndent(&timer, "", " ")
+		logger.Info("timer %s", string(bytes))
 	}
 
 	return
+}
+
+func getClient(config *Configuration) (logic.Logic, error) {
+	switch config.Client.Type {
+	default:
+		return nil, errors.Errorf("Unsupported client: %s", config.Client.Type)
+	case client.TypeRest:
+		return rest.New(*config.Client.Rest), nil
+	}
+}
+
+func Main(pwd string, args []string, envs map[string]string) error {
+	logger := logger.New("bludgeon-client")
+	options, err := cli.Parse(pwd, args, envs)
+	if err != nil {
+		return err
+	}
+	configPath, cacheFile, err := Files(pwd)
+	if err != nil {
+		return err
+	}
+	cache := &cache{}
+	if err := cache.Read(cacheFile); err != nil {
+		return err
+	}
+	if options.Timer.UUID == "" {
+		options.Timer.UUID = cache.TimerID
+	}
+	config := NewConfiguration()
+	if err = config.Read(configPath, pwd, envs); err != nil {
+		return err
+	}
+	client, err := getClient(config)
+	if err != nil {
+		return err
+	}
+	return execute(client, options, logger)
 }

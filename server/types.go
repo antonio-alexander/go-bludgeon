@@ -29,5 +29,5 @@ func AtoType(s string) Type {
 }
 
 type Owner interface {
-	Stop() (err error)
+	Stop()
 }

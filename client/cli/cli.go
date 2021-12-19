@@ -12,7 +12,7 @@ func Parse(pwd string, args []string, envs map[string]string) (o Options, err er
 	var objectType, remoteType, metaType string
 
 	//create the flagset
-	flagSet := flag.NewFlagSet("bludgeon", flag.ExitOnError)
+	flagSet := flag.NewFlagSet("bludgeon-client", flag.ExitOnError)
 	//options
 	flagSet.StringVar(&o.Command, ArgCommand, DefaultCommand, UsageCommand)
 	flagSet.StringVar(&objectType, ArgObjectType, DefaultObjectType, UsageObjectType)
