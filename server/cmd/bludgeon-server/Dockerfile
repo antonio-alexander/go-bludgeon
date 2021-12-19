@@ -37,8 +37,12 @@ RUN apk add jq
 
 RUN \
     VERSION=`cat /go/src/go-bludgeon/server/version.json | jq '.Version' | sed 's/"//g'` \
-    && cd cmd \
-    && env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux go build -ldflags "-X github.com/antonio-alexander/go-bludgeon/server/cmd/internal.Version=${VERSION} -X github.com/antonio-alexander/go-bludgeon/server/cmd/internal.GitCommit=${GIT_COMMIT} -X github.com/antonio-alexander/go-bludgeon/server/cmd/internal.GitBranch=${GIT_BRANCH}" -o bludgeon-server \
+    && cd cmd/bludgeon-server \
+    && env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux go build -ldflags \
+    "-X github.com/antonio-alexander/go-bludgeon/server/cmd/internal.Version=${VERSION} \
+    -X github.com/antonio-alexander/go-bludgeon/server/cmd/internal.GitCommit=${GIT_COMMIT} \
+    -X github.com/antonio-alexander/go-bludgeon/server/cmd/internal.GitBranch=${GIT_BRANCH}" \
+    -o bludgeon-server \
     && chmod +X bludgeon-server \
     && tar -czvf bludgeon-server.tar.gz ./bludgeon-server
 
@@ -49,8 +53,8 @@ ARG GIT_COMMIT
 
 WORKDIR /app
 
-COPY --from=build /go/src/go-bludgeon/server/cmd/bludgeon-server.tar.gz /app/bludgeon-server.tar.gz
-COPY --from=build /go/src/go-bludgeon/server/cmd/config/bludgeon_server_config-default.json /app/config/bludgeon_server_config-default.json
+COPY --from=build /go/src/go-bludgeon/server/cmd/bludgeon-server/bludgeon-server.tar.gz /app/bludgeon-server.tar.gz
+COPY --from=build /go/src/go-bludgeon/server/cmd/bludgeon-server/config/bludgeon_server_config-default.json /app/config/bludgeon_server_config-default.json
 
 LABEL antonio-alexander.git.branch=${GIT_BRANCH}
 LABEL antonio-alexander.git.commit=${GIT_COMMIT}

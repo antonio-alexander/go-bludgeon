@@ -43,3 +43,17 @@ services:
       BLUDGEON_REST_ADDRESS: "0.0.0.0"
       BLUDGEON_REST_PORT: "8080"
       BLUDGEON_META_FILE: "data/bludgeon.json"
+
+  bludgeon-client:
+    container_name: "bludgeon-client"
+    hostname: "bludgeon-client"
+    image: ghcr.io/antonio-alexander/bludgeon-client:latest
+    depends_on:
+      bludgeon-server:
+        condition: service_started
+    build:
+      context: ./
+      dockerfile: ./cmd/bludgeon-client/Dockerfile
+    command: "tail /dev/null -f"
+    environment:
+      BLUDGEON_META_FILE: "data/bludgeon.json"

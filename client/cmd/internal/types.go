@@ -9,9 +9,9 @@ import (
 // to find where the variables are...
 //  go tool nm ./app | grep app
 var (
-	Version   string
-	GitCommit string
-	GitBranch string
+	Version   string = "<version>"
+	GitCommit string = "<commit>"
+	GitBranch string = "<branch>"
 )
 
 //SerializedData

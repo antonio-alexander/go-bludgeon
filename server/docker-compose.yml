@@ -30,7 +30,7 @@ services:
     restart: "always"
     build:
       context: ./
-      dockerfile: ./cmd/Dockerfile
+      dockerfile: ./cmd/bludgeon-server/Dockerfile
     ports:
       - "8080:8080"
     environment:
