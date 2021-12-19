@@ -1,9 +1,15 @@
+github.com/antonio-alexander/go-bludgeon/data v0.0.0-20211219073027-c8df4e76fd42/go.mod h1:tSxdjkkBnHslaKOAtA52CPe4+WLbH/SWdC/MpmOmBPM=
+github.com/antonio-alexander/go-bludgeon/data v1.0.0 h1:gkvLdsq25WXci33FMnUQm7zwRX0bqO4oBULgp1ATsGg=
+github.com/antonio-alexander/go-bludgeon/data v1.0.0/go.mod h1:tSxdjkkBnHslaKOAtA52CPe4+WLbH/SWdC/MpmOmBPM=
+github.com/antonio-alexander/go-bludgeon/internal v1.0.0 h1:pQ1mHRV+xTwFqXwcSGUcseoJB/TfNy0iwmMcAobB/MM=
+github.com/antonio-alexander/go-bludgeon/internal v1.0.0/go.mod h1:YagjdpjF6zVtM7N8kUcQEwWfQdZp8FKrfqf7dXrNKH0=
+github.com/antonio-alexander/go-bludgeon/meta v1.0.0 h1:81mVmfiAac0W/0ekwgK90K8zzk6J3ZpnYZl/rgDql7A=
+github.com/antonio-alexander/go-bludgeon/meta v1.0.0/go.mod h1:7ZNg6KlNsj95cbwLg/Rpnm8E+ahzBYpYKOBFOncAJpo=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/go-sql-driver/mysql v1.6.0/go.mod h1:DCzpHaOWr8IXmIStZouvnhqoel9Qv2LBy8hT2VhHyBg=
 github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
 github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
