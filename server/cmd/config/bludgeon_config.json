@@ -1,0 +1,16 @@
+{
+    "MetaType": "invalid",
+    "Meta": {
+        "json": {
+            "File": "/app/data/bludgeon.json"
+        }
+    },
+    "Rest": {
+        "Address": "0.0.0.0",
+        "Port": "8080",
+        "Timeout": 5000000000
+    },
+    "Server": {
+        "TokenWait": 0
+    }
+}

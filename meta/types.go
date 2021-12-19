@@ -31,7 +31,7 @@ const (
 func (m Type) String() string {
 	switch m {
 	case TypeFile:
-		return "json"
+		return "file"
 	case TypeMySQL:
 		return "mysql"
 	default:

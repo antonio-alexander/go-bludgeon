@@ -2,10 +2,9 @@ package main
 
 import (
 	"os"
-	"os/signal"
 	"strings"
 
-	"github.com/antonio-alexander/go-bludgeon/cmd/server/internal"
+	internal "github.com/antonio-alexander/go-bludgeon/client/cmd/internal"
 )
 
 func main() {
@@ -17,11 +16,8 @@ func main() {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	chSignalInt := make(chan os.Signal, 1)
-	signal.Notify(chSignalInt, os.Interrupt)
-	if err := internal.Main(pwd, args, envs, chSignalInt); err != nil {
+	if err := internal.Main(pwd, args, envs); err != nil {
 		os.Stderr.WriteString(err.Error() + "\n")
 		os.Exit(1)
 	}
-	close(chSignalInt)
 }

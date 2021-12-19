@@ -8,7 +8,7 @@ import (
 
 const (
 	ErrFileEmpty string = "file is empty"
-	EnvNameFile  string = "BLUDGEON_META_JSON_FILE"
+	EnvNameFile  string = "BLUDGEON_META_FILE"
 	DefaultFile  string = "data/bludgeon.json"
 )
 

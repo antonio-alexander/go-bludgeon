@@ -1,0 +1,126 @@
+{
+ "Timers": {
+  "1f8eb080-1e04-4698-9498-0efdec949ddf": {
+   "UUID": "8878d30a-649c-4b60-852c-36ca8e71c92e",
+   "ActiveSliceUUID": "",
+   "Comment": "",
+   "Start": 0,
+   "Finish": 0,
+   "ElapsedTime": 0,
+   "Completed": false,
+   "Archived": false,
+   "Billed": false,
+   "EmployeeID": 0
+  },
+  "33757e36-0a1c-4098-8fe4-2b9ddd40841f": {
+   "UUID": "33757e36-0a1c-4098-8fe4-2b9ddd40841f",
+   "ActiveSliceUUID": "",
+   "Comment": "",
+   "Start": 0,
+   "Finish": 0,
+   "ElapsedTime": 0,
+   "Completed": false,
+   "Archived": false,
+   "Billed": false,
+   "EmployeeID": 0
+  },
+  "59cf61ec-7aad-4e1f-adc7-e77dd9458f32": {
+   "UUID": "8878d30a-649c-4b60-852c-36ca8e71c92e",
+   "ActiveSliceUUID": "",
+   "Comment": "",
+   "Start": 0,
+   "Finish": 0,
+   "ElapsedTime": 0,
+   "Completed": false,
+   "Archived": false,
+   "Billed": false,
+   "EmployeeID": 0
+  },
+  "7ec783d8-e808-4f2f-b7bc-40ea0e3d0fbb": {
+   "UUID": "8878d30a-649c-4b60-852c-36ca8e71c92e",
+   "ActiveSliceUUID": "",
+   "Comment": "",
+   "Start": 0,
+   "Finish": 0,
+   "ElapsedTime": 0,
+   "Completed": false,
+   "Archived": false,
+   "Billed": false,
+   "EmployeeID": 0
+  },
+  "8878d30a-649c-4b60-852c-36ca8e71c92e": {
+   "UUID": "8878d30a-649c-4b60-852c-36ca8e71c92e",
+   "ActiveSliceUUID": "",
+   "Comment": "",
+   "Start": 0,
+   "Finish": 0,
+   "ElapsedTime": 0,
+   "Completed": false,
+   "Archived": false,
+   "Billed": false,
+   "EmployeeID": 0
+  },
+  "ada18512-7270-409d-8eaf-c7657850508a": {
+   "UUID": "8878d30a-649c-4b60-852c-36ca8e71c92e",
+   "ActiveSliceUUID": "",
+   "Comment": "",
+   "Start": 0,
+   "Finish": 0,
+   "ElapsedTime": 0,
+   "Completed": false,
+   "Archived": false,
+   "Billed": false,
+   "EmployeeID": 0
+  },
+  "c41a5432-c258-48ae-ac32-c870a0d158dd": {
+   "UUID": "8878d30a-649c-4b60-852c-36ca8e71c92e",
+   "ActiveSliceUUID": "",
+   "Comment": "",
+   "Start": 0,
+   "Finish": 0,
+   "ElapsedTime": 0,
+   "Completed": false,
+   "Archived": false,
+   "Billed": false,
+   "EmployeeID": 0
+  },
+  "df9847a8-87c1-4456-9e65-9101b46064fa": {
+   "UUID": "8878d30a-649c-4b60-852c-36ca8e71c92e",
+   "ActiveSliceUUID": "",
+   "Comment": "",
+   "Start": 0,
+   "Finish": 0,
+   "ElapsedTime": 0,
+   "Completed": false,
+   "Archived": false,
+   "Billed": false,
+   "EmployeeID": 0
+  }
+ },
+ "TimeSlices": {
+  "": {
+   "UUID": "5d8c135f-d580-4951-a04d-ec30731cbf50",
+   "TimerUUID": "1f8eb080-1e04-4698-9498-0efdec949ddf",
+   "Start": 1639872593073050000,
+   "Finish": 1639872594075571000,
+   "ElapsedTime": 1002521000,
+   "Archived": true
+  },
+  "3449c8c9-4ce4-4f21-88d9-19b43aa7fda7": {
+   "UUID": "5d8c135f-d580-4951-a04d-ec30731cbf50",
+   "TimerUUID": "1f8eb080-1e04-4698-9498-0efdec949ddf",
+   "Start": 1639872593073050000,
+   "Finish": 1639872594075571000,
+   "ElapsedTime": 1002521000,
+   "Archived": true
+  },
+  "5d8c135f-d580-4951-a04d-ec30731cbf50": {
+   "UUID": "5d8c135f-d580-4951-a04d-ec30731cbf50",
+   "TimerUUID": "1f8eb080-1e04-4698-9498-0efdec949ddf",
+   "Start": 1639872593073050000,
+   "Finish": 1639872594075571000,
+   "ElapsedTime": 1002521000,
+   "Archived": true
+  }
+ }
+}

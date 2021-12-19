@@ -1,10 +1,36 @@
 package logic
 
 import (
+	"strings"
 	"time"
 
 	data "github.com/antonio-alexander/go-bludgeon/data"
 )
+
+type Type string
+
+const (
+	TypeInvalid Type = "invalid"
+	TypeSimple  Type = "simple"
+)
+
+func (t Type) String() string {
+	switch t {
+	case TypeSimple:
+		return "simple"
+	default:
+		return "invalid"
+	}
+}
+
+func AtoType(s string) Type {
+	switch strings.ToLower(s) {
+	default:
+		return TypeInvalid
+	case "simple":
+		return TypeSimple
+	}
+}
 
 type Functional interface {
 	Start() (err error)

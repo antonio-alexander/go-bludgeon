@@ -4,9 +4,10 @@ import (
 	"os"
 	"path/filepath"
 
-	data "github.com/antonio-alexander/go-bludgeon/data"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	logic "github.com/antonio-alexander/go-bludgeon/logic"
+	logger_simple "github.com/antonio-alexander/go-bludgeon/internal/logger/simple"
+	logic "github.com/antonio-alexander/go-bludgeon/internal/logic"
+	logic_simple "github.com/antonio-alexander/go-bludgeon/internal/logic/simple"
 	meta "github.com/antonio-alexander/go-bludgeon/meta"
 	metafile "github.com/antonio-alexander/go-bludgeon/meta/file"
 	metamysql "github.com/antonio-alexander/go-bludgeon/meta/mysql"
@@ -39,7 +40,23 @@ func getMeta(config *Configuration) (interface {
 	}
 }
 
-func getServer(config *Configuration, logic logic.Logic, logger data.Logger) (server.Owner, error) {
+func getLogic(config *Configuration, logger logger.Logger) (interface {
+	logic.Logic
+	logic.Functional
+}, error) {
+	switch v := config.Server.Type; v {
+	default:
+		return nil, errors.Errorf("unsupported server: %s", v)
+	case server.Type(logic.TypeSimple):
+		logic := logic_simple.New(logger)
+		if err := logic.Start(); err != nil {
+			return nil, err
+		}
+		return logic, nil
+	}
+}
+
+func getServer(config *Configuration, logic logic.Logic, logger logger.Logger) (server.Owner, error) {
 	switch v := config.Server.Type; v {
 	default:
 		return nil, errors.Errorf("unsupported server: %s", v)
@@ -53,7 +70,8 @@ func getServer(config *Configuration, logic logic.Logic, logger data.Logger) (se
 }
 
 func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os.Signal) error {
-	logger := logger.New("bludgeon-server")
+	logger := logger_simple.New("bludgeon-server")
+	logger.Info("version %s (%s@%s)", Version, GitBranch, GitCommit)
 	config := NewConfiguration()
 	config.Default(pwd)
 	configFile := filepath.Join(pwd, DefaultConfigPath, DefaultConfigFile)
@@ -65,7 +83,7 @@ func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os
 	if err != nil {
 		return err
 	}
-	logic := logic.New(logger, meta)
+	logic := logic_simple.New(logger, meta)
 	server, err := getServer(config, logic, logger)
 	if err != nil {
 		return err

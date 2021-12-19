@@ -10,7 +10,8 @@ import (
 	"time"
 
 	data "github.com/antonio-alexander/go-bludgeon/data"
-	logic "github.com/antonio-alexander/go-bludgeon/logic"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	logic "github.com/antonio-alexander/go-bludgeon/internal/logic"
 	server "github.com/antonio-alexander/go-bludgeon/server"
 
 	"github.com/gorilla/mux"
@@ -21,7 +22,7 @@ type restServer struct {
 	sync.RWMutex
 	sync.WaitGroup
 	logic.Logic
-	data.Logger
+	logger.Logger
 	config  Configuration
 	router  *mux.Router
 	server  *http.Server
@@ -29,7 +30,7 @@ type restServer struct {
 	started bool
 }
 
-func New(logger data.Logger, logic logic.Logic) interface {
+func New(logger logger.Logger, logic logic.Logic) interface {
 	Owner
 	server.Owner
 	logic.Logic

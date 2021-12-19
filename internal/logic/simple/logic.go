@@ -1,4 +1,4 @@
-package logic
+package simple
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"time"
 
 	data "github.com/antonio-alexander/go-bludgeon/data"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	logic "github.com/antonio-alexander/go-bludgeon/internal/logic"
 	meta "github.com/antonio-alexander/go-bludgeon/meta"
 )
 
@@ -13,10 +15,10 @@ import (
 // indicates that we're doing logic here that should be done within meta (using it's mutex)
 // it may or may not be preferable in the long run to do it that way.
 
-type logic struct {
+type logicSimple struct {
 	sync.WaitGroup
 	sync.RWMutex
-	data.Logger
+	logger.Logger
 	meta.Timer
 	meta.TimeSlice
 	stopper chan struct{}
@@ -24,22 +26,31 @@ type logic struct {
 	started bool
 }
 
-func New(logger data.Logger,
-	meta interface {
-		meta.Timer
-		meta.TimeSlice
-	}) interface {
-	Logic
-	Functional
+func New(parameters ...interface{}) interface {
+	logic.Logic
+	logic.Functional
 } {
-	return &logic{
-		Timer:     meta,
-		TimeSlice: meta,
-		Logger:    logger,
+	l := &logicSimple{}
+	for _, parameter := range parameters {
+		switch p := parameter.(type) {
+		case interface {
+			meta.Timer
+			meta.TimeSlice
+		}:
+			l.Timer = p
+			l.TimeSlice = p
+		case meta.Timer:
+			l.Timer = p
+		case meta.TimeSlice:
+			l.TimeSlice = p
+		case logger.Logger:
+			l.Logger = p
+		}
 	}
+	return l
 }
 
-func (l *logic) Start() (err error) {
+func (l *logicSimple) Start() (err error) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -54,7 +65,7 @@ func (l *logic) Start() (err error) {
 	return
 }
 
-func (l *logic) Stop() (err error) {
+func (l *logicSimple) Stop() (err error) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -68,7 +79,7 @@ func (l *logic) Stop() (err error) {
 	return
 }
 
-func (l *logic) launchCache() {
+func (l *logicSimple) launchCache() {
 	//create channel to block until go routine enters business logic
 	started := make(chan struct{})
 	//launch go Routine
@@ -99,7 +110,7 @@ func (l *logic) launchCache() {
 	<-started
 }
 
-func (l *logic) TimerCreate() (timer data.Timer, err error) {
+func (l *logicSimple) TimerCreate() (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -114,7 +125,7 @@ func (l *logic) TimerCreate() (timer data.Timer, err error) {
 	return
 }
 
-func (l *logic) TimerRead(id string) (timer data.Timer, err error) {
+func (l *logicSimple) TimerRead(id string) (timer data.Timer, err error) {
 	l.RLock()
 	defer l.RUnlock()
 
@@ -134,7 +145,7 @@ func (l *logic) TimerRead(id string) (timer data.Timer, err error) {
 	return
 }
 
-func (l *logic) TimerUpdate(t data.Timer) (timer data.Timer, err error) {
+func (l *logicSimple) TimerUpdate(t data.Timer) (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -154,7 +165,7 @@ func (l *logic) TimerUpdate(t data.Timer) (timer data.Timer, err error) {
 	return
 }
 
-func (l *logic) TimerDelete(timerID string) (err error) {
+func (l *logicSimple) TimerDelete(timerID string) (err error) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -166,7 +177,7 @@ func (l *logic) TimerDelete(timerID string) (err error) {
 	return
 }
 
-func (l *logic) TimerStart(id string, startTime time.Time) (timer data.Timer, err error) {
+func (l *logicSimple) TimerStart(id string, startTime time.Time) (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -211,7 +222,7 @@ func (l *logic) TimerStart(id string, startTime time.Time) (timer data.Timer, er
 	return
 }
 
-func (l *logic) TimerPause(timerID string, pauseTime time.Time) (timer data.Timer, err error) {
+func (l *logicSimple) TimerPause(timerID string, pauseTime time.Time) (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -250,7 +261,7 @@ func (l *logic) TimerPause(timerID string, pauseTime time.Time) (timer data.Time
 	return
 }
 
-func (l *logic) TimerSubmit(timerID string, submitTime time.Time) (timer data.Timer, err error) {
+func (l *logicSimple) TimerSubmit(timerID string, submitTime time.Time) (timer data.Timer, err error) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -287,7 +298,7 @@ func (l *logic) TimerSubmit(timerID string, submitTime time.Time) (timer data.Ti
 	return
 }
 
-func (l *logic) TimeSliceRead(timeSliceID string) (timeSlice data.TimeSlice, err error) {
+func (l *logicSimple) TimeSliceRead(timeSliceID string) (timeSlice data.TimeSlice, err error) {
 	l.RLock()
 	defer l.RUnlock()
 

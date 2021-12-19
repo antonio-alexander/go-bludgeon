@@ -10,12 +10,13 @@ import (
 	rest "github.com/antonio-alexander/go-bludgeon/client/rest"
 	data "github.com/antonio-alexander/go-bludgeon/data"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	logic "github.com/antonio-alexander/go-bludgeon/logic"
+	logger_simple "github.com/antonio-alexander/go-bludgeon/internal/logger/simple"
+	logic "github.com/antonio-alexander/go-bludgeon/internal/logic"
 
 	"github.com/pkg/errors"
 )
 
-func execute(client logic.Logic, options cli.Options, logger data.Logger) (err error) {
+func execute(client logic.Logic, options cli.Options, logger logger.Logger) (err error) {
 	switch options.ObjectType {
 	default:
 		return errors.Errorf("unsupported object: %s", options.ObjectType)
@@ -70,7 +71,8 @@ func getClient(config *Configuration) (logic.Logic, error) {
 }
 
 func Main(pwd string, args []string, envs map[string]string) error {
-	logger := logger.New("bludgeon-client")
+	logger := logger_simple.New("bludgeon-client")
+	logger.Info("version %s (%s@%s)", Version, GitBranch, GitCommit)
 	options, err := cli.Parse(pwd, args, envs)
 	if err != nil {
 		return err

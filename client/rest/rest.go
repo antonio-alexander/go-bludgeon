@@ -10,7 +10,7 @@ import (
 	"time"
 
 	data "github.com/antonio-alexander/go-bludgeon/data"
-	logic "github.com/antonio-alexander/go-bludgeon/logic"
+	logic "github.com/antonio-alexander/go-bludgeon/internal/logic"
 )
 
 type rest struct {
