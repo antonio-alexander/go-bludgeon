@@ -11,8 +11,12 @@
 # The GOOS will always be linux, but in case you were curious
 # 
 # Sample docker build commands:
-#  docker build -f ./server/cmd/Dockerfile . -t ghcr.io/antonio-alexander/bludgeon-server:amd64_latest --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$GITHUB_REF --build-arg PLATFORM=linux/amd64 --build-arg GO_ARCH=amd64
-#  docker build -f ./server/cmd/Dockerfile . -t ghcr.io/antonio-alexander/bludgeon-server:armv7_latest --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$GITHUB_REF --build-arg PLATFORM=linux/arm/v7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
+#  docker build -f ./server/cmd/Dockerfile . -t ghcr.io/antonio-alexander/bludgeon-server:amd64_latest \
+#    --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$GITHUB_REF --build-arg PLATFORM=linux/amd64 \
+#    --build-arg GO_ARCH=amd64
+#  docker build -f ./server/cmd/Dockerfile . -t ghcr.io/antonio-alexander/bludgeon-server:armv7_latest \
+#    --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$GITHUB_REF --build-arg PLATFORM=linux/arm/v7
+#    --build-arg GO_ARCH=arm --build-arg GO_ARM=7
 #
 #---------------------------------------------------------------------------------------------------
 

@@ -2,22 +2,16 @@ package rest
 
 import (
 	"net/http"
-	"time"
 )
 
 //endpoint constants
 const (
-	GET                    string        = http.MethodGet
-	PUT                    string        = http.MethodPut
-	POST                   string        = http.MethodPost
-	DELETE                 string        = http.MethodDelete
-	ErrStarted             string        = "rest server started"
-	ErrNotStarted          string        = "rest server not started"
-	DefaultShutdownTimeout time.Duration = 10 * time.Second
-)
-
-var (
-	ConfigShutdownTimeout = DefaultShutdownTimeout
+	GET           string = http.MethodGet
+	PUT           string = http.MethodPut
+	POST          string = http.MethodPost
+	DELETE        string = http.MethodDelete
+	ErrStarted    string = "already started"
+	ErrNotStarted string = "not started"
 )
 
 type handleFuncConfig struct {

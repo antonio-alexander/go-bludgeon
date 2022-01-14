@@ -5,14 +5,15 @@ import (
 	"path/filepath"
 
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	logger_simple "github.com/antonio-alexander/go-bludgeon/internal/logger/simple"
 	logic "github.com/antonio-alexander/go-bludgeon/internal/logic"
-	logic_simple "github.com/antonio-alexander/go-bludgeon/internal/logic/simple"
 	meta "github.com/antonio-alexander/go-bludgeon/meta"
-	metafile "github.com/antonio-alexander/go-bludgeon/meta/file"
-	metamysql "github.com/antonio-alexander/go-bludgeon/meta/mysql"
 	server "github.com/antonio-alexander/go-bludgeon/server"
-	serverrest "github.com/antonio-alexander/go-bludgeon/server/rest"
+
+	logger_simple "github.com/antonio-alexander/go-bludgeon/internal/logger/simple"
+	logic_simple "github.com/antonio-alexander/go-bludgeon/internal/logic/simple"
+	meta_file "github.com/antonio-alexander/go-bludgeon/meta/file"
+	meta_mysql "github.com/antonio-alexander/go-bludgeon/meta/mysql"
+	server_rest "github.com/antonio-alexander/go-bludgeon/server/rest"
 
 	"github.com/pkg/errors"
 )
@@ -26,13 +27,13 @@ func getMeta(config *Configuration) (interface {
 	default:
 		return nil, errors.Errorf("unsupported meta: %s", v)
 	case meta.TypeFile:
-		meta := metafile.New()
+		meta := meta_file.New()
 		if err := meta.Initialize(config.Meta.File); err != nil {
 			return nil, err
 		}
 		return meta, nil
 	case meta.TypeMySQL:
-		meta := metamysql.New()
+		meta := meta_mysql.New()
 		if err := meta.Initialize(config.Meta.Mysql); err != nil {
 			return nil, err
 		}
@@ -40,7 +41,10 @@ func getMeta(config *Configuration) (interface {
 	}
 }
 
-func getLogic(config *Configuration, logger logger.Logger) (interface {
+func getLogic(config *Configuration, logger logger.Logger, meta interface {
+	meta.Timer
+	meta.TimeSlice
+}) (interface {
 	logic.Logic
 	logic.Functional
 }, error) {
@@ -48,7 +52,7 @@ func getLogic(config *Configuration, logger logger.Logger) (interface {
 	default:
 		return nil, errors.Errorf("unsupported server: %s", v)
 	case server.Type(logic.TypeSimple):
-		logic := logic_simple.New(logger)
+		logic := logic_simple.New(logger, meta)
 		if err := logic.Start(); err != nil {
 			return nil, err
 		}
@@ -61,7 +65,7 @@ func getServer(config *Configuration, logic logic.Logic, logger logger.Logger) (
 	default:
 		return nil, errors.Errorf("unsupported server: %s", v)
 	case server.TypeREST:
-		server := serverrest.New(logger, logic)
+		server := server_rest.New(logger, logic)
 		if err := server.Start(config.Server.Rest); err != nil {
 			return nil, err
 		}
@@ -83,7 +87,10 @@ func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os
 	if err != nil {
 		return err
 	}
-	logic := logic_simple.New(logger, meta)
+	logic, err := getLogic(config, logger, meta)
+	if err != nil {
+		return err
+	}
 	server, err := getServer(config, logic, logger)
 	if err != nil {
 		return err

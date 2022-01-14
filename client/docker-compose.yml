@@ -57,3 +57,6 @@ services:
     command: "tail /dev/null -f"
     environment:
       BLUDGEON_META_FILE: "data/bludgeon.json"
+    volumes:
+      - ./cmd/bludgeon-client/config:/app/config
+      - ./cmd/bludgeon-client/data:/app/data

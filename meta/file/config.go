@@ -13,7 +13,7 @@ const (
 )
 
 type Configuration struct {
-	File string
+	File string `json:"file"`
 }
 
 func (c *Configuration) Default(pwd string) {

@@ -28,6 +28,7 @@ const (
 	ErrBadTaskID           string = "taskID is invalid or missing"
 	ErrBadClientID         string = "clientID is invalid or missing"
 	ErrBadTimerID          string = "timerID is invalid or missing"
+	ErrBadTimeSliceID      string = "timeSlice is invalid or missing"
 	ErrBadUnitID           string = "unitID is invalid or missing"
 	ErrBadEmployeeIDTaskID string = "employeeID and/or TaskID is invalid or mising"
 	ErrBadClientIDUnitID   string = "clientID and/or UnitID is invalid or missing"

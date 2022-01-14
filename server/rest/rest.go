@@ -290,10 +290,10 @@ func (s *restServer) Stop() {
 	if !s.started {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), ConfigShutdownTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout)
 	defer cancel()
 	if err := s.server.Shutdown(ctx); err != nil {
-		s.Error("shutting down - %s", err)
+		s.Error("stopping - %s", err)
 	}
 	close(s.stopper)
 	s.Wait()

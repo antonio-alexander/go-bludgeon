@@ -1,0 +1,13 @@
+#binaries
+blugeon-client
+bludgeon-client.exe
+
+#configuration
+!./config/.gitkeep
+
+#data
+!./file/data/.gitkeep
+*.json
+
+# Dependency directories (remove the comment below to include it)
+# vendor/

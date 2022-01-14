@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -86,6 +87,9 @@ func (m *memory) TimerDelete(timerID string) (err error) {
 	m.Lock()
 	defer m.Unlock()
 
+	if _, ok := m.timers[timerID]; !ok {
+		return errors.New(data.ErrBadTimerID)
+	}
 	delete(m.timers, timerID)
 	return
 }
@@ -116,6 +120,9 @@ func (m *memory) TimeSliceDelete(timeSliceID string) error {
 	m.Lock()
 	defer m.Unlock()
 
+	if _, ok := m.timeSlices[timeSliceID]; !ok {
+		return errors.New(data.ErrBadTimerID)
+	}
 	delete(m.timeSlices, timeSliceID)
 	return nil
 }

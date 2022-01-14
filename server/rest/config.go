@@ -7,53 +7,55 @@ import (
 	"github.com/pkg/errors"
 )
 
-//errors
 const (
-	ErrAddressEmpty string = "Address is empty"
-	ErrPortEmpty    string = "Port is empty"
-	ErrPortBadf     string = "Port is a non-integer: %s"
-	ErrTimeoutBadf  string = "Timeout is lte to 0: %v"
-)
-
-//environmental variables
-const (
-	EnvNameRestAddress string = "BLUDGEON_REST_ADDRESS"
-	EnvNameRestPort    string = "BLUDGEON_REST_PORT"
-	EnvNameRestTimeout string = "BLUDGEON_REST_TIMEOUT"
-)
-
-//defaults
-const (
-	DefaultAddress string        = "127.0.0.1"
-	DefaultPort    string        = "8080"
-	DefaultTimeout time.Duration = 5 * time.Second
+	ErrAddressEmpty        string        = "address is empty"
+	ErrPortEmpty           string        = "port is empty"
+	ErrPortBadf            string        = "port is a non-integer: %s"
+	ErrTimeoutBadf         string        = "timeout is lte to 0: %v"
+	EnvNameAddress         string        = "BLUDGEON_REST_ADDRESS"
+	EnvNamePort            string        = "BLUDGEON_REST_PORT"
+	EnvNameTimeout         string        = "BLUDGEON_REST_TIMEOUT"
+	EnvNameShutdownTimeout string        = "BLUDGEON_REST_SHUTDOWN_TIMEOUT"
+	DefaultAddress         string        = "127.0.0.1"
+	DefaultPort            string        = "8080"
+	DefaultTimeout         time.Duration = 5 * time.Second
+	DefaultShutdownTimeout time.Duration = 10 * time.Second
 )
 
 type Configuration struct {
-	Address string        `json:"Address"`
-	Port    string        `json:"Port"`
-	Timeout time.Duration `json:"Timeout"`
+	Address         string        `json:"address"`
+	Port            string        `json:"port"`
+	Timeout         time.Duration `json:"timeout"`
+	ShutdownTimeout time.Duration `json:"shutdown_timeout"`
 }
 
 func (r *Configuration) Default() {
 	r.Address = DefaultAddress
 	r.Port = DefaultPort
 	r.Timeout = DefaultTimeout
+	r.ShutdownTimeout = DefaultShutdownTimeout
 }
 
 func (r *Configuration) FromEnv(pwd string, envs map[string]string) {
 	//Get the address from the environment, then the port
 	// then the timeout
-	if address, ok := envs[EnvNameRestAddress]; ok {
+	if address, ok := envs[EnvNameAddress]; ok {
 		r.Address = address
 	}
-	if port, ok := envs[EnvNameRestPort]; ok {
+	if port, ok := envs[EnvNamePort]; ok {
 		r.Port = port
 	}
-	if timeoutString, ok := envs[EnvNameRestTimeout]; ok {
+	if timeoutString, ok := envs[EnvNameTimeout]; ok {
 		if timeoutInt, err := strconv.Atoi(timeoutString); err == nil {
 			if timeout := time.Duration(timeoutInt) * time.Second; timeout > 0 {
 				r.Timeout = timeout
+			}
+		}
+	}
+	if shutdownTimeoutString, ok := envs[EnvNameShutdownTimeout]; ok {
+		if shutdownTimeoutInt, err := strconv.Atoi(shutdownTimeoutString); err == nil {
+			if timeout := time.Duration(shutdownTimeoutInt) * time.Second; timeout > 0 {
+				r.ShutdownTimeout = timeout
 			}
 		}
 	}
@@ -65,22 +67,16 @@ func (r *Configuration) Validate() (err error) {
 	// that the port is an integer, finally
 	// check if the timeout is lte 0
 	if r.Address == "" {
-		err = errors.New(ErrAddressEmpty)
-
-		return
+		return errors.New(ErrAddressEmpty)
 	}
 	if r.Port == "" {
-		err = errors.New(ErrPortEmpty)
-
-		return
+		return errors.New(ErrPortEmpty)
 	}
 	if _, e := strconv.Atoi(r.Port); e != nil {
-		err = errors.Errorf(ErrPortBadf, r.Port)
-
-		return
+		return errors.Errorf(ErrPortBadf, r.Port)
 	}
 	if r.Timeout <= 0 {
-		err = errors.Errorf(ErrTimeoutBadf, r.Timeout)
+		return errors.Errorf(ErrTimeoutBadf, r.Timeout)
 	}
 
 	return

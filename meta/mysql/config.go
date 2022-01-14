@@ -19,15 +19,15 @@ const (
 
 //Configuration is a struct that contains al lthe possible configuration for supported database drivers
 type Configuration struct {
-	Hostname       string        `json:"Hostname"`       //hostame to user to access the database
-	Port           string        `json:"Port"`           //port to connect to
-	Username       string        `json:"Username"`       //username to authenticate with
-	Password       string        `json:"Password"`       //password to authenticate with
-	Database       string        `json:"Database"`       //database to connect to
-	ConnectTimeout time.Duration `json:"ConnectTimeout"` //how long to wait to connect
-	QueryTimeout   time.Duration `json:"QueryTimeout"`   //how long to wait when querying
-	ParseTime      bool          `json:"ParseTime"`      //whether or not to parse time
-	// Driver         string        `json:"Driver"`         //what driver to use
+	Hostname       string        `json:"hostname"`        //hostame to user to access the database
+	Port           string        `json:"port"`            //port to connect to
+	Username       string        `json:"username"`        //username to authenticate with
+	Password       string        `json:"password"`        //password to authenticate with
+	Database       string        `json:"database"`        //database to connect to
+	ConnectTimeout time.Duration `json:"connect_timeout"` //how long to wait to connect
+	QueryTimeout   time.Duration `json:"query_timeout"`   //how long to wait when querying
+	ParseTime      bool          `json:"parse_time"`      //whether or not to parse time
+	// Driver         string        `json:"driver"`         //what driver to use
 }
 
 //Validate is used to ensure that the values being configured make sense

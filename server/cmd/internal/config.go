@@ -6,50 +6,51 @@ import (
 	"io/ioutil"
 
 	meta "github.com/antonio-alexander/go-bludgeon/meta"
-	metafile "github.com/antonio-alexander/go-bludgeon/meta/file"
-	metamysql "github.com/antonio-alexander/go-bludgeon/meta/mysql"
 	server "github.com/antonio-alexander/go-bludgeon/server"
-	serverrest "github.com/antonio-alexander/go-bludgeon/server/rest"
+
+	meta_file "github.com/antonio-alexander/go-bludgeon/meta/file"
+	meta_mysql "github.com/antonio-alexander/go-bludgeon/meta/mysql"
+	server_rest "github.com/antonio-alexander/go-bludgeon/server/rest"
 
 	"github.com/pkg/errors"
 )
 
 const (
-	EnvNameRemoteType string      = "BLUDGEON_REMOTE_TYPE"
-	EnvNameMetaType   string      = "BLUDGEON_META_TYPE"
 	DefaultConfigFile string      = "bludgeon_server_config.json"
 	DefaultConfigPath string      = "config"
 	DefaultMetaType   meta.Type   = meta.TypeFile
-	ErrMetaTypeEmpty  string      = "meta type empty"
 	DefaultServerType server.Type = server.TypeREST
+	EnvNameRemoteType string      = "BLUDGEON_REMOTE_TYPE"
+	EnvNameMetaType   string      = "BLUDGEON_META_TYPE"
+	ErrMetaTypeEmpty  string      = "meta type empty"
 )
 
 type ConfigurationMeta struct {
-	Type  meta.Type
-	File  *metafile.Configuration
-	Mysql *metamysql.Configuration
+	Type  meta.Type                 `json:"type"`
+	File  *meta_file.Configuration  `json:"file"`
+	Mysql *meta_mysql.Configuration `json:"mysql"`
 }
 
 type ConfigurationServer struct {
-	Type server.Type
-	Rest *serverrest.Configuration
+	Type server.Type                `json:"type"`
+	Rest *server_rest.Configuration `json:"rest"`
 }
 
 type Configuration struct {
-	Meta   ConfigurationMeta
-	Server ConfigurationServer
+	Meta   ConfigurationMeta   `json:"meta"`
+	Server ConfigurationServer `json:"server"`
 }
 
 func NewConfiguration() *Configuration {
 	return &Configuration{
 		Meta: ConfigurationMeta{
 			Type:  "",
-			File:  &metafile.Configuration{},
-			Mysql: &metamysql.Configuration{},
+			File:  &meta_file.Configuration{},
+			Mysql: &meta_mysql.Configuration{},
 		},
 		Server: ConfigurationServer{
 			Type: "",
-			Rest: &serverrest.Configuration{},
+			Rest: &server_rest.Configuration{},
 		},
 	}
 }
@@ -60,9 +61,7 @@ func (c *Configuration) Read(configFile string) (err error) {
 	if bytes, err = ioutil.ReadFile(configFile); err != nil {
 		return
 	}
-	err = json.Unmarshal(bytes, c)
-
-	return
+	return json.Unmarshal(bytes, c)
 }
 
 func (c *Configuration) Write(configFile string) (err error) {
@@ -72,9 +71,7 @@ func (c *Configuration) Write(configFile string) (err error) {
 	if bytes, err = json.MarshalIndent(&c, "", "  "); err != nil {
 		return
 	}
-	err = ioutil.WriteFile(configFile, bytes, fs.FileMode(0644))
-
-	return
+	return ioutil.WriteFile(configFile, bytes, fs.FileMode(0644))
 }
 
 func (c *Configuration) Default(pwd string) {
