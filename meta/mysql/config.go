@@ -6,7 +6,7 @@ import (
 
 //configuration defaults
 const (
-	DefaultHostname       string        = "127.0.0.1"
+	DefaultHostname       string        = "localhost"
 	DefaultPort           string        = "3306"
 	DefaultUsername       string        = "bludgeon"
 	DefaultPassword       string        = "bludgeon"

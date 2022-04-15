@@ -4,97 +4,38 @@ import (
 	"os"
 	"testing"
 
-	file "github.com/antonio-alexander/go-bludgeon/meta/file"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger/simple"
+	metafile "github.com/antonio-alexander/go-bludgeon/meta/file"
 	tests "github.com/antonio-alexander/go-bludgeon/meta/tests"
 
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	validConfig   *file.Configuration
-	defaultConfig *file.Configuration
+	validConfig   *metafile.Configuration
+	defaultConfig *metafile.Configuration
 )
 
 func init() {
 	//TODO: setup variables from environment?
 	pwd, _ := os.Getwd()
-	defaultConfig = &file.Configuration{}
+	defaultConfig = &metafile.Configuration{}
 	defaultConfig.Default(pwd)
-	validConfig = &file.Configuration{
-		File: file.DefaultFile,
+	validConfig = &metafile.Configuration{
+		File: metafile.DefaultFile,
 	}
 }
 
-func TestIntTimerReadWrite(t *testing.T) {
-	//Test:
-	//Notes:
-	//Verification:
-
-	json := file.New()
-	json.Initialize(validConfig)
-	tests.TestIntTimerReadWrite(t, json)
+func TestMetaMemory(t *testing.T) {
+	m := metafile.New(
+		logger.New(),
+	)
+	err := m.Initialize(validConfig)
+	if assert.Nil(t, err) {
+		t.Run("Employee CRUD", tests.TestEmployeeCRUD(m))
+		t.Run("Timer CRUD", tests.TestTimerCRUD(m))
+		t.Run("Timers Read", tests.TestTimersRead(m))
+		t.Run("Timer Logic", tests.TestTimerLogic(m))
+	}
+	m.Shutdown()
 }
-
-func TestIntDelete(t *testing.T) {
-	//Test:
-	//Notes:
-	//Verification:
-
-	json := file.New()
-	json.Initialize(validConfig)
-	tests.TestIntDelete(t, json)
-	err := json.Shutdown()
-	assert.Nil(t, err)
-}
-
-func TestIntSliceReadWrite(t *testing.T) {
-	//Test:
-	//Notes:
-	//Verification:
-
-	json := file.New()
-	json.Initialize(validConfig)
-	tests.TestIntSliceReadWrite(t, json)
-	err := json.Shutdown()
-	assert.Nil(t, err)
-}
-
-func TestIntSliceDelete(t *testing.T) {
-	//Test:
-	//Notes:
-	//Verification:
-
-	json := file.New()
-	json.Initialize(validConfig)
-	tests.TestIntSliceDelete(t, json)
-	err := json.Shutdown()
-	assert.Nil(t, err)
-}
-
-func TestIntSliceTimer(t *testing.T) {
-	//Test:
-	//Notes:
-	//Verification:
-
-	json := file.New()
-	json.Initialize(validConfig)
-	tests.TestIntSliceTimer(t, json)
-	err := json.Shutdown()
-	assert.Nil(t, err)
-}
-
-func TestIntTimerActiveSlice(t *testing.T) {
-	//Test:
-	//Notes:
-	//Verification:
-
-	json := file.New()
-	json.Initialize(validConfig)
-	tests.TestIntTimerActiveSlice(t, json)
-	err := json.Shutdown()
-	assert.Nil(t, err)
-}
-
-//TODO: write test for deleting a timer
-//TODO: write test for calculating elapsed time on
-// an active time slice

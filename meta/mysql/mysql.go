@@ -1,11 +1,15 @@
 package metamysql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/antonio-alexander/go-bludgeon/data"
+	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 	"github.com/antonio-alexander/go-bludgeon/meta"
 
 	"github.com/pkg/errors"
@@ -16,320 +20,540 @@ import (
 type mysql struct {
 	sync.RWMutex                  //mutex for threadsafe functionality
 	sync.WaitGroup                //waitgroup to manage goroutines
+	*sql.DB                       //pointer to the database
+	logger.Logger                 //logger
 	started        bool           //whether or not started
 	config         *Configuration //configuration
 	stopper        chan struct{}  //stopper for go routines
-	*sql.DB                       //pointer to the database
 }
 
-func New() interface {
+func New(parameters ...interface{}) interface {
 	Owner
 	meta.Owner
 	meta.Timer
 	meta.TimeSlice
+	meta.Employee
 } {
-	config := &Configuration{}
-	config.Default()
-	//create internal pointers
-	//create mysql pointer
-	return &mysql{
+	m := &mysql{
 		stopper: make(chan struct{}),
-		config:  config,
 	}
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case logger.Logger:
+			m.Logger = p
+		}
+	}
+	return m
 }
 
-func (m *mysql) Initialize(config *Configuration) (err error) {
+func (m *mysql) Initialize(config *Configuration) error {
 	m.Lock()
 	defer m.Unlock()
 
 	if m.started {
-		err = errors.New(ErrStarted)
-
-		return
+		return errors.New(ErrStarted)
 	}
 	if config == nil {
 		return errors.New("configuration is nil")
 	}
-	if err = config.Validate(); err != nil {
-		return
+	if err := config.Validate(); err != nil {
+		return err
 	}
+	//EXAMPLE: [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
+	// user:password@tcp(localhost:5555)/dbname?charset=utf8
 	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=%t",
 		config.Username, config.Password, config.Hostname, config.Port, config.Database, config.ParseTime)
-	//[username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
-	//user:password@tcp(localhost:5555)/dbname?charset=utf8
-	if m.DB, err = sql.Open("mysql", dataSourceName); err != nil {
-		return
+	db, err := sql.Open("mysql", dataSourceName)
+	if err != nil {
+		return err
 	}
-	if err = m.DB.Ping(); err != nil {
-		return
+	ctx, cancel := context.WithTimeout(context.Background(), config.ConnectTimeout)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		return err
 	}
+	m.DB, m.config = db, config
 	m.started = true
-
-	return
+	return nil
 }
 
-//Close
-func (m *mysql) Shutdown() (err error) {
+func (m *mysql) Shutdown() {
 	m.Lock()
 	defer m.Unlock()
 
 	if !m.started {
-		err = errors.New(ErrNotStarted)
-
+		m.Error("MySQL: ", errors.New(ErrNotStarted))
 		return
 	}
 	close(m.stopper)
 	m.Wait()
-	//only close if it's nil
 	if m.DB != nil {
-		err = m.DB.Close()
+		if err := m.DB.Close(); err != nil {
+			m.Error("MySQL: ", errors.New(ErrNotStarted))
+		}
 	}
-	//set internal configuration to defaults
 	m.config.Default()
-	//set internal pointers to nil
 	m.started = false
-
-	return
 }
 
-//MetaTimerRead
-func (m *mysql) TimerRead(timerUUID string) (timer data.Timer, err error) {
-	m.RLock()
-	defer m.RUnlock()
+func (m *mysql) EmployeeCreate(employeePartial data.EmployeePartial) (*data.Employee, error) {
+	var args []interface{}
+	var columns []string
+	var values []string
 
-	//REVIEW: does it make sense to read all of the items within a transaction and then
-	// roll it back?
+	if firstName := employeePartial.FirstName; firstName != nil {
+		args = append(args, firstName)
+		values = append(values, "?")
+		columns = append(columns, "first_name")
+	}
+	if lastName := employeePartial.LastName; lastName != nil {
+		args = append(args, lastName)
+		values = append(values, "?")
+		columns = append(columns, "last_name")
+	}
+	if emailAddress := employeePartial.EmailAddress; emailAddress != nil {
+		args = append(args, emailAddress)
+		values = append(values, "?")
+		columns = append(columns, "email_address")
+	}
+	tx, err := m.Begin()
+	if err != nil {
+		return nil, err
+	}
+	query := fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s);", tableEmployees, strings.Join(columns, ","), strings.Join(values, ","))
+	result, err := tx.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	employee, err := employeeRead(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return employee, nil
+}
 
-	var row *sql.Row
+func (m *mysql) EmployeeRead(id string) (*data.Employee, error) {
+	return employeeRead(m, id)
+}
+
+func (m *mysql) EmployeeUpdate(id string, employeePartial data.EmployeePartial) (*data.Employee, error) {
+	var args []interface{}
+	var updates []string
+
+	if firstName := employeePartial.FirstName; firstName != nil {
+		args = append(args, firstName)
+		updates = append(updates, "first_name = ?")
+	}
+	if lastName := employeePartial.LastName; lastName != nil {
+		args = append(args, lastName)
+		updates = append(updates, "last_name = ?")
+	}
+	if len(updates) <= 0 || len(args) <= 0 {
+		return nil, errors.New("nothing to update")
+	}
+	tx, err := m.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	args = append(args, id)
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE uuid=?;", tableEmployees, strings.Join(updates, ","))
+	result, err := tx.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	if err := rowsAffected(result, fmt.Sprintf(ErrEmployeeNotFoundf, id)); err != nil {
+		return nil, err
+	}
+	employee, err := employeeRead(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return employee, nil
+}
+
+func (m *mysql) EmployeeDelete(id string) error {
+	query := fmt.Sprintf("DELETE FROM %s WHERE uuid = ?", tableEmployees)
+	result, err := m.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	return rowsAffected(result, fmt.Sprintf(ErrEmployeeNotFoundf, id))
+}
+
+func (m *mysql) EmployeesRead(search data.EmployeeSearch) ([]*data.Employee, error) {
+	var searchParameters []string
+	var args []interface{}
 	var query string
-	var tx *sql.Tx
 
-	//start a transaction (to be rolled back), then do the following:
-	// (1) Query standalone attributes from the timer table
-	// (2) Query any active timeslice
-	// (3) Query elapsed time
-	if tx, err = m.DB.Begin(); err != nil {
-		return
+	if ids := search.IDs; len(ids) > 0 {
+		searchParameters = append(searchParameters, "uuid IN(?)")
+		args = append(args, ids)
 	}
-	defer tx.Rollback()
-	query = fmt.Sprintf(`SELECT timer_uuid, timer_start, timer_finish, timer_comment, 
-			timer_archived, timer_billed, timer_completed
-		FROM %s WHERE timer_uuid = ?`, TableTimer)
-	row = tx.QueryRow(query, timerUUID)
-	if err = row.Scan(
-		&timer.UUID, &timer.Start, &timer.Finish, &timer.Comment,
-		&timer.Archived, &timer.Billed, &timer.Completed,
-	); err != nil {
-		if err == sql.ErrNoRows {
-			err = errors.Errorf(ErrTimerNotFoundf, timerUUID)
-		}
-
-		return
+	switch {
+	case search.FirstName != nil:
+		searchParameters = append(searchParameters, "first_name = ?")
+		args = append(args, search.FirstName)
+	case len(search.FirstNames) > 0:
+		searchParameters = append(searchParameters, "first_name IN(?)")
+		args = append(args, search.FirstNames)
 	}
-	query = fmt.Sprintf(`SELECT slice_uuid FROM %s
-			INNER JOIN %s ON %s.slice_id=%s.slice_id
-			INNER JOIN %s ON %s.timer_id=%s.timer_id
-		WHERE timer_uuid=?`,
-		TableSlice,
-		TableTimerSliceActive, TableSlice, TableTimerSliceActive,
-		TableTimer, TableTimer, TableTimerSliceActive,
-	)
-	row = tx.QueryRow(query, timer.UUID)
-	if err = row.Scan(&timer.ActiveSliceUUID); err != nil {
-		if err != sql.ErrNoRows {
-			return
-		}
-		err = nil
+	switch {
+	case search.LastName != nil:
+		searchParameters = append(searchParameters, "last_name = ?")
+		args = append(args, search.LastName)
+	case len(search.LastNames) > 0:
+		searchParameters = append(searchParameters, "last_name IN(?)")
+		args = append(args, search.LastNames)
 	}
-	query = fmt.Sprintf(`SELECT COALESCE(sum(slice_elapsed_time),0) 
-		FROM %s INNER JOIN %s ON %s.timer_id = %s.timer_id WHERE timer_uuid=?`,
-		TableSlice, TableTimer, TableSlice, TableTimer)
-	row = tx.QueryRow(query, timer.UUID)
-	if err = row.Scan(&timer.ElapsedTime); err != nil {
-		if err != sql.ErrNoRows {
-			return
-		}
-		err = nil
+	switch {
+	case search.EmailAddress != nil:
+		searchParameters = append(searchParameters, "email_address = ?")
+		args = append(args, search.EmailAddress)
+	case len(search.EmailAddresses) > 0:
+		searchParameters = append(searchParameters, "email_address IN(?)")
+		args = append(args, search.EmailAddresses)
 	}
-	err = tx.Rollback()
-
-	return
-}
-
-//MetaTimerWrite
-func (m *mysql) TimerWrite(timerUUID string, timer data.Timer) (err error) {
-	m.RLock()
-	defer m.RUnlock()
-
-	//REVIEW: how would we handle a uuid collision here?
-
-	var tx *sql.Tx
-
-	//Start a transaction, then do the following:
-	// (1) Attempt to upsert the standalone timer attributes
-	// (2) Set or unset the active timeslice as provided
-	if tx, err = m.DB.Begin(); err != nil {
-		return
-	}
-	defer tx.Rollback()
-	query := fmt.Sprintf(`INSERT INTO %s (timer_uuid, timer_start, timer_finish, timer_comment, 
-			timer_archived, timer_billed, timer_completed)
-		VALUES(?, ?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY 
-			UPDATE timer_start=VALUES(timer_start), timer_finish=VALUES(timer_finish), timer_comment=VALUES(timer_comment), 
-			timer_billed=VALUES(timer_billed), timer_completed=VALUES(timer_completed), timer_archived=VALUES(timer_archived)`, TableTimer)
-	if _, err = tx.Exec(query,
-		timerUUID, timer.Start, timer.Finish, timer.Comment,
-		timer.Archived, timer.Billed, timer.Completed,
-	); err != nil {
-		return
-	}
-	//KIM: No need to check if rows were affected since none of the above may
-	// have changed
-	if timer.ActiveSliceUUID != "" {
-		//REVIEW: insert ignore is dangerous...but this doesn't do a whole lot
-		query = fmt.Sprintf(`INSERT IGNORE INTO %s (timer_id, slice_id) values((%s),(%s))`,
-			TableTimerSliceActive,
-			fmt.Sprintf("SELECT timer_id FROM %s WHERE timer_uuid=\"%s\"", TableTimer, timer.UUID),
-			fmt.Sprintf("SELECT slice_id FROM %s WHERE slice_uuid=\"%s\"", TableSlice, timer.ActiveSliceUUID),
-		)
-		if _, err = tx.Exec(query); err != nil {
-			return
-		}
+	if len(searchParameters) > 0 {
+		query = fmt.Sprintf(`SELECT employee_id, first_name, last_name, email_address,
+		version, last_updated, last_updated_by FROM %s WHERE %s`,
+			tableEmployeesV1, strings.Join(searchParameters, " AND "))
 	} else {
-		query = fmt.Sprintf(`DELETE FROM %s WHERE timer_id=(%s)`,
-			TableTimerSliceActive,
-			fmt.Sprintf("SELECT timer_id FROM %s WHERE timer_uuid=\"%s\"", TableTimer, timer.UUID),
-		)
-		if _, err = tx.Exec(query); err != nil {
-			return
-		}
+		query = fmt.Sprintf(`SELECT employee_id, first_name, last_name, email_address,
+		version, last_updated, last_updated_by FROM %s`, tableEmployeesV1)
 	}
-	err = tx.Commit()
-
-	return
+	rows, err := m.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var employees []*data.Employee
+	for rows.Next() {
+		employee := &data.Employee{}
+		if err := rows.Scan(
+			&employee.ID,
+			&employee.FirstName,
+			&employee.LastName,
+			&employee.EmailAddress,
+			&employee.Version,
+			&employee.LastUpdated,
+			&employee.LastUpdatedBy,
+		); err != nil {
+			return nil, err
+		}
+		employees = append(employees, employee)
+	}
+	return employees, nil
 }
 
-//MetaTimerDelete
-func (m *mysql) TimerDelete(timerUUID string) (err error) {
-	m.RLock()
-	defer m.RUnlock()
-
-	var result sql.Result
-	var query string
-	var tx *sql.Tx
-
-	//Start a transaction and do the following:
-	// (1) Delete the timer from the timer table
-	// (2) Delete any associated slices
-	// (3) Delete
-	if tx, err = m.DB.Begin(); err != nil {
-		return
+func (m *mysql) TimerCreate(timerValues data.TimerPartial) (*data.Timer, error) {
+	if !m.started {
+		return nil, errors.New(ErrNotStarted)
+	}
+	tx, err := m.Begin()
+	if err != nil {
+		return nil, err
 	}
 	defer tx.Rollback()
-	query = fmt.Sprintf(`DELETE FROM %s WHERE timer_id=(SELECT timer_id from %s WHERE timer_uuid=?)`,
-		TableTimerSliceActive, TableTimer)
-	if _, err = tx.Exec(query, timerUUID); err != nil {
-		return
+	columns := make([]string, 0, 4)
+	values := make([]string, 0, 4)
+	args := make([]interface{}, 0, 4)
+	if employeeID := timerValues.EmployeeID; employeeID != nil {
+		columns = append(columns, "employee_id")
+		values = append(values, fmt.Sprintf("(SELECT id FROM %s WHERE uuid=?)", tableEmployees))
+		args = append(args, employeeID)
 	}
-	query = fmt.Sprintf(`DELETE FROM %s WHERE timer_id=(SELECT timer_id from %s WHERE timer_uuid=?)`,
-		TableSlice, TableTimer)
-	if _, err = tx.Exec(query, timerUUID); err != nil {
-		return
+	if completed := timerValues.Completed; completed != nil {
+		columns = append(columns, "completed")
+		values = append(values, "?")
+		args = append(args, completed)
 	}
-	query = fmt.Sprintf(`DELETE FROM %s WHERE timer_uuid=?`, TableTimer)
-	if result, err = tx.Exec(query, timerUUID); err != nil {
-		return
+	if archived := timerValues.Archived; archived != nil {
+		columns = append(columns, "archived")
+		values = append(values, "?")
+		args = append(args, archived)
 	}
-	if err = rowsAffected(result, ErrDeleteFailed); err != nil {
-		return
+	if comment := timerValues.Comment; comment != nil {
+		columns = append(columns, "comment")
+		values = append(values, "?")
+		args = append(args, comment)
 	}
-	err = tx.Commit()
-
-	return
+	query := fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s);", tableTimers, strings.Join(columns, ","), strings.Join(values, ","))
+	result, err := tx.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	timerID, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	timer, err := timerRead(tx, timerID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return timer, nil
 }
 
-//MetaTimeSliceRead
-func (m *mysql) TimeSliceRead(timeSliceUUID string) (slice data.TimeSlice, err error) {
-	m.RLock()
-	defer m.RUnlock()
-
-	var row *sql.Row
-
-	//query the slice attributes, also get teh timer_uuid via an inner join with the timer table
-	// because a slice is dependent on a timer, this column can never be NULL (it's also a foreign
-	// key)
-	query := fmt.Sprintf(`SELECT slice_uuid, timer_uuid, slice_start, slice_finish, slice_archived, COALESCE(slice_elapsed_time,0)
-		FROM %s	INNER JOIN %s ON %s.timer_id=%s.timer_id
-		WHERE slice_uuid=?`,
-		TableSlice, TableTimer, TableSlice, TableTimer)
-	row = m.DB.QueryRow(query, timeSliceUUID)
-	if err = row.Scan(
-		&slice.UUID,
-		&slice.TimerUUID,
-		&slice.Start,
-		&slice.Finish,
-		&slice.Archived,
-		&slice.ElapsedTime,
-	); err != nil {
-		if err == sql.ErrNoRows {
-			err = errors.Errorf(ErrTimeSliceNotFoundf, timeSliceUUID)
-		}
-
-		return
-	}
-
-	return
+func (m *mysql) TimerRead(id string) (*data.Timer, error) {
+	return timerRead(m, id)
 }
 
-//MetaTimeSliceWrite
-func (m *mysql) TimeSliceWrite(sliceUUID string, slice data.TimeSlice) (err error) {
-	m.RLock()
-	defer m.RUnlock()
-
-	var result sql.Result
-
-	query := fmt.Sprintf(`INSERT INTO %s (slice_uuid, slice_start, slice_finish, slice_archived, timer_id) 
-		VALUES(?, ?, ?, ?, (SELECT timer_id FROM %s WHERE timer_uuid="%s"))
-			ON DUPLICATE KEY
-		UPDATE slice_start=VALUES(slice_start), slice_finish=(slice_finish), slice_archived=VALUES(slice_archived)`,
-		TableSlice, TableTimer, slice.TimerUUID)
-	if result, err = m.DB.Exec(query, sliceUUID, slice.Start, slice.Finish, slice.Archived); err != nil {
-		return
-	}
-	if err = rowsAffected(result, ErrUpdateFailed); err != nil {
-		return
-	}
-
-	return
-}
-
-//MetaTimeSliceDelete
-func (m *mysql) TimeSliceDelete(timeSliceUUID string) (err error) {
-	m.RLock()
-	defer m.RUnlock()
-
-	var result sql.Result
-	var query string
-	var tx *sql.Tx
-
-	if tx, err = m.DB.Begin(); err != nil {
-		return
+func (m *mysql) TimerStart(id string) (*data.Timer, error) {
+	tx, err := m.Begin()
+	if err != nil {
+		return nil, err
 	}
 	defer tx.Rollback()
-	query = fmt.Sprintf("DELETE FROM %s WHERE slice_id=(SELECT slice_id FROM %s WHERE slice_uuid=?)",
-		TableTimerSliceActive, TableSlice)
-	if _, err = tx.Exec(query, timeSliceUUID); err != nil {
-		return
+	start := time.Now().UnixNano()
+	if _, err = timeSliceCreate(tx, data.TimeSlicePartial{
+		TimerID: &id,
+		Start:   &start,
+	}); err != nil {
+		//KIM: this will fail if an active time slice already exists
+		return nil, err
 	}
-	query = fmt.Sprintf("DELETE FROM %s WHERE slice_uuid = ?", TableSlice)
-	if result, err = tx.Exec(query, timeSliceUUID); err != nil {
-		return
+	timer, err := timerRead(tx, id)
+	if err != nil {
+		return nil, err
 	}
-	if err = rowsAffected(result, ErrDeleteFailed); err != nil {
-		return
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
-	err = tx.Commit()
+	return timer, nil
+}
 
-	return
+func (m *mysql) TimerStop(id string) (*data.Timer, error) {
+	tx, err := m.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	timer, err := timerRead(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if timer.ActiveTimeSliceID == "" {
+		return timer, nil
+	}
+	finish := time.Now().UnixNano()
+	if _, err := timeSliceUpdate(tx, timer.ActiveTimeSliceID, data.TimeSlicePartial{
+		Finish: &finish,
+	}); err != nil {
+		return nil, err
+	}
+	if timer, err = timerRead(tx, id); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return timer, nil
+}
+
+func (m *mysql) TimerUpdate(id string, timerPartial data.TimerPartial) (*data.Timer, error) {
+	var args []interface{}
+	var updates []string
+
+	if comment := timerPartial.Comment; comment != nil {
+		updates = append(updates, "comment = ?")
+		args = append(args, comment)
+	}
+	if completed := timerPartial.Completed; completed != nil {
+		updates = append(updates, "completed = ?")
+		args = append(args, completed)
+	}
+	if employeeID := timerPartial.EmployeeID; employeeID != nil {
+		updates = append(updates, "employee_id = ?")
+		args = append(args, employeeID)
+	}
+	if archived := timerPartial.Archived; archived != nil {
+		updates = append(updates, "archived = ?")
+		args = append(args, archived)
+	}
+	if len(updates) <= 0 || len(args) <= 0 {
+		return nil, errors.New("nothing to update")
+	}
+	tx, err := m.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	args = append(args, id)
+	query := fmt.Sprintf(`UPDATE %s SET %s WHERE uuid = ?;`, tableTimers, strings.Join(updates, ","))
+	result, err := tx.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	if err := rowsAffected(result, fmt.Sprintf(ErrTimerNotFoundf, id)); err != nil {
+		return nil, err
+	}
+	timer, err := timerRead(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return timer, nil
+}
+
+func (m *mysql) TimerDelete(id string) error {
+	query := fmt.Sprintf("DELETE FROM %s WHERE uuid = ?", tableTimers)
+	result, err := m.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	return rowsAffected(result, fmt.Sprintf(ErrTimerNotFoundf, id))
+}
+
+func (m *mysql) TimersRead(search data.TimerSearch) ([]*data.Timer, error) {
+	var searchParameters []string
+	var args []interface{}
+	var query string
+
+	if ids := search.IDs; len(ids) > 0 {
+		searchParameters = append(searchParameters, "timer_id IN(?)")
+		args = append(args, ids)
+	}
+	switch {
+	case search.EmployeeID != nil:
+		searchParameters = append(searchParameters, "employee_id = ?")
+		args = append(args, search.EmployeeID)
+	case len(search.EmployeeIDs) > 0:
+		searchParameters = append(searchParameters, "employee_id IN(?)")
+		args = append(args, search.EmployeeIDs)
+	}
+	if completed := search.Completed; completed != nil {
+		searchParameters = append(searchParameters, "completed = ?")
+		args = append(args, completed)
+	}
+	if archived := search.Archived; archived != nil {
+		searchParameters = append(searchParameters, "archived = ?")
+		args = append(args, archived)
+	}
+	if len(searchParameters) > 0 {
+		query = fmt.Sprintf(`SELECT timer_id, start, finish, elapsed_time, comment, archived, completed, 
+		employee_id, active_time_slice_id, version, last_updated, last_updated_by FROM %s WHERE %s`,
+			tableTimersV1, strings.Join(searchParameters, " AND "))
+	} else {
+		query = fmt.Sprintf(`SELECT timer_id, start, finish, elapsed_time, comment, archived, completed, 
+		employee_id, active_time_slice_id, version, last_updated, last_updated_by FROM %s`,
+			tableTimersV1)
+	}
+	rows, err := m.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var timers []*data.Timer
+	for rows.Next() {
+		timer := &data.Timer{}
+		employeeID, activeTimeSliceID := sql.NullString{}, sql.NullString{}
+		start, finish := sql.NullInt64{}, sql.NullInt64{}
+		elapsed_time := sql.NullInt64{}
+		if err := rows.Scan(
+			&timer.ID,
+			&start,
+			&finish,
+			&elapsed_time,
+			&timer.Comment,
+			&timer.Archived,
+			&timer.Completed,
+			&employeeID,
+			&activeTimeSliceID,
+			&timer.Version,
+			&timer.LastUpdated,
+			&timer.LastUpdatedBy,
+		); err != nil {
+			return nil, err
+		}
+		timer.EmployeeID, timer.ActiveTimeSliceID = employeeID.String, activeTimeSliceID.String
+		timer.Start, timer.Finish = start.Int64, finish.Int64
+		timer.ElapsedTime = elapsed_time.Int64
+		timers = append(timers, timer)
+	}
+	return timers, nil
+}
+
+func (m *mysql) TimeSliceCreate(timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
+	return timeSliceCreate(m, timeSlicePartial)
+}
+
+func (m *mysql) TimeSliceRead(timeSliceID string) (*data.TimeSlice, error) {
+	return timeSliceRead(m, timeSliceID)
+}
+
+func (m *mysql) TimeSliceUpdate(timeSliceID string, timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
+	return timeSliceUpdate(m, timeSliceID, timeSlicePartial)
+}
+
+func (m *mysql) TimeSliceDelete(timeSliceID string) error {
+	query := fmt.Sprintf("DELETE FROM %s WHERE uuid=?", tableTimeSlices)
+	result, err := m.Exec(query, timeSliceID)
+	if err != nil {
+		return err
+	}
+	return rowsAffected(result, ErrTimeSliceNotFoundf)
+}
+
+func (m *mysql) TimeSlicesRead(search data.TimeSliceSearch) ([]*data.TimeSlice, error) {
+	var searchParameters []string
+	var args []interface{}
+
+	if search.Completed != nil {
+		searchParameters = append(searchParameters, "completed = ?")
+		args = append(args, search.Completed)
+	}
+	if search.TimerID != nil {
+		searchParameters = append(searchParameters, "timer_id = ?")
+		args = append(args, search.TimerID)
+	}
+	if len(search.TimerIDs) > 0 {
+		searchParameters = append(searchParameters, "timer_id IN(?)")
+		args = append(args, search.TimerIDs)
+	}
+	if len(search.IDs) > 0 {
+		searchParameters = append(searchParameters, "uuid IN(?)")
+		args = append(args, search.IDs)
+	}
+	query := fmt.Sprintf(`SELECT time_slice_id, start, finish, completed, elapsed_time, timer_id,
+		version, last_updated, last_updated_by FROM %s WHERE %s`,
+		tableTimeSlicesV1, strings.Join(searchParameters, " AND "))
+	rows, err := m.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var timeSlices []*data.TimeSlice
+	for rows.Next() {
+		timeSlice := &data.TimeSlice{}
+		if err := rows.Scan(
+			&timeSlice.ID,
+			&timeSlice.Start,
+			&timeSlice.Finish,
+			&timeSlice.Completed,
+			&timeSlice.ElapsedTime,
+			&timeSlice.TimerID,
+			&timeSlice.Version,
+			&timeSlice.LastUpdated,
+			&timeSlice.LastUpdatedBy,
+		); err != nil {
+			return nil, err
+		}
+		timeSlices = append(timeSlices, timeSlice)
+	}
+	return timeSlices, nil
 }
