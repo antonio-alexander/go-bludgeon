@@ -12,6 +12,7 @@ const (
 
 //error constants
 const (
+	ErrEmployeeNotFoundf  string = "employee with id, \"%s\", not found locally"
 	ErrTimerNotFoundf     string = "timer with id, \"%s\", not found locally"
 	ErrTimeSliceNotFoundf string = "timeSlice with id, \"%s\", not found locally"
 	ErrTimerIsArchivedf   string = "timer with id, \"%s\", is archived"
@@ -27,12 +28,12 @@ const (
 
 //query constants
 const (
-	TableTimer            string = "timer"
-	TableSlice            string = "slice"
-	TableTimerSliceActive string = "timer_slice_active"
-	TableProject          string = "project"
-	TableClient           string = "client"
-	TableEmployee         string = "employee"
+	tableEmployees    string = "employees"
+	tableTimers       string = "timers"
+	tableTimeSlices   string = "time_slices"
+	tableTimersV1     string = "timers_v1"
+	tableTimeSlicesV1 string = "time_slices_v1"
+	tableEmployeesV1  string = "employees_v1"
 )
 
 type Owner interface {

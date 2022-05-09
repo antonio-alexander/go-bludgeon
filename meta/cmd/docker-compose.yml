@@ -1,0 +1,58 @@
+version: "3"
+services:
+
+  # postgres:
+  #   container_name: "postgres"
+  #   hostname: "postgres"
+  #   image: postgres:alpine
+  #   restart: "always"
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_DB: postgres
+  #     POSTGRES_PASSWORD: postgres
+
+  mysql:
+    container_name: "mysql"
+    hostname: "mysql"
+    image: yobasystems/alpine-mariadb:latest
+    restart: "always"
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql
+      MYSQL_DATABASE: mysql
+      MYSQL_USER: mysql
+      MYSQL_PASSWORD: mysql
+
+  # bludgeon-postgres:
+  #   container_name: "bludgeon-postgres"
+  #   hostname: "bludgeon-postgres"
+  #   image: ghcr.io/antonio-alexander/bludgeon-database-postgres:latest
+  #   restart: "always"
+  #   build:
+  #     context: ./postgres
+  #     dockerfile: ./Dockerfile
+  #   ports:
+  #     - "5433:5433"
+  #   environment:
+  #     POSTGRES_USER: bludgeon
+  #     POSTGRES_DB: bludgeon
+  #     POSTGRES_PASSWORD: bludgeon
+
+  bludgeon-mysql:
+    container_name: "bludgeon-mysql"
+    hostname: "bludgeon-mysql"
+    image: ghcr.io/antonio-alexander/bludgeon-database-mysql:latest
+    restart: "always"
+    build:
+      context: ./mysql
+      dockerfile: ./Dockerfile
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: bludgeon
+      MYSQL_DATABASE: bludgeon
+      MYSQL_USER: bludgeon
+      MYSQL_PASSWORD: bludgeon
