@@ -14,3 +14,6 @@
 #vs_code stuff
 __debug_bin
 .vscode/*
+
+#swagger files
+**/swagger.yaml

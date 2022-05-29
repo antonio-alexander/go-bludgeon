@@ -1,0 +1,22 @@
+{
+ "employees": {
+  "127e0548-4767-4bfd-b0f7-33289e834024": {
+   "id": "127e0548-4767-4bfd-b0f7-33289e834024",
+   "first_name": "Antonio",
+   "last_name": "Alexander",
+   "email_address": "antonio.l.alexander@gmail.com",
+   "last_updated": 1652238023978685000,
+   "last_updated_by": "bludgeon_meta_memory",
+   "version": 1
+  },
+  "b9f18ad6-d132-4fdd-ab61-7344edd75cd1": {
+   "id": "b9f18ad6-d132-4fdd-ab61-7344edd75cd1",
+   "first_name": "Antonio",
+   "last_name": "Alexander",
+   "email_address": "antonio.l.alexander@gmail.com",
+   "last_updated": 1652154662311279000,
+   "last_updated_by": "bludgeon_meta_memory",
+   "version": 1
+  }
+ }
+}

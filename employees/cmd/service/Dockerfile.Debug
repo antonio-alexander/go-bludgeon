@@ -1,0 +1,56 @@
+#---------------------------------------------------------------------------------------------------
+# bludgeon-employee [Dockerfile.Debug]
+# 
+# Reference: https://stackoverflow.com/questions/63178036/how-to-find-commit-hash-from-within-a-running-docker-image
+# commit: git rev-parse HEAD
+# 
+# https://stackoverflow.com/questions/6245570/how-to-get-the-current-branch-name-in-git
+# branch: git rev-parse --abbrev-ref HEAD
+# 
+# https://gist.github.com/asukakenji/f15ba7e588ac42795f421b48b8aede63
+# The GOOS will always be linux, but in case you were curious
+#
+#---------------------------------------------------------------------------------------------------
+
+# build from alpine container with golang
+FROM golang:1.16.2-alpine3.13 AS builder
+
+# set the working directory to cmd, so we can build easily
+WORKDIR /build
+
+# set environment
+ENV GOPATH=/go PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+
+# copy current directory into the gopath
+COPY . /build
+
+# build/install delve
+RUN \
+    apk add --no-cache ca-certificates \
+    dpkg \
+    gcc \
+    git \
+    musl-dev \
+    && mkdir -p "$GOPATH/src" "$GOPATH/bin" \
+    && chmod -R 777 "$GOPATH" \
+    && go get github.com/go-delve/delve/cmd/dlv 
+
+# build the executable
+RUN \
+    mkdir -p /app && \
+    cd ./server/cmd/server-rest && \
+    go build -gcflags "all=-N -l" -o /app/bludgeon_server && \
+    chmod +x /app/bludgeon_server
+
+# build from a clean container (without golang)
+FROM alpine:latest
+
+# set working directory to app
+WORKDIR /app
+
+# copy delve and the app
+COPY --from=builder /app/bludgeon_server /app/bludgeon_server
+COPY --from=builder /go/bin/dlv /bin/
+
+# use this to run delve with the executable
+CMD dlv exec /app/bludgeon_server --headless --listen=":2345" --log --api-version=2 --check-go-version=false

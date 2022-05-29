@@ -1,0 +1,17 @@
+linters:
+  disable-all: true
+  enable:
+    # - gosec
+    - bodyclose
+    - deadcode
+    - gosimple
+    - govet
+    - staticcheck
+    - structcheck
+    - unused
+    - varcheck
+    - whitespace
+
+run:
+  skip-dirs:
+    - service/rest/swagger
