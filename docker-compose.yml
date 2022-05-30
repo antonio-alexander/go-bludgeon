@@ -1,0 +1,23 @@
+version: "3"
+services:
+
+  mysql:
+    container_name: "mysql"
+    hostname: "mysql"
+    image: ghcr.io/antonio-alexander/go-bludgeon-mysql:latest
+    restart: "always"
+    ports:
+      - "3306:3306"
+    build:
+      context: ./
+      dockerfile: ./cmd/mysql/Dockerfile
+      args:
+        - PLATFORM=linux/amd64
+        - GO_ARCH=amd64
+        # - GO_ARCH=arm
+        # - GO_ARM=7
+    environment:
+      MYSQL_ROOT_PASSWORD: bludgeon
+      MYSQL_DATABASE: bludgeon
+      MYSQL_USER: bludgeon
+      MYSQL_PASSWORD: bludgeon

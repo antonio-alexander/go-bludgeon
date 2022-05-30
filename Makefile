@@ -13,3 +13,9 @@ check-godoc:
 
 serve-godoc: check-godoc
 	cd .. && godoc -http :8080
+
+build:
+	docker compose build
+
+run:
+	docker compose up
