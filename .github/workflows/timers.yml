@@ -253,8 +253,8 @@ jobs:
           docker load -i /tmp/go-bludgeon-timers_amd64-${{ env.version }}.tar.gz
           docker load -i /tmp/go-bludgeon-timers_armv7-${{ env.version }}.tar.gz
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_latest
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
       - name: Push Docker Images
         run: |
@@ -277,7 +277,7 @@ jobs:
 
   git_push_tag:
     if: github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main'
-    needs: [go_test, go_lint]
+    needs: [go_test_client, go_lint]
     runs-on: ubuntu-latest
     permissions:
       contents: write
