@@ -5,6 +5,9 @@ on:
     branches:
       - master
       - develop
+    paths:
+      - "timers/**"
+      - ".github/workflows/timers.yml"
   pull_request:
     paths:
       - "timers/**"
@@ -249,10 +252,10 @@ jobs:
         run: |
           docker load -i /tmp/go-bludgeon-timers_amd64-${{ env.version }}.tar.gz
           docker load -i /tmp/go-bludgeon-timers_armv7-${{ env.version }}.tar.gz
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_latest
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
       - name: Push Docker Images
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}

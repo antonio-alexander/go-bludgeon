@@ -5,6 +5,9 @@ on:
     branches:
       - master
       - develop
+    paths:
+      - "cmd/mysql/**"
+      - ".github/workflows/mysql.yml"
   pull_request:
     paths:
       - "cmd/mysql/**"

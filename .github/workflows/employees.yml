@@ -5,6 +5,9 @@ on:
     branches:
       - master
       - develop
+    paths:
+      - "employees/**"
+      - ".github/workflows/employees.yml"
   pull_request:
     paths:
       - "employees/**"
