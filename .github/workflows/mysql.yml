@@ -6,16 +6,16 @@ on:
       - master
       - develop
     paths:
-      - "cmd/mysql/**"
+      - "mysql/**"
       - ".github/workflows/mysql.yml"
   pull_request:
     paths:
-      - "cmd/mysql/**"
+      - "mysql/**"
       - ".github/workflows/mysql.yml"
   release:
     types: [published]
     paths:
-      - "cmd/mysql/**"
+      - "mysql/**"
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -25,7 +25,87 @@ env:
   PLATFORM_ARMV7: linux/arm/v7
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Get version
+        run: |
+          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/mysql/version.json | jq '.Version' | sed 's/"//g'`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Generate build artifacts
+        run: |
+          mkdir -p /tmp
+          echo ${{ env.version }} >> /tmp/version
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts
+          path: |
+            /tmp/version
+
+  version_validate:
+    if: github.event_name == 'pull_request' && github.base_ref == 'refs/heads/main'
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get version
+        run: |
+          version=`cat /tmp/version`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.base_ref }}
+      - name: Get base version
+        run: |
+          base_version=`cat /home/runner/work/go-bludgeon/go-bludgeon/mysql/version.json | jq '.Version' | sed 's/"//g'`
+          echo "base_version=$base_version" >> $GITHUB_ENV
+      - name: Compare versions
+        run: |
+          echo "Comparing version \"$version\" to base version \"$base_version\""
+          if [ "$version" = "$base_version" ]; then
+               echo "versions equal, verions must be different"
+               exit 1
+          fi
+
+  git_push_tag:
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main'
+    needs: [version]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get version
+        run: |
+          version=`cat /tmp/version`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+      - name: Git push version
+        uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          CUSTOM_TAG: mysql/v${{ env.version }}
+
   docker_build_images:
+    needs: [version]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,14 +114,15 @@ jobs:
         uses: actions/checkout@v2
       - name: Get Version
         run: |
-          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/cmd/mysql/version.json | jq '.Version' | sed 's/"//g'`
+          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/mysql/version.json | jq '.Version' | sed 's/"//g'`
           echo "version=$version" >> $GITHUB_ENV
-      - name: Build docker employees
+      - name: Build docker mysql
         run: |
           github_ref=${GITHUB_REF##refs/heads/}
           github_ref=${GITHUB_REF##refs/tags/}
-          docker build -f ./cmd/mysql/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_AMD64
-          docker build -f ./cmd/mysql/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_ARMV7
+          cd mysql
+          docker build --no-cache -f ./cmd/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
+          docker build --no-cache -f ./cmd/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp
@@ -64,7 +145,7 @@ jobs:
 
   docker_push_images:
     if: github.event_name == 'release' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-    needs: docker_build_images
+    needs: [version, docker_build_images]
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -89,12 +170,14 @@ jobs:
           docker load -i /tmp/go-bludgeon-mysql_amd64-${{ env.version }}.tar.gz
           docker load -i /tmp/go-bludgeon-mysql_armv7-${{ env.version }}.tar.gz
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_${{ env.version }}
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_${{ env.version }}
       - name: Push Docker Images
         run: |
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_${{ env.version }} 
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_${{ env.version }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_latest
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_${{ env.version }} 
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_${{ env.version }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_latest
       - name: Create/Push Docker manifest
         run: |

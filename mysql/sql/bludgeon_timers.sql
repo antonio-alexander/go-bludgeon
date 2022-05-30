@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS timers (
     version INT NOT NULL DEFAULT 1,
     last_updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     last_updated_by TEXT NOT NULL DEFAULT CURRENT_USER,
-    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
     INDEX(aux_id)
 ) ENGINE = InnoDB;
 
