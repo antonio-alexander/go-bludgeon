@@ -35,8 +35,8 @@ RUN \
     && chown -R root:root /var/lib/mysql \
     && mysql_install_db --user=root --ldata=/var/lib/mysql
 
-COPY ./init_bludgeon_db.sh /bludgeon
-COPY ./sql /bludgeon
+COPY ./cmd/mysql/init_bludgeon_db.sh /bludgeon
+COPY ./cmd/mysql/sql /bludgeon
 
 RUN \
     chmod +x /bludgeon/init_bludgeon_db.sh \

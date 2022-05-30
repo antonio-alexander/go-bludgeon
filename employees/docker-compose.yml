@@ -4,7 +4,7 @@ services:
   mysql:
     container_name: "mysql"
     hostname: "mysql"
-    image: ghcr.io/antonio-alexander/go-bludgeon/mysql:latest
+    image: ghcr.io/antonio-alexander/go-bludgeon-mysql:latest
     restart: "always"
     ports:
       - "3306:3306"
@@ -17,14 +17,14 @@ services:
   employees:
     container_name: "employees"
     hostname: "employees"
-    image: ghcr.io/antonio-alexander/go-bludgeon/employees:latest
+    image: ghcr.io/antonio-alexander/go-bludgeon-employees:latest
     depends_on:
       - mysql
     restart: "always"
     ports:
       - "8080:8080"
     build:
-      context: ../
+      context: ./
       dockerfile: ./cmd/service/Dockerfile
       args:
         - PLATFORM=linux/amd64
