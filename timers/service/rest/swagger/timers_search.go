@@ -5,8 +5,8 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/timers/data"
 )
 
-// swagger:route GET /timers/search timers search
-// GET allows you to read an timer, the id is required.
+// swagger:route GET /timers/search timers search_timers
+// Read one or more timers using search parameters.
 //
 //     Consumes:
 //     - application/json
@@ -17,23 +17,22 @@ import (
 //     Schemes: http
 //
 // responses:
-//   200: timersGetResponseOk
-//   404: timersGetResponseNotFound
+//   200: TimersGetResponseOk
+//   404: TimersGetResponseNotFound
 
-// swagger:response timersGetResponseOk
-type timerSearchResponseOk struct {
+// swagger:response TimersGetResponseOk
+type TimersSearchResponseOk struct {
 	// in:body
-	Body data.Timer
+	Body []data.Timer
 }
 
-// swagger:response timersGetResponseNotFound
-type timerSearchResponseNotFound struct {
+// swagger:response TimersGetResponseNotFound
+type TimersSearchResponseNotFound struct {
 	// in:body
 	Body errors.Error
 }
 
-// swagger:parameters timers search
-type timerSearchParams struct {
-	// in:path
-	ID string `json:"id"`
+// swagger:parameters TimerSearchParams
+type TimersSearchParams struct {
+	data.TimerSearch
 }

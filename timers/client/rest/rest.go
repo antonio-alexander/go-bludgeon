@@ -21,14 +21,20 @@ type rest struct {
 	config *client.Configuration
 }
 
-type Owner interface {
+//Client describes operations that can be done with a rest
+// client
+type Client interface {
+	logic.Logic
+
+	//Initialize can be used to configure and start the business logic
+	// of the underlying pointer
 	Initialize(config *client.Configuration) error
 }
 
-func New(parameters ...interface{}) interface {
-	logic.Logic
-	Owner
-} {
+//New will create a populated instance of the rest client
+// if Configuration is provided as a parameter, it will
+// also attempt to initialize (and panic on error)
+func New(parameters ...interface{}) Client {
 	var config *client.Configuration
 	r := &rest{
 		Client: client.New(parameters...),
@@ -49,6 +55,8 @@ func New(parameters ...interface{}) interface {
 	return r
 }
 
+//Initialize can be used to configure and start the business logic
+// of the underlying pointer
 func (r *rest) Initialize(config *client.Configuration) error {
 	if config == nil {
 		return errors.New("config is nil")
@@ -200,4 +208,76 @@ func (r *rest) TimerSubmit(id string, finishTime *time.Time) (*data.Timer, error
 		return nil, err
 	}
 	return timer, nil
+}
+
+func (r *rest) TimeSliceCreate(timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
+	bytes, err := json.Marshal(&timeSlicePartial)
+	if err != nil {
+		return nil, err
+	}
+	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port, data.RouteTimeSlices)
+	bytes, err = r.DoRequest(uri, http.MethodPost, bytes)
+	if err != nil {
+		return nil, err
+	}
+	timeSlice := new(data.TimeSlice)
+	if err = json.Unmarshal(bytes, timeSlice); err != nil {
+		return nil, err
+	}
+	return timeSlice, nil
+}
+
+func (r *rest) TimeSliceRead(id string) (*data.TimeSlice, error) {
+	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
+		fmt.Sprintf(data.RouteTimeSlicesIDf, id))
+	bytes, err := r.DoRequest(uri, http.MethodGet, nil)
+	if err != nil {
+		return nil, err
+	}
+	timeSlice := new(data.TimeSlice)
+	if err = json.Unmarshal(bytes, timeSlice); err != nil {
+		return nil, err
+	}
+	return timeSlice, nil
+}
+
+func (r *rest) TimeSliceUpdate(id string, timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
+	bytes, err := json.Marshal(&timeSlicePartial)
+	if err != nil {
+		return nil, err
+	}
+	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
+		fmt.Sprintf(data.RouteTimeSlicesIDf, id))
+	bytes, err = r.DoRequest(uri, http.MethodPut, bytes)
+	if err != nil {
+		return nil, err
+	}
+	timeSlice := new(data.TimeSlice)
+	if err = json.Unmarshal(bytes, timeSlice); err != nil {
+		return nil, err
+	}
+	return timeSlice, nil
+}
+
+func (r *rest) TimeSliceDelete(id string) error {
+	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
+		fmt.Sprintf(data.RouteTimeSlicesIDf, id))
+	if _, err := r.DoRequest(uri, http.MethodDelete, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *rest) TimeSlicesRead(search data.TimeSliceSearch) ([]*data.TimeSlice, error) {
+	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
+		data.RouteTimeSlicesSearch+search.ToParams())
+	bytes, err := r.DoRequest(uri, http.MethodGet, nil)
+	if err != nil {
+		return nil, err
+	}
+	var timeSlices = []*data.TimeSlice{}
+	if err = json.Unmarshal(bytes, &timeSlices); err != nil {
+		return nil, err
+	}
+	return timeSlices, nil
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/employees/data"
 	"github.com/antonio-alexander/go-bludgeon/employees/logic"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
-	rest_server "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
+	"github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 
 	"github.com/gorilla/mux"
 )
@@ -16,7 +16,7 @@ import (
 type restServer struct {
 	logger.Logger
 	logic  logic.Logic
-	router rest_server.Router
+	router server.Router
 }
 
 func New(parameters ...interface{}) interface {
@@ -27,7 +27,7 @@ func New(parameters ...interface{}) interface {
 		switch p := parameter.(type) {
 		case logic.Logic:
 			s.logic = p
-		case rest_server.Router:
+		case server.Router:
 			s.router = p
 		case logger.Logger:
 			s.Logger = p
@@ -135,7 +135,7 @@ func (s *restServer) endpointEmployeeDelete() func(http.ResponseWriter, *http.Re
 }
 
 func (s *restServer) buildRoutes() {
-	for _, route := range []rest_server.HandleFuncConfig{
+	for _, route := range []server.HandleFuncConfig{
 		{Route: data.RouteEmployees, Method: http.MethodPost, HandleFx: s.endpointEmployeeCreate()},
 		{Route: data.RouteEmployeesSearch, Method: http.MethodGet, HandleFx: s.endpointEmployeesRead()},
 		{Route: data.RouteEmployeesID, Method: http.MethodGet, HandleFx: s.endpointEmployeeRead()},

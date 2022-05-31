@@ -75,10 +75,7 @@ type Serializer interface {
 	Deserialize(data *SerializedData) error
 }
 
-type Owner interface {
-	Shutdown()
-}
-
+//Timer provides an interface that can be used to interact with timers
 type Timer interface {
 	//TimerCreate can be used to create a timer, although
 	// all fields are available, the only fields that will
@@ -114,6 +111,7 @@ type Timer interface {
 	TimersRead(search data.TimerSearch) ([]*data.Timer, error)
 }
 
+//TimeSlice provides an interface that can be used to interact with time slices
 type TimeSlice interface {
 	//TimeSliceCreate can be used to create a single time
 	// slice
@@ -131,4 +129,10 @@ type TimeSlice interface {
 	//TimeSlicesRead can be used to read zero or more time slices depending on the
 	// search criteria
 	TimeSlicesRead(search data.TimeSliceSearch) ([]*data.TimeSlice, error)
+}
+
+//Shutdown provides a function that can be used to deconstruct
+// a pointer
+type Shutdown interface {
+	Shutdown()
 }

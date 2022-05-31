@@ -16,14 +16,12 @@ func generateID() (string, error) {
 
 func copyEmployee(e *data.Employee) *data.Employee {
 	return &data.Employee{
-		ID:           e.ID,
-		FirstName:    e.FirstName,
-		LastName:     e.LastName,
-		EmailAddress: e.EmailAddress,
-		Audit: data.Audit{
-			LastUpdated:   e.LastUpdated,
-			LastUpdatedBy: e.LastUpdatedBy,
-			Version:       e.Version,
-		},
+		ID:            e.ID,
+		FirstName:     e.FirstName,
+		LastName:      e.LastName,
+		EmailAddress:  e.EmailAddress,
+		LastUpdated:   e.LastUpdated,
+		LastUpdatedBy: e.LastUpdatedBy,
+		Version:       e.Version,
 	}
 }

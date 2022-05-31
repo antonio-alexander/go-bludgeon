@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -26,21 +27,38 @@ type mysql struct {
 	logger.Logger
 }
 
-func New(parameters ...interface{}) interface {
-	internal_mysql.Owner
-	meta.Owner
-	meta.Employee
-} {
+func New(parameters ...interface{}) MySQL {
+	var config *Configuration
+
 	m := &mysql{
 		DB: internal_mysql.New(parameters...),
 	}
 	for _, p := range parameters {
 		switch p := p.(type) {
+		case *Configuration:
+			config = p
 		case logger.Logger:
 			m.Logger = p
 		}
 	}
+	if config != nil {
+		if err := m.Initialize(config); err != nil {
+			panic(err)
+		}
+	}
 	return m
+}
+
+func (m *mysql) Initialize(config *Configuration) error {
+	m.Lock()
+	defer m.Unlock()
+	if config == nil {
+		return errors.New("config is nil")
+	}
+	if err := m.DB.Initialize(&config.Configuration); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *mysql) EmployeeCreate(employeePartial data.EmployeePartial) (*data.Employee, error) {

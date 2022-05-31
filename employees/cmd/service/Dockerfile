@@ -56,5 +56,7 @@ LABEL antonio-alexander.git.branch=${GIT_BRANCH}
 LABEL antonio-alexander.git.commit=${GIT_COMMIT}
 LABEL org.opencontainers.image.source=https://github.com/antonio-alexander/go-bludgeon
 
+EXPOSE 8080 2345
+
 CMD tar -xzf bludgeon-employee.tar.gz && ./bludgeon-employee
 

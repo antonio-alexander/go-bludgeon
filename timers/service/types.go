@@ -1,10 +1,10 @@
-package server
+package service
 
 import "strings"
 
 type Type string
 
-//task states
+//type constants
 const (
 	TypeInvalid Type = "invalid"
 	TypeREST    Type = "rest"
@@ -26,8 +26,4 @@ func AtoType(s string) Type {
 	case "rest":
 		return TypeREST
 	}
-}
-
-type Owner interface {
-	Stop()
 }

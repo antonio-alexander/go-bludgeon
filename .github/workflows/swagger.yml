@@ -1,0 +1,158 @@
+name: swagger
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "cmd/swagger/**"
+      - "timers/**"
+      - "employees/**"
+      - ".github/workflows/swagger.yml"
+  pull_request:
+    paths:
+      - "cmd/swagger/**"
+      - "timers/**"
+      - "employees/**"
+      - ".github/workflows/swagger.yml"
+  release:
+    types: [published]
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  GITHUB_REPO: ${{ github.repository }}
+  GITHUB_SHA: ${{ github.sha }}
+  GITHUB_REF: ${{ github.ref }}
+  GITHUB_BASE_REF: ${{ github.base_ref }}
+  PLATFORM_AMD64: linux/amd64
+  PLATFORM_ARMV7: linux/arm/v7
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Get version
+        run: |
+          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Generate build artifacts
+        run: |
+          mkdir -p /tmp
+          echo ${{ env.version }} >> /tmp/version
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts
+          path: |
+            /tmp/version
+
+  version_validate:
+    if: github.event_name == 'pull_request' && github.base_ref == 'refs/heads/main'
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get version
+        run: |
+          version=`cat /tmp/version`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.base_ref }}
+      - name: Get base version
+        run: |
+          base_version=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
+          echo "base_version=$base_version" >> $GITHUB_ENV
+      - name: Compare versions
+        run: |
+          echo "Comparing version \"$version\" to base version \"$base_version\""
+          if [ "$version" = "$base_version" ]; then
+               echo "versions equal, verions must be different"
+               exit 1
+          fi
+
+  docker_build_images:
+    needs: [version]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Get Version
+        run: |
+          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Build docker images
+        run: |
+          github_ref=${GITHUB_REF##refs/heads/}
+          github_ref=${GITHUB_REF##refs/tags/}
+          docker build -f ./cmd/swagger/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_${{ env.version }} --no-cache --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg BRANCH=$GITHUB_BASE_REF --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
+      - name: Generate build artifacts
+        run: |
+          mkdir -p /tmp
+          docker save -o /tmp/go-bludgeon-swagger_amd64-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_${{ env.version }}
+          echo ${{ env.version }} >> /tmp/version
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts
+          path: |
+            /tmp/go-bludgeon-swagger_amd64-${{ env.version }}.tar.gz
+          retention-days: 1
+      - name: Docker clean-up
+        run: |
+          docker image prune -f
+          docker container prune -f
+
+  docker_push_images:
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    needs: [docker_build_images]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get Version
+        run: |
+          version=`cat /tmp/version`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Login to ghcr.io
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Load Docker Images
+        run: |
+          docker load -i /tmp/go-bludgeon-swagger_amd64-${{ env.version }}.tar.gz
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_${{ env.version }}
+      - name: Push Docker Images
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_${{ env.version }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_latest
+      - name: Create/Push Docker manifest
+        run: |
+          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_${{ env.version }}
+          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:${{ env.version }} --purge
+          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_latest
+          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:latest --purge
+      - name: Docker clean-up
+        run: |
+          docker image prune -f
+          docker container prune -f

@@ -1,0 +1,61 @@
+#---------------------------------------------------------------------------------------------------
+# bludgeon-swagger [Dockerfile]
+# 
+# Reference: https://stackoverflow.com/questions/63178036/how-to-find-commit-hash-from-within-a-running-docker-image
+# commit: git rev-parse HEAD
+# 
+# https://stackoverflow.com/questions/6245570/how-to-get-the-current-branch-name-in-git
+# branch: git rev-parse --abbrev-ref HEAD
+# 
+#---------------------------------------------------------------------------------------------------
+
+ARG GIT_BRANCH=no_git_branch_provided
+ARG GIT_COMMIT=no_git_commit_provided
+ARG PLATFORM=linux/amd64
+ARG GO_ARCH=amd64
+ARG GO_ARM=7
+ARG REPO=https://github.com/antonio-alexander/go-bludgeon.git
+ARG BRANCH=develop
+
+FROM --platform=${PLATFORM} golang:alpine AS build
+
+ARG GO_ARCH
+ARG GO_ARM
+ARG BRANCH
+ARG REPO
+
+RUN \
+    apk add git openssh-client gcc g++ wget \
+    && env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux CGO_ENABLED=1 \
+    go install github.com/go-swagger/go-swagger/cmd/swagger@v0.29.0
+
+WORKDIR /go/src/github.com/antonio-alexander
+
+RUN \
+    git clone --depth=1 --branch ${BRANCH} ${REPO} \
+    && rm -r /go/src/github.com/antonio-alexander/go-bludgeon/.git
+
+WORKDIR /swagger
+
+RUN \
+    cd /go/src/github.com/antonio-alexander/go-bludgeon/employees/service/rest/swagger \
+    && swagger generate spec -o /swagger/swagger_employees.json --scan-models \
+    && cd /go/src/github.com/antonio-alexander/go-bludgeon/timers/service/rest/swagger\
+    && swagger generate spec -o /swagger/swagger_timers.json --scan-models 
+
+FROM --platform=${PLATFORM} swaggerapi/swagger-ui:v4.12.0
+
+ARG GIT_BRANCH
+ARG GIT_COMMIT
+
+COPY --from=build /swagger/swagger_timers.json /usr/share/nginx/html/api/swagger_timers.json
+COPY --from=build /swagger/swagger_employees.json /usr/share/nginx/html/api/swagger_employees.json
+
+ENV URLS="[{ url: \"./api/swagger_employees.json\", name: \"Employees\" }, { url: \"./api/swagger_timers.json\", name: \"Timers\" }, ]"
+
+RUN apk add wget
+
+LABEL antonio-alexander.git.branch=${GIT_BRANCH}
+LABEL antonio-alexander.git.commit=${GIT_COMMIT}
+LABEL org.opencontainers.image.source=https://github.com/antonio-alexander/go-bludgeon
+

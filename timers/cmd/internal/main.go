@@ -20,7 +20,7 @@ import (
 func startMeta(config *Configuration, parameters ...interface{}) (interface {
 	meta.Timer
 	meta.TimeSlice
-	meta.Owner
+	meta.Shutdown
 }, error) {
 	switch v := config.Meta.Type; v {
 	default:
@@ -74,6 +74,7 @@ func getConfig(pwd string, envs map[string]string, logger logger.Logger) *Config
 	return config
 }
 
+//Main provides the runtime business logic for the timers service
 func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os.Signal) error {
 	logger := logger.New("bludgeon-timers-service")
 	logger.Info("version %s (%s@%s)", Version, GitBranch, GitCommit)

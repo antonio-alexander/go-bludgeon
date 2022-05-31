@@ -1,4 +1,4 @@
-package metamysql_test
+package mysql_test
 
 import (
 	"os"
@@ -6,15 +6,13 @@ import (
 	"testing"
 
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	metamysql "github.com/antonio-alexander/go-bludgeon/timers/meta/mysql"
+	meta "github.com/antonio-alexander/go-bludgeon/timers/meta/mysql"
 	tests "github.com/antonio-alexander/go-bludgeon/timers/meta/tests"
-
-	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var config *internal_mysql.Configuration
+var config *meta.Configuration
 
 func init() {
 	pwd, _ := os.Getwd()
@@ -24,13 +22,13 @@ func init() {
 			envs[s[0]] = strings.Join(s[1:], ",")
 		}
 	}
-	config = new(internal_mysql.Configuration)
+	config = new(meta.Configuration)
 	config.Default()
 	config.FromEnv(pwd, envs)
 }
 
 func TestMetaMySQL(t *testing.T) {
-	m := metamysql.New(
+	m := meta.New(
 		logger.New(),
 	)
 	err := m.Initialize(config)

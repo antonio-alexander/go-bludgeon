@@ -5,7 +5,7 @@ import (
 )
 
 // swagger:route GET /employees/search employees search
-// You can read one or more employees by providing zero or no search parameters.
+// Reads one or more employees using search parameters.
 //
 //     Consumes:
 //     - application/json
@@ -16,17 +16,15 @@ import (
 //     Schemes: http
 //
 // responses:
-//   200: employeeSearchResponseOk
-//   500: employeeGetResponseNotFound
+//   200: EmployeeSearchResponseOk
 
-// swagger:response employeeGetResponseOk
-type employeeSearchResponseOk struct {
+// swagger:response EmployeeSearchResponseOk
+type EmployeeSearchResponseOk struct {
 	// in:body
 	Body []data.Employee
 }
 
-// swagger:parameters employee read
-type employeeSearchParams struct {
-	// in:body
+// swagger:parameters EmployeeSearchParams
+type EmployeeSearchParams struct {
 	data.EmployeeSearch
 }

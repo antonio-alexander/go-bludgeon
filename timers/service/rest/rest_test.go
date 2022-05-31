@@ -46,7 +46,6 @@ type restServerTest struct {
 		server.Router
 	}
 	meta interface {
-		meta.Owner
 		meta.Serializer
 		meta.Timer
 		meta.TimeSlice
@@ -93,7 +92,6 @@ func (r *restServerTest) Initialize(t *testing.T) {
 }
 
 func (r *restServerTest) Shutdown(t *testing.T) {
-	r.meta.Shutdown()
 	r.server.Stop()
 }
 

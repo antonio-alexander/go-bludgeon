@@ -18,30 +18,35 @@ type file struct {
 		internal_file.Owner
 	}
 	logger.Logger
-	meta.Owner
 	meta.Serializer
 	meta.Employee
+	meta.Owner
 }
 
-func New(parameters ...interface{}) interface {
-	internal_file.Owner
-	meta.Owner
-	meta.Employee
-} {
+func New(parameters ...interface{}) File {
+	var config *Configuration
+
 	memory := memory.New(parameters)
-	m := &file{
-		Owner:      memory,
+	file := &file{
 		Serializer: memory,
 		Employee:   memory,
+		Owner:      memory,
 		File:       internal_file.New(parameters...),
 	}
 	for _, p := range parameters {
 		switch p := p.(type) {
+		case *Configuration:
+			config = p
 		case logger.Logger:
-			m.Logger = p
+			file.Logger = p
 		}
 	}
-	return m
+	if config != nil {
+		if err := file.Initialize(config); err != nil {
+			panic(err)
+		}
+	}
+	return file
 }
 
 func (m *file) write() error {
@@ -53,11 +58,11 @@ func (m *file) write() error {
 }
 
 //Initialize
-func (m *file) Initialize(config *internal_file.Configuration) error {
+func (m *file) Initialize(config *Configuration) error {
 	m.Lock()
 	defer m.Unlock()
 
-	if err := m.File.Initialize(config); err != nil {
+	if err := m.File.Initialize(&config.Configuration); err != nil {
 		return err
 	}
 	serializedData := &meta.SerializedData{}

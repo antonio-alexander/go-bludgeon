@@ -1,6 +1,6 @@
-// Package swagger provides documentation neccessary to automatically generate swagger docs using go-swagger.
+// Package Swagger Bludgeon Timers.
 //
-// The bludgeon-timers service provides the ability to interact with timers.
+// The timers endpoints allow you to interact with one or more timers.
 //
 //     Schemes: http
 //     Host: localhost:8080

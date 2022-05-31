@@ -55,7 +55,9 @@ func TestTimerCRUD(m interface {
 		assert.Nil(t, err)
 		assert.Equal(t, updatedComment, timerUpdated.Comment)
 		timer.Comment = timerUpdated.Comment
-		timer.Audit = timerUpdated.Audit
+		timer.LastUpdated = timerUpdated.LastUpdated
+		timer.LastUpdatedBy = timerUpdated.LastUpdatedBy
+		timer.Version = timerUpdated.Version
 		assert.Equal(t, timer, timerUpdated)
 		//delete
 		err = m.TimerDelete(timer.ID)

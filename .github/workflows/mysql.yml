@@ -3,7 +3,7 @@ name: mysql
 on:
   push:
     branches:
-      - master
+      - main
       - develop
     paths:
       - "mysql/**"

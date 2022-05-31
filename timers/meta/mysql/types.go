@@ -1,16 +1,24 @@
-package metamysql
+package mysql
 
-//error constants
-const (
-	ErrTimerNotFoundf     string = "timer with id, \"%s\", not found locally"
-	ErrTimeSliceNotFoundf string = "timeSlice with id, \"%s\", not found locally"
+import (
+	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
+	"github.com/antonio-alexander/go-bludgeon/timers/meta"
 )
 
-//query constants
-const (
-	tableEmployees    string = "employees"
-	tableTimers       string = "timers"
-	tableTimeSlices   string = "time_slices"
-	tableTimersV1     string = "timers_v1"
-	tableTimeSlicesV1 string = "time_slices_v1"
-)
+//Configuration provides parameters to control the functionality of the
+// meta pointer at run time, although it exposes the configuration of the
+// underlying pointer, it prevents having to directly reference it
+type Configuration struct {
+	internal_mysql.Configuration
+}
+
+//MySQL combines all the methods implemented by the underlying pointer
+type MySQL interface {
+	meta.Timer
+	meta.TimeSlice
+	meta.Shutdown
+
+	//Initialize will configure and prepare the underlying pointer to
+	// execute its business logic
+	Initialize(config *Configuration) (err error)
+}

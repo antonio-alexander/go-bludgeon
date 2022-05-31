@@ -73,6 +73,7 @@ func getConfig(pwd string, envs map[string]string, logger logger.Logger) *Config
 	return config
 }
 
+//Main is used to start an instance of the bludgeon employees service
 func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os.Signal) error {
 	logger := logger.New("bludgeon-employees-service")
 	logger.Info("version %s (%s@%s)", Version, GitBranch, GitCommit)

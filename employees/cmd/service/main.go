@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	internal "github.com/antonio-alexander/go-bludgeon/employees/cmd/internal"
-
-	_ "github.com/antonio-alexander/go-bludgeon/employees/service/rest/swagger" //for swagger docs
 )
 
 func main() {

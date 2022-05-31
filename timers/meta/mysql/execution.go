@@ -1,4 +1,4 @@
-package metamysql
+package mysql
 
 import (
 	"database/sql"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/antonio-alexander/go-bludgeon/timers/data"
+	"github.com/antonio-alexander/go-bludgeon/timers/meta"
 
 	"github.com/pkg/errors"
 )
@@ -14,13 +15,13 @@ import (
 //rowsAffected can be used to return a pre-determined error via errorString in the event
 // no rows are affected; this function assumes that in the event no error is returned and
 // rows were supposed to be affected, an error will be returned
-func rowsAffected(result sql.Result, errorString string) error {
+func rowsAffected(result sql.Result, customErr error) error {
 	n, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}
 	if n <= 0 {
-		return errors.New(errorString)
+		return customErr
 	}
 	return nil
 }
@@ -223,7 +224,7 @@ func timerUpdate(db interface {
 	if err != nil {
 		return nil, err
 	}
-	if err := rowsAffected(result, fmt.Sprintf(ErrTimerNotFoundf, id)); err != nil {
+	if err := rowsAffected(result, meta.ErrTimerNotFound); err != nil {
 		return nil, err
 	}
 	timer, err := timerRead(db, id)

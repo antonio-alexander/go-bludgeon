@@ -16,30 +16,22 @@ import (
 type file struct {
 	sync.RWMutex
 	logger.Logger
+	internal_file.Owner
 	internal_file.File
-	file interface {
-		internal_file.Owner
-		internal_file.File
-	}
-	meta.Owner
 	meta.Serializer
 	meta.Timer
 	meta.TimeSlice
 }
 
-func New(parameters ...interface{}) interface {
-	internal_file.Owner
-	meta.Owner
-	meta.Timer
-	meta.TimeSlice
-} {
+func New(parameters ...interface{}) File {
 	memory := memory.New(parameters...)
+	internalFile := internal_file.New(parameters...)
 	m := &file{
-		Owner:      memory,
 		Serializer: memory,
 		Timer:      memory,
 		TimeSlice:  memory,
-		file:       internal_file.New(parameters...),
+		File:       internalFile,
+		Owner:      internalFile,
 	}
 	for _, p := range parameters {
 		switch p := p.(type) {
@@ -50,29 +42,29 @@ func New(parameters ...interface{}) interface {
 	return m
 }
 
-func (m *file) write() error {
+func (m *file) Write() error {
 	serializedData, err := m.Serialize()
 	if err != nil {
 		return err
 	}
-	return m.file.Write(serializedData)
+	return m.File.Write(serializedData)
 }
 
-func (m *file) read() error {
+func (m *file) Read() error {
 	serializedData := &meta.SerializedData{}
-	if err := m.file.Read(serializedData); err != nil {
+	if err := m.File.Read(serializedData); err != nil {
 		return err
 	}
 	return m.Deserialize(serializedData)
 }
 
-func (m *file) Initialize(config *internal_file.Configuration) error {
+func (m *file) Initialize(config *Configuration) error {
 	m.Lock()
 	defer m.Unlock()
-	if err := m.file.Initialize(config); err != nil {
+	if err := m.Owner.Initialize(&config.Configuration); err != nil {
 		return err
 	}
-	if err := m.read(); err != nil {
+	if err := m.Read(); err != nil {
 		folder := filepath.Dir(config.File)
 		return os.MkdirAll(folder, os.ModePerm)
 	}
@@ -82,10 +74,9 @@ func (m *file) Initialize(config *internal_file.Configuration) error {
 func (m *file) Shutdown() {
 	m.Lock()
 	defer m.Unlock()
-	if err := m.write(); err != nil {
+	if err := m.Write(); err != nil {
 		m.Error("error while shutting down: %s", err.Error())
 	}
-	m.Owner.Shutdown()
 }
 
 func (m *file) TimerCreate(t data.TimerPartial) (*data.Timer, error) {
@@ -95,7 +86,7 @@ func (m *file) TimerCreate(t data.TimerPartial) (*data.Timer, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := m.write(); err != nil {
+	if err := m.Write(); err != nil {
 		return nil, err
 	}
 	return timer, nil
@@ -108,7 +99,7 @@ func (m *file) TimerUpdate(id string, t data.TimerPartial) (*data.Timer, error) 
 	if err != nil {
 		return nil, err
 	}
-	if err := m.write(); err != nil {
+	if err := m.Write(); err != nil {
 		return nil, err
 	}
 	return timer, nil
@@ -120,7 +111,7 @@ func (m *file) TimerDelete(id string) error {
 	if err := m.Timer.TimerDelete(id); err != nil {
 		return err
 	}
-	if err := m.write(); err != nil {
+	if err := m.Write(); err != nil {
 		return err
 	}
 	return nil
@@ -133,7 +124,7 @@ func (m *file) TimerStart(id string) (*data.Timer, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := m.write(); err != nil {
+	if err := m.Write(); err != nil {
 		return nil, err
 	}
 	return timer, nil
@@ -146,7 +137,7 @@ func (m *file) TimerStop(id string) (*data.Timer, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := m.write(); err != nil {
+	if err := m.Write(); err != nil {
 		return nil, err
 	}
 	return timer, nil
@@ -159,7 +150,7 @@ func (m *file) TimeSliceCreate(t data.TimeSlicePartial) (*data.TimeSlice, error)
 	if err != nil {
 		return nil, err
 	}
-	if err := m.write(); err != nil {
+	if err := m.Write(); err != nil {
 		return nil, err
 	}
 	return timeSlice, nil
@@ -172,7 +163,7 @@ func (m *file) TimeSliceUpdate(id string, t data.TimeSlicePartial) (*data.TimeSl
 	if err != nil {
 		return nil, err
 	}
-	if err := m.write(); err != nil {
+	if err := m.Write(); err != nil {
 		return nil, err
 	}
 	return timeSlice, nil
@@ -184,7 +175,7 @@ func (m *file) TimeSliceDelete(id string) error {
 	if err := m.TimeSlice.TimeSliceDelete(id); err != nil {
 		return err
 	}
-	if err := m.write(); err != nil {
+	if err := m.Write(); err != nil {
 		return err
 	}
 	return nil

@@ -20,9 +20,11 @@ type restServer struct {
 	rest_server.Router
 }
 
-func New(parameters ...interface{}) interface {
-	Owner
-} {
+type Owner interface {
+	Close()
+}
+
+func New(parameters ...interface{}) Owner {
 	s := &restServer{}
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
@@ -172,22 +174,108 @@ func (s *restServer) endpointTimerSubmit() func(http.ResponseWriter, *http.Reque
 	}
 }
 
+func (s *restServer) endpointTimeSliceCreate() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var timeSlicePartial data.TimeSlicePartial
+		var timeSlice *data.TimeSlice
+		var bytes []byte
+		var err error
+
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			if err = json.Unmarshal(bytes, &timeSlicePartial); err == nil {
+				if timeSlice, err = s.TimeSliceCreate(timeSlicePartial); err == nil {
+					bytes, err = json.Marshal(timeSlice)
+				}
+			}
+		}
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error("time slice create -  %s", err)
+		}
+	}
+}
+
+func (s *restServer) endpointTimeSliceRead() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var timeSlice *data.TimeSlice
+		var bytes []byte
+		var err error
+
+		id := idFromPath(mux.Vars(request))
+		if timeSlice, err = s.TimeSliceRead(id); err == nil {
+			bytes, err = json.Marshal(timeSlice)
+		}
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error("time slice read -  %s", err)
+		}
+	}
+}
+
+func (s *restServer) endpointTimeSlicesRead() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var timeSlices []*data.TimeSlice
+		var search data.TimeSliceSearch
+		var bytes []byte
+		var err error
+
+		search.FromParams(request.URL.Query())
+		if timeSlices, err = s.TimeSlicesRead(search); err == nil {
+			bytes, err = json.Marshal(timeSlices)
+		}
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error("time slices read -  %s", err)
+		}
+	}
+}
+
+func (s *restServer) endpointTimeSliceUpdate() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var timeSlicePartial data.TimeSlicePartial
+		var timeSlice *data.TimeSlice
+		var bytes []byte
+		var err error
+
+		id := idFromPath(mux.Vars(request))
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			if err = json.Unmarshal(bytes, &timeSlicePartial); err == nil {
+				if timeSlice, err = s.TimeSliceUpdate(id, timeSlicePartial); err == nil {
+					bytes, err = json.Marshal(timeSlice)
+				}
+			}
+		}
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error("timer slice create -  %s", err)
+		}
+	}
+}
+
+func (s *restServer) endpointTimeSliceDelete() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var err error
+
+		id := idFromPath(mux.Vars(request))
+		err = s.TimeSliceDelete(id)
+		if err = handleResponse(writer, err, nil); err != nil {
+			s.Error("timer delete -  %s", err)
+		}
+	}
+}
+
 func (s *restServer) buildRoutes() {
 	for _, route := range []rest_server.HandleFuncConfig{
 		//timer
-		{Route: data.RouteTimers, Method: POST, HandleFx: s.endpointTimerCreate()},
-		{Route: data.RouteTimersSearch, Method: GET, HandleFx: s.endpointTimersRead()},
-		{Route: data.RouteTimersID, Method: GET, HandleFx: s.endpointTimerRead()},
-		{Route: data.RouteTimersID, Method: DELETE, HandleFx: s.endpointTimerDelete()},
-		{Route: data.RouteTimersIDStart, Method: PUT, HandleFx: s.endpointTimerStart()},
-		{Route: data.RouteTimersIDStop, Method: PUT, HandleFx: s.endpointTimerStop()},
-		{Route: data.RouteTimersIDSubmit, Method: PUT, HandleFx: s.endpointTimerSubmit()},
+		{Route: data.RouteTimers, Method: http.MethodPost, HandleFx: s.endpointTimerCreate()},
+		{Route: data.RouteTimersSearch, Method: http.MethodGet, HandleFx: s.endpointTimersRead()},
+		{Route: data.RouteTimersID, Method: http.MethodGet, HandleFx: s.endpointTimerRead()},
+		{Route: data.RouteTimersID, Method: http.MethodDelete, HandleFx: s.endpointTimerDelete()},
+		{Route: data.RouteTimersIDStart, Method: http.MethodPut, HandleFx: s.endpointTimerStart()},
+		{Route: data.RouteTimersIDStop, Method: http.MethodPut, HandleFx: s.endpointTimerStop()},
+		{Route: data.RouteTimersIDSubmit, Method: http.MethodPut, HandleFx: s.endpointTimerSubmit()},
 		//time slice
-		// {Route: RouteTimeSlices, Method: POST, HandleFx: s.endpointTimeSliceCreate()},
-		// {Route: RouteTimeSlicesID, Method: GET, HandleFx: s.endpointTimeSliceRead()},
-		// {Route: RouteTimeSlices, Method: GET, HandleFx: s.endpointTimeSlicesRead()},
-		// {Route: RouteTimeSlicesID, Method: PUT, HandleFx: s.endpointTimeSliceUpdate()},
-		// {Route: RouteTimeSlicesID, Method: DELETE, HandleFx: s.endpointTimeSliceDelete()},
+		{Route: data.RouteTimeSlices, Method: http.MethodPost, HandleFx: s.endpointTimeSliceCreate()},
+		{Route: data.RouteTimeSlicesID, Method: http.MethodGet, HandleFx: s.endpointTimeSliceRead()},
+		{Route: data.RouteTimeSlices, Method: http.MethodGet, HandleFx: s.endpointTimeSlicesRead()},
+		{Route: data.RouteTimeSlicesID, Method: http.MethodPut, HandleFx: s.endpointTimeSliceUpdate()},
+		{Route: data.RouteTimeSlicesID, Method: http.MethodDelete, HandleFx: s.endpointTimeSliceDelete()},
 	} {
 		s.Router.HandleFunc(route)
 	}

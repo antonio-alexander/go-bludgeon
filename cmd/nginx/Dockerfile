@@ -18,7 +18,7 @@ ARG PLATFORM=linux/amd64
 
 FROM --platform=${PLATFORM} nginx:1.21.6-alpine
 
-COPY ./config/default.conf /etc/nginx/conf.d/default.conf
+COPY ./cmd/nginx/config/default.conf /etc/nginx/conf.d/default.conf
 
 LABEL antonio-alexander.git.branch=${GIT_BRANCH}
 LABEL antonio-alexander.git.commit=${GIT_COMMIT}

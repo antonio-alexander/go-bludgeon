@@ -5,16 +5,14 @@ import (
 	"strings"
 	"testing"
 
-	mysql "github.com/antonio-alexander/go-bludgeon/employees/meta/mysql"
+	meta "github.com/antonio-alexander/go-bludgeon/employees/meta/mysql"
 	tests "github.com/antonio-alexander/go-bludgeon/employees/meta/tests"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-
-	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var config *internal_mysql.Configuration
+var config *meta.Configuration
 
 func init() {
 	pwd, _ := os.Getwd()
@@ -24,13 +22,13 @@ func init() {
 			envs[s[0]] = strings.Join(s[1:], ",")
 		}
 	}
-	config = new(internal_mysql.Configuration)
+	config = new(meta.Configuration)
 	config.Default()
 	config.FromEnv(pwd, envs)
 }
 
 func TestMetaMysql(t *testing.T) {
-	m := mysql.New(logger.New())
+	m := meta.New(logger.New())
 	err := m.Initialize(config)
 	assert.Nil(t, err)
 	t.Run("Employee CRUD", tests.TestEmployeeCRUD(m))

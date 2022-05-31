@@ -11,15 +11,13 @@ import (
 
 	"github.com/antonio-alexander/go-bludgeon/employees/client/rest"
 	"github.com/antonio-alexander/go-bludgeon/employees/data"
-	"github.com/antonio-alexander/go-bludgeon/employees/logic"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
-	"github.com/antonio-alexander/go-bludgeon/internal/rest/client"
 
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	config      *client.Configuration
+	config      *rest.Configuration
 	letterRunes []rune = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 )
 
@@ -40,17 +38,14 @@ func init() {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	config = new(client.Configuration)
+	config = new(rest.Configuration)
 	config.Default()
 	config.FromEnv(pwd, envs)
 	rand.Seed(time.Now().UnixNano())
 }
 
 type restClientTest struct {
-	client interface {
-		logic.Logic
-		rest.Owner
-	}
+	client rest.Client
 }
 
 func newRestclientTest() *restClientTest {

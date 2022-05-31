@@ -12,45 +12,51 @@
 #
 #---------------------------------------------------------------------------------------------------
 
-# build from alpine container with golang
-FROM golang:1.16.2-alpine3.13 AS builder
+ARG GIT_BRANCH=no_git_branch_provided
+ARG GIT_COMMIT=no_git_commit_provided
+ARG PLATFORM=linux/amd64
+ARG GO_ARCH=amd64
+ARG GO_ARM=7
 
-# set the working directory to cmd, so we can build easily
-WORKDIR /build
+FROM golang:alpine AS build
 
-# set environment
-ENV GOPATH=/go PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+ARG GIT_BRANCH
+ARG GIT_COMMIT
+ARG GO_ARCH
+ARG GO_ARM
 
-# copy current directory into the gopath
-COPY . /build
+WORKDIR /go/src/go-bludgeon/employee
 
-# build/install delve
+COPY . /go/src/go-bludgeon/employee
+
 RUN \
-    apk add --no-cache ca-certificates \
-    dpkg \
-    gcc \
-    git \
-    musl-dev \
-    && mkdir -p "$GOPATH/src" "$GOPATH/bin" \
-    && chmod -R 777 "$GOPATH" \
-    && go get github.com/go-delve/delve/cmd/dlv 
+    apk add --no-cache ca-certificates jq dpkg gcc git musl-dev \
+    && go get github.com/go-delve/delve/cmd/dlv@v1.8.3
 
-# build the executable
 RUN \
-    mkdir -p /app && \
-    cd ./server/cmd/server-rest && \
-    go build -gcflags "all=-N -l" -o /app/bludgeon_server && \
-    chmod +x /app/bludgeon_server
+    VERSION=`cat /go/src/go-bludgeon/employee/version.json | jq '.Version' | sed 's/"//g'` \
+    && cd cmd/service \
+    && env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux go build -gcflags "all=-N -l" -ldflags \
+    "-X github.com/antonio-alexander/go-bludgeon/employee/cmd/service/internal.Version=${VERSION} \
+    -X github.com/antonio-alexander/go-bludgeon/employee/cmd/service/internal.GitCommit=${GIT_COMMIT} \
+    -X github.com/antonio-alexander/go-bludgeon/employee/cmd/service/internal.GitBranch=${GIT_BRANCH}" \
+    -o bludgeon-employee \
+    && chmod +X bludgeon-employee
 
-# build from a clean container (without golang)
-FROM alpine:latest
+FROM --platform=${PLATFORM} alpine:latest
 
-# set working directory to app
+ARG GIT_BRANCH
+ARG GIT_COMMIT
+
 WORKDIR /app
 
-# copy delve and the app
-COPY --from=builder /app/bludgeon_server /app/bludgeon_server
-COPY --from=builder /go/bin/dlv /bin/
+COPY --from=build /go/src/go-bludgeon/employee/cmd/service/bludgeon-employee /app/bludgeon-employee
+COPY --from=build /go/src/go-bludgeon/employee/cmd/service/config/bludgeon_server_config-default.json /app/config/bludgeon_server_config-default.json
 
-# use this to run delve with the executable
-CMD dlv exec /app/bludgeon_server --headless --listen=":2345" --log --api-version=2 --check-go-version=false
+LABEL antonio-alexander.git.branch=${GIT_BRANCH}-debug
+LABEL antonio-alexander.git.commit=${GIT_COMMIT}-debug
+LABEL org.opencontainers.image.source=https://github.com/antonio-alexander/go-bludgeon
+
+EXPOSE 8080 2345
+
+CMD dlv exec /app/bludgeon-employee --headless --listen=":2345" --log --api-version=2 --check-go-version=false

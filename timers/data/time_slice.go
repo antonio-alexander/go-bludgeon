@@ -30,8 +30,50 @@ type TimeSlice struct {
 	// example: "7f583116-c7b8-457d-97e0-be0670e9e27e"
 	TimerID string `json:"timer_id"`
 
-	//Used for accounting of this unique time slice
-	Audit
+	//LastUpdated represents the last time (unix nano) something was mutated
+	// example: 1652417242000
+	LastUpdated int64 `json:"last_updated"`
+
+	//LastUpdatedBy will identify the last someone who mutated something
+	// example: bludgeon_employee_memory
+	LastUpdatedBy string `json:"last_updated_by"`
+
+	//Version is an integer that's atomically incremented each time something i smutated
+	// example: 1
+	Version int `json:"version"`
+}
+
+func (t *TimeSlice) Validate() bool {
+	if t.TimerID == "" {
+		return false
+	}
+	if t.Start <= 0 {
+		return false
+	}
+	if t.Finish != 0 && t.Finish <= t.Start {
+		return false
+	}
+	return true
+}
+
+func (t *TimeSlice) Contains(tC TimeSlice) bool {
+	//validate both the time slices
+	if t.Start == 0 || (t.Finish > 0 && t.Finish <= t.Start) ||
+		tC.Start == 0 || (tC.Finish > 0 && tC.Finish <= tC.Start) {
+		//both time slices must have a non zero start and if
+		// the finish is non zero it must be greater or equal to start
+		return false
+	}
+	if t.Finish == 0 {
+		//finish and start must be less than start
+		return tC.Start < t.Start && tC.Finish < t.Start
+	}
+	if tC.Finish == 0 {
+		//start must be greater than finish and start
+		return tC.Start > t.Finish && tC.Start > t.Start
+	}
+	//start must be greater than the finish
+	return tC.Start > t.Finish
 }
 
 // swagger:model TimeSlicePartial
@@ -56,16 +98,35 @@ type TimeSlicePartial struct {
 	Finish *int64
 }
 
-//TimeSliceByStart can be used to sort slices by
-// start time using the sort.Sort function
+//TimeSliceByStart implements sort.Interface
+// var _ sort.Interface = TimeSliceByStart{}
 type TimeSliceByStart []*TimeSlice
 
+//Len is the number of elements in the collection.
 func (t TimeSliceByStart) Len() int {
 	return len(t)
 }
+
+//Swap swaps the elements with indexes i and j.
 func (t TimeSliceByStart) Swap(i, j int) {
 	t[i], t[j] = t[j], t[i]
 }
+
+//Less reports whether the element with index i
+// must sort before the element with index j.
+//
+// If both Less(i, j) and Less(j, i) are false,
+// then the elements at index i and j are considered equal.
+// Sort may place equal elements in any order in the final result,
+// while Stable preserves the original input order of equal elements.
+//
+// Less must describe a transitive ordering:
+//  - if both Less(i, j) and Less(j, k) are true, then Less(i, k) must be true as well.
+//  - if both Less(i, j) and Less(j, k) are false, then Less(i, k) must be false as well.
+//
+// Note that floating-point comparison (the < operator on float32 or float64 values)
+// is not a transitive ordering when not-a-number (NaN) values are involved.
+// See Float64Slice.Less for a correct implementation for floating-point values.
 func (t TimeSliceByStart) Less(i, j int) bool {
 	return t[i].Start < t[j].Start
 }
