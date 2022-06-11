@@ -19,8 +19,17 @@ type Employee struct {
 	// example: John.Smith@foobar.duck
 	EmailAddress string `json:"email_address"`
 
-	//Used for accounting of this unique employee
-	Audit
+	//The last time (unix nano) something was mutated
+	// example: 1652417242000
+	LastUpdated int64 `json:"last_updated"`
+
+	//identifies the last someone who mutated something
+	// example: bludgeon_employee_memory
+	LastUpdatedBy string `json:"last_updated_by"`
+
+	//An integer that's atomically incremented each time something is mutated
+	// example: 1
+	Version int `json:"version"`
 }
 
 // swagger:model EmployeePartial

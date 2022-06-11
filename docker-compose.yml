@@ -2,6 +2,62 @@ version: "3"
 
 services:
 
+  godocs:
+    container_name: "godocs"
+    hostname: "godocs"
+    image: ghcr.io/antonio-alexander/go-bludgeon-godocs:latest
+    restart: "always"
+    ports:
+      - "8081:8080"
+    build:
+      context: ./
+      dockerfile: ./cmd/godocs/Dockerfile
+      args:
+        - BRANCH=develop
+        - REPO=https://github.com/antonio-alexander/go-bludgeon.git
+        - PLATFORM=linux/amd64
+        - GO_ARCH=amd64
+        # - PLATFORM=linux/arm/v7
+        # - GO_ARCH=arm
+        # - GO_ARM=7
+    volumes:
+      - ./tmp/godoc:/tmp
+
+  swagger:
+    container_name: "swagger"
+    hostname: "swagger"
+    image: ghcr.io/antonio-alexander/go-bludgeon-swagger:latest
+    restart: "always"
+    ports:
+      - "8082:8080"
+    build:
+      context: ./
+      dockerfile: ./cmd/swagger/Dockerfile
+      args:
+        - BRANCH=develop
+        - REPO=https://github.com/antonio-alexander/go-bludgeon.git
+        - PLATFORM=linux/amd64
+        - GO_ARCH=amd64
+        # - PLATFORM=linux/arm/v7
+        # - GO_ARCH=arm
+        # - GO_ARM=7
+    volumes:
+      - ./tmp/swagger:/tmp
+
+  nginx:
+    container_name: "nginx"
+    hostname: "nginx"
+    image: ghcr.io/antonio-alexander/go-bludgeon-nginx:latest
+    restart: "always"
+    depends_on:
+      - employees
+      - timers
+    build:
+      context: ./
+      dockerfile: ./cmd/nginx/Dockerfile
+    ports:
+      - "8080:80"
+
   mysql:
     container_name: "mysql"
     hostname: "mysql"
@@ -14,6 +70,7 @@ services:
       MYSQL_DATABASE: bludgeon
       MYSQL_USER: bludgeon
       MYSQL_PASSWORD: bludgeon
+      BLUDGEON_MICROSERVICE: false
 
   employees:
     container_name: "employees"
@@ -23,14 +80,14 @@ services:
       - mysql
     restart: "always"
     ports:
-      - "8082:8080"
+      - "9000:8080"
     environment:
       BLUDGEON_SERVICE_TYPE: "rest"
       BLUDGEON_META_TYPE: "mysql"
       BLUDGEON_REST_ADDRESS: ""
       BLUDGEON_REST_PORT: "8080"
       BLUDGEON_META__FILE: "data/bludgeon.json"
-      BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal"
+      BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal,http://localhost:8082"
       BLUDGEON_CORS_DEBUG: "true"
       DATABASE_HOST: "mysql"
       DATABASE_PORT: "3306"
@@ -44,14 +101,14 @@ services:
     image: ghcr.io/antonio-alexander/go-bludgeon-timers:latest
     restart: "always"
     ports:
-      - "8080:8080"
+      - "9010:8080"
     environment:
       BLUDGEON_SERVICE_TYPE: "rest"
       BLUDGEON_META_TYPE: "mysql"
       BLUDGEON_REST_ADDRESS: ""
       BLUDGEON_REST_PORT: "8080"
       BLUDGEON_META__FILE: "data/bludgeon.json"
-      BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal"
+      BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal,http://localhost:8082"
       BLUDGEON_CORS_DEBUG: "true"
       DATABASE_HOST: "mysql"
       DATABASE_PORT: "3306"

@@ -10,30 +10,37 @@ import (
 type EmployeeSearch struct {
 	//An array of one or more ids to search for
 	// example: ["5afbea80-f36e-4e20-8763-64b5badbaf7d","a059dd1e-8406-4f8e-ace0-6cd2a5d54166"]
+	// in:query
 	IDs []string `json:"ids,omitempty"`
 
 	//A single first name to search for
 	// example: Jane
+	// in:query
 	FirstName *string `json:"first_name,omitempty"`
 
 	//An array of one or more first names to search for
 	// example: ["John", "Jane"]
+	// in:query
 	FirstNames []string `json:"first_names,omitempty"`
 
 	//A single last name to search for
 	// example: "Doe"
+	// in:query
 	LastName *string `json:"last_name,omitempty"`
 
 	//An array of one or more first names to search for
 	// example: ["John", "Jane"]
+	// in:query
 	LastNames []string `json:"last_names,omitempty"`
 
 	//A single email address to search for
 	// example: name@company.com
+	// in:query
 	EmailAddress *string `json:"email_address,omitempty"`
 
 	//An array of one or more email addresses to search for
 	// example: ["john.doe@company.com", "jane.doe@company.com"]
+	// in:query
 	EmailAddresses []string `json:"email_addresses,omitempty"`
 }
 

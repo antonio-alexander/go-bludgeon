@@ -17,3 +17,8 @@ __debug_bin
 
 #swagger files
 **/swagger.yaml
+**/swagger.json
+
+#temporary files
+tmp/*
+!tmp/.gitkeep

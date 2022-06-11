@@ -1,4 +1,4 @@
-package metamysql
+package mysql
 
 import (
 	"database/sql"
@@ -10,10 +10,20 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 	"github.com/antonio-alexander/go-bludgeon/timers/data"
 	"github.com/antonio-alexander/go-bludgeon/timers/meta"
+	"github.com/pkg/errors"
 
 	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
 
 	_ "github.com/go-sql-driver/mysql" //import for driver support
+)
+
+//query constants
+const (
+	tableEmployees    string = "employees"
+	tableTimers       string = "timers"
+	tableTimeSlices   string = "time_slices"
+	tableTimersV1     string = "timers_v1"
+	tableTimeSlicesV1 string = "time_slices_v1"
 )
 
 type mysql struct {
@@ -23,24 +33,46 @@ type mysql struct {
 	logger.Logger
 }
 
-func New(parameters ...interface{}) interface {
-	internal_mysql.Owner
-	meta.Owner
-	meta.Timer
-	meta.TimeSlice
-} {
+//New will instante a concrete implementation of the MySQL
+// pointer that implements the meta abstraction for interacting
+// with timers, if Configuration provided as a parameter, it will
+// attempt to Initialize (and panic on error)
+func New(parameters ...interface{}) MySQL {
+	var config *Configuration
 	m := &mysql{
 		DB: internal_mysql.New(parameters...),
 	}
 	for _, p := range parameters {
 		switch p := p.(type) {
+		case *Configuration:
+			config = p
 		case logger.Logger:
 			m.Logger = p
+		}
+	}
+	if config != nil {
+		if err := m.Initialize(config); err != nil {
+			panic(err)
 		}
 	}
 	return m
 }
 
+func (m *mysql) Initialize(config *Configuration) error {
+	m.Lock()
+	defer m.Unlock()
+	if config == nil {
+		return errors.New("config is nil")
+	}
+	if err := m.DB.Initialize(&config.Configuration); err != nil {
+		return err
+	}
+	return nil
+}
+
+//TimerCreate can be used to create a timer, although
+// all fields are available, the only fields that will
+// actually be set are: timer_id and comment
 func (m *mysql) TimerCreate(timerValues data.TimerPartial) (*data.Timer, error) {
 	tx, err := m.Begin()
 	if err != nil {
@@ -89,10 +121,16 @@ func (m *mysql) TimerCreate(timerValues data.TimerPartial) (*data.Timer, error) 
 	return timer, nil
 }
 
+//TimerRead can be used to read the current value of a given
+// timer, values such as start/finish and elapsed time are
+// "calculated" values rather than values that can be set
 func (m *mysql) TimerRead(id string) (*data.Timer, error) {
 	return timerRead(m, id)
 }
 
+//TimerUpdate can be used to update values a given timer
+// not associated with timer operations, values such as:
+// comment, archived and completed
 func (m *mysql) TimerUpdate(id string, timerPartial data.TimerPartial) (*data.Timer, error) {
 	tx, err := m.Begin()
 	if err != nil {
@@ -109,15 +147,18 @@ func (m *mysql) TimerUpdate(id string, timerPartial data.TimerPartial) (*data.Ti
 	return timer, nil
 }
 
+//TimerDelete can be used to delete a timer if it exists
 func (m *mysql) TimerDelete(id string) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", tableTimers)
 	result, err := m.Exec(query, id)
 	if err != nil {
 		return err
 	}
-	return rowsAffected(result, fmt.Sprintf(ErrTimerNotFoundf, id))
+	return rowsAffected(result, meta.ErrTimerNotFound)
 }
 
+//TimersRead can be used to read one or more timers depending
+// on search values provided
 func (m *mysql) TimersRead(search data.TimerSearch) ([]*data.Timer, error) {
 	var searchParameters []string
 	var args []interface{}
@@ -187,6 +228,8 @@ func (m *mysql) TimersRead(search data.TimerSearch) ([]*data.Timer, error) {
 	return timers, nil
 }
 
+//TimerStart can be used to start a given timer or do nothing
+// if the timer is already started
 func (m *mysql) TimerStart(id string) (*data.Timer, error) {
 	tx, err := m.Begin()
 	if err != nil {
@@ -211,6 +254,8 @@ func (m *mysql) TimerStart(id string) (*data.Timer, error) {
 	return timer, nil
 }
 
+//TimerStop can be used to stop a given timer or do nothing
+// if the timer is not started
 func (m *mysql) TimerStop(id string) (*data.Timer, error) {
 	tx, err := m.Begin()
 	if err != nil {
@@ -250,27 +295,34 @@ func (m *mysql) TimerSubmit(id string, finishTime int64) (*data.Timer, error) {
 	return timer, nil
 }
 
+//TimeSliceCreate can be used to create a single time
+// slice
 func (m *mysql) TimeSliceCreate(timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
 	return timeSliceCreate(m, timeSlicePartial)
 }
 
+//TimeSliceRead can be used to read an existing time slice
 func (m *mysql) TimeSliceRead(timeSliceID string) (*data.TimeSlice, error) {
 	return timeSliceRead(m, timeSliceID)
 }
 
+//TimeSliceUpdate can be used to update an existing time slice
 func (m *mysql) TimeSliceUpdate(timeSliceID string, timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
 	return timeSliceUpdate(m, timeSliceID, timeSlicePartial)
 }
 
+//TimeSliceDelete can be used to delete an existing time slice
 func (m *mysql) TimeSliceDelete(timeSliceID string) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE id=?", tableTimeSlices)
 	result, err := m.Exec(query, timeSliceID)
 	if err != nil {
 		return err
 	}
-	return rowsAffected(result, ErrTimeSliceNotFoundf)
+	return rowsAffected(result, meta.ErrTimerNotFound)
 }
 
+//TimeSlicesRead can be used to read zero or more time slices depending on the
+// search criteria
 func (m *mysql) TimeSlicesRead(search data.TimeSliceSearch) ([]*data.TimeSlice, error) {
 	var searchParameters []string
 	var args []interface{}

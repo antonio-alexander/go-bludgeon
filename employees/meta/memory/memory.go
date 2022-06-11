@@ -79,13 +79,11 @@ func (m *memory) EmployeeCreate(e data.EmployeePartial) (*data.Employee, error) 
 		return nil, err
 	}
 	employee := &data.Employee{
-		ID:           id,
-		EmailAddress: *e.EmailAddress, //KIM: validate will ensure that email address isn't empty or nil
-		Audit: data.Audit{
-			LastUpdated:   time.Now().UnixNano(),
-			LastUpdatedBy: lastUpdatedBy,
-			Version:       1,
-		},
+		ID:            id,
+		EmailAddress:  *e.EmailAddress, //KIM: validate will ensure that email address isn't empty or nil
+		LastUpdated:   time.Now().UnixNano(),
+		LastUpdatedBy: lastUpdatedBy,
+		Version:       1,
 	}
 	employee.EmailAddress = *e.EmailAddress
 	if e.FirstName != nil {

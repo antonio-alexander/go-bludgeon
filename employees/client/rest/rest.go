@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	data "github.com/antonio-alexander/go-bludgeon/employees/data"
-	logic "github.com/antonio-alexander/go-bludgeon/employees/logic"
-
+	"github.com/antonio-alexander/go-bludgeon/employees/data"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 	"github.com/antonio-alexander/go-bludgeon/internal/rest/client"
 )
@@ -18,24 +16,22 @@ const urif string = "http://%s:%s%s"
 type rest struct {
 	client.Client
 	logger.Logger
-	config *client.Configuration
+	config *Configuration
 }
 
-type Owner interface {
-	Initialize(config *client.Configuration) error
-}
-
+//New can be used to create a concrete instance of the rest client
+// that implements the interfaces of logic.Logic and Owner
 func New(parameters ...interface{}) interface {
-	logic.Logic
-	Owner
+	Client
 } {
-	var config *client.Configuration
-	r := &rest{
-		Client: client.New(),
-	}
+	var config *Configuration
+	//create a rest pointer, and range over the parameters
+	// if configuration is provided, initialize (panic on
+	// error)
+	r := &rest{Client: client.New()}
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
-		case *client.Configuration:
+		case *Configuration:
 			config = p
 		case logger.Logger:
 			r.Logger = p
@@ -49,11 +45,12 @@ func New(parameters ...interface{}) interface {
 	return r
 }
 
-func (r *rest) Initialize(config *client.Configuration) error {
+//Initialize can be used to ready the underlying pointer for use
+func (r *rest) Initialize(config *Configuration) error {
 	if config == nil {
 		return errors.New("config is nil")
 	}
-	if err := r.Client.Initialize(config); err != nil {
+	if err := r.Client.Initialize(&config.Configuration); err != nil {
 		return err
 	}
 	r.config = config

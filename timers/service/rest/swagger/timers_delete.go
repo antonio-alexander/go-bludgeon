@@ -4,8 +4,8 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/internal/errors"
 )
 
-// swagger:route DELETE /timers/{id} timers delete
-// DELETE allows you to delete an existing timer, the id is required.
+// swagger:route DELETE /timers/{id} timers delete_timers
+// Delete a timer, the id is required.
 //
 //     Consumes:
 //     - application/json
@@ -16,26 +16,25 @@ import (
 //     Schemes: http
 //
 // responses:
-//   204: timersDeleteResponseNoContent
-//   404: timersDeleteResponseNotFound
+//   204: TimersDeleteResponseNoContent
+//   404: TimersDeleteResponseNotFound
 
 // When an timer is successfully deleted, no content is returned
-// swagger:response timersDeleteResponseNoContent
-type timersDeleteResponseNoContent struct {
+// swagger:response TimersDeleteResponseNoContent
+type TimersDeleteResponseNoContent struct {
 	// in:body
 	Body struct{}
 }
 
 // This is the response when you attempt to query an timer that doesn't exist
-// swagger:response timersDeleteResponseNotFound
-type timersDeleteResponseNotFound struct {
+// swagger:response TimersDeleteResponseNotFound
+type TimersDeleteResponseNotFound struct {
 	// in:body
 	Body errors.Error
 }
 
-// swagger:parameters timer delete
-type timersDeleteParams struct {
-	// The timer's id
+// swagger:parameters delete_timers
+type TimersDeleteParams struct {
 	// in:path
 	ID string `json:"id"`
 }

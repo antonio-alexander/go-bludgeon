@@ -30,11 +30,9 @@ func elapsedTime(timer *data.Timer, timeSlices []*data.TimeSlice) *data.Timer {
 
 func copyTimer(t *data.Timer) *data.Timer {
 	return &data.Timer{
-		Audit: data.Audit{
-			LastUpdated:   t.LastUpdated,
-			LastUpdatedBy: t.LastUpdatedBy,
-			Version:       t.Version,
-		},
+		LastUpdated:       t.LastUpdated,
+		LastUpdatedBy:     t.LastUpdatedBy,
+		Version:           t.Version,
 		Completed:         t.Completed,
 		Archived:          t.Archived,
 		Start:             t.Start,
@@ -49,16 +47,29 @@ func copyTimer(t *data.Timer) *data.Timer {
 
 func copyTimeSlice(t *data.TimeSlice) *data.TimeSlice {
 	return &data.TimeSlice{
-		Completed:   t.Completed,
-		Start:       t.Start,
-		Finish:      t.Finish,
-		ElapsedTime: t.ElapsedTime,
-		ID:          t.ID,
-		TimerID:     t.TimerID,
-		Audit: data.Audit{
-			LastUpdated:   t.LastUpdated,
-			LastUpdatedBy: t.LastUpdatedBy,
-			Version:       t.Version,
-		},
+		Completed:     t.Completed,
+		Start:         t.Start,
+		Finish:        t.Finish,
+		ElapsedTime:   t.ElapsedTime,
+		ID:            t.ID,
+		TimerID:       t.TimerID,
+		LastUpdated:   t.LastUpdated,
+		LastUpdatedBy: t.LastUpdatedBy,
+		Version:       t.Version,
 	}
+}
+
+func validateTimeSlice(t data.TimeSlice) error {
+	if !t.Validate() {
+		if t.TimerID == "" {
+			return ErrTimeSliceNoTimerID
+		}
+		if t.Start <= 0 {
+			return ErrTimeSliceStartZero
+		}
+		if t.Finish != 0 && t.Finish <= t.Start {
+			return ErrTimeSliceFinishLessStart
+		}
+	}
+	return nil
 }

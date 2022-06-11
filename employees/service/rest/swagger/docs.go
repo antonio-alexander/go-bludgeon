@@ -1,6 +1,6 @@
-// Package swagger provides documentation neccessary to automatically generate swagger docs using go-swagger.
+// Package Swagger Bludgeon Employees
 //
-// The bludgeon-employees service provides the ability to interact with employees.
+// The employees endpoints allow you to interact with one or more employees.
 //
 //     Schemes: http
 //     Host: localhost:8080

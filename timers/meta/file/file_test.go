@@ -2,38 +2,35 @@ package file_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	metafile "github.com/antonio-alexander/go-bludgeon/timers/meta/file"
+	meta "github.com/antonio-alexander/go-bludgeon/timers/meta/file"
 	tests "github.com/antonio-alexander/go-bludgeon/timers/meta/tests"
-
-	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	validConfig   *internal_file.Configuration
-	defaultConfig *internal_file.Configuration
-)
+var config *meta.Configuration
 
 func init() {
 	pwd, _ := os.Getwd()
-	defaultConfig = &internal_file.Configuration{}
-	defaultConfig.Default(pwd)
-	validConfig = &internal_file.Configuration{
-		File:        internal_file.DefaultFile,
-		FileLocking: internal_file.DefaultFileLocking,
-		LockFile:    internal_file.DefaultLockFile,
+	envs := make(map[string]string)
+	for _, env := range os.Environ() {
+		if s := strings.Split(env, "="); len(s) > 0 {
+			envs[s[0]] = strings.Join(s[1:], ",")
+		}
 	}
+	config.Default(pwd)
+	config.FromEnv(pwd, envs)
 }
 
 func TestMetaFile(t *testing.T) {
-	m := metafile.New(
+	m := meta.New(
 		logger.New(),
 	)
-	err := m.Initialize(validConfig)
+	err := m.Initialize(config)
 	assert.Nil(t, err)
 	t.Run("Timer CRUD", tests.TestTimerCRUD(m))
 	t.Run("Timers Read", tests.TestTimersRead(m))

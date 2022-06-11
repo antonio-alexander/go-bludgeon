@@ -10,7 +10,6 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/internal/rest/client"
 	"github.com/antonio-alexander/go-bludgeon/timers/client/rest"
 	"github.com/antonio-alexander/go-bludgeon/timers/data"
-	"github.com/antonio-alexander/go-bludgeon/timers/logic"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -31,10 +30,7 @@ func init() {
 }
 
 type restClientTest struct {
-	client interface {
-		logic.Logic
-		rest.Owner
-	}
+	client rest.Client
 }
 
 func newRestClientTest() *restClientTest {

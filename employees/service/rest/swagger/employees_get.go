@@ -6,7 +6,7 @@ import (
 )
 
 // swagger:route GET /employees/{id} employees read
-// You can read an existing employee, the id is required.
+// Reads an employee using their id.
 //
 //     Consumes:
 //     - application/json
@@ -17,23 +17,23 @@ import (
 //     Schemes: http
 //
 // responses:
-//   200: employeeGetResponseOk
-//   404: employeeGetResponseNotFound
+//   200: EmployeeGetResponseOk
+//   404: EmployeeGetResponseNotFound
 
-// swagger:response employeeGetResponseOk
-type employeeGetResponseOk struct {
+// swagger:response EmployeeGetResponseOk
+type EmployeeGetResponseOk struct {
 	// in:body
 	Body data.Employee
 }
 
-// swagger:response employeeGetResponseNotFound
-type employeeGetResponseNotFound struct {
+// swagger:response EmployeeGetResponseNotFound
+type EmployeeGetResponseNotFound struct {
 	// in:body
 	Body errors.Error
 }
 
-// swagger:parameters employee read
-type employeeGetParams struct {
+// swagger:parameters employees read
+type EmployeeGetParams struct {
 	// in:path
 	ID string `json:"id"`
 }

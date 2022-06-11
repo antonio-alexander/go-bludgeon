@@ -1,5 +1,5 @@
 #---------------------------------------------------------------------------------------------------
-# bludgeon-employee-godoc [Dockerfile]
+# bludgeon-godoc [Dockerfile]
 # 
 # Reference: https://stackoverflow.com/questions/63178036/how-to-find-commit-hash-from-within-a-running-docker-image
 # commit: git rev-parse HEAD
@@ -14,21 +14,28 @@ ARG GIT_COMMIT=no_git_commit_provided
 ARG PLATFORM=linux/amd64
 ARG GO_ARCH=amd64
 ARG GO_ARM=7
+ARG REPO=https://github.com/antonio-alexander/go-bludgeon.git
+ARG BRANCH=develop
 
-FROM golang:alpine AS build
+FROM --platform=${PLATFORM} golang:alpine
 
 ARG GO_ARCH
 ARG GO_ARM
 ARG GIT_BRANCH
 ARG GIT_COMMIT
-
-WORKDIR /app
+ARG BRANCH
+ARG REPO
 
 RUN \
-    env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux \
-    go install golang.org/x/tools/cmd/godoc@v0.1.10 
+    apk add git openssh-client wget \
+    && env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux \
+    go install golang.org/x/tools/cmd/godoc@v0.1.10
 
-COPY . /go/src/github.com/antonio-alexander/go-bludgeon 
+WORKDIR /go/src/github.com/antonio-alexander
+
+RUN \
+    git clone --depth=1 --branch ${BRANCH} ${REPO} \
+    && rm -r /go/src/github.com/antonio-alexander/go-bludgeon/.git
 
 WORKDIR /go/src/github.com/antonio-alexander/go-bludgeon
 
@@ -38,4 +45,4 @@ LABEL org.opencontainers.image.source=https://github.com/antonio-alexander/go-bl
 
 EXPOSE 8080
 
-CMD godoc -http :8080
+CMD [ "godoc", "-http", ":8080" ]

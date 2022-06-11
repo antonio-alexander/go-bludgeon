@@ -3,7 +3,7 @@ name: internal
 on:
   push:
     branches:
-      - master
+      - main
       - develop
     paths:
       - "internal/**"

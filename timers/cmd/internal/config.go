@@ -10,8 +10,8 @@ import (
 
 	service_rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 
-	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
-	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
+	meta_file "github.com/antonio-alexander/go-bludgeon/timers/meta/file"
+	meta_mysql "github.com/antonio-alexander/go-bludgeon/timers/meta/mysql"
 
 	"github.com/pkg/errors"
 )
@@ -27,9 +27,9 @@ const (
 )
 
 type ConfigurationMeta struct {
-	Type  meta.Type                     `json:"type"`
-	File  *internal_file.Configuration  `json:"file"`
-	Mysql *internal_mysql.Configuration `json:"mysql"`
+	Type  meta.Type                 `json:"type"`
+	File  *meta_file.Configuration  `json:"file"`
+	Mysql *meta_mysql.Configuration `json:"mysql"`
 }
 
 type ConfigurationServer struct {
@@ -46,12 +46,12 @@ func NewConfiguration() *Configuration {
 	return &Configuration{
 		Meta: ConfigurationMeta{
 			Type:  "",
-			File:  &internal_file.Configuration{},
-			Mysql: &internal_mysql.Configuration{},
+			File:  new(meta_file.Configuration),
+			Mysql: new(meta_mysql.Configuration),
 		},
 		Server: ConfigurationServer{
 			Type: "",
-			Rest: &service_rest.Configuration{},
+			Rest: new(service_rest.Configuration),
 		},
 	}
 }

@@ -5,16 +5,14 @@ import (
 	"strings"
 	"testing"
 
-	metafile "github.com/antonio-alexander/go-bludgeon/employees/meta/file"
+	meta "github.com/antonio-alexander/go-bludgeon/employees/meta/file"
 	tests "github.com/antonio-alexander/go-bludgeon/employees/meta/tests"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-
-	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var config *internal_file.Configuration
+var config *meta.Configuration
 
 func init() {
 	pwd, _ := os.Getwd()
@@ -24,13 +22,13 @@ func init() {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	config = &internal_file.Configuration{}
+	config = new(meta.Configuration)
 	config.Default(pwd)
 	config.FromEnv(pwd, envs)
 }
 
 func TestMetaFile(t *testing.T) {
-	m := metafile.New(
+	m := meta.New(
 		logger.New(),
 	)
 	err := m.Initialize(config)

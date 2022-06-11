@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -20,12 +21,14 @@ type memory struct {
 	timeSlices    map[string]*data.TimeSlice //active time slices indexed by timer id
 }
 
-func New(parameters ...interface{}) interface {
-	meta.Owner
+type Memory interface {
 	meta.Timer
 	meta.TimeSlice
 	meta.Serializer
-} {
+	meta.Shutdown
+}
+
+func New(parameters ...interface{}) Memory {
 	m := &memory{
 		timers:     make(map[string]*data.Timer),
 		timeSlices: make(map[string]*data.TimeSlice),
@@ -39,7 +42,54 @@ func New(parameters ...interface{}) interface {
 	return m
 }
 
-func (m *memory) validateTimeSlice(t data.TimeSlicePartial, id ...string) error {
+func (m *memory) validateTimeSlice(p data.TimeSlicePartial, ids ...string) error {
+	var timeSlices []*data.TimeSlice
+	var t *data.TimeSlice
+
+	switch {
+	case len(ids) <= 0:
+		t = &data.TimeSlice{}
+		if p.Start != nil {
+			t.Start = *p.Start
+		}
+		if p.Finish != nil {
+			t.Finish = *p.Finish
+		}
+		if p.TimerID != nil {
+			t.TimerID = *p.TimerID
+		}
+	case len(ids) > 0:
+		id := ids[0]
+		ok := false
+		t, ok = m.timeSlices[id]
+		if !ok {
+			return meta.ErrTimeSliceNotFound
+		}
+		if p.Start != nil {
+			t.Start = *p.Start
+		}
+		if p.Finish != nil {
+			t.Finish = *p.Finish
+		}
+	}
+	if err := validateTimeSlice(*t); err != nil {
+		return err
+	}
+	for _, timeSlice := range m.timeSlices {
+		if timeSlice.ID == t.ID || timeSlice.TimerID != t.TimerID {
+			continue
+		}
+		timeSlices = append(timeSlices, timeSlice)
+	}
+	if len(timeSlices) <= 0 {
+		return nil
+	}
+	sort.Sort(data.TimeSliceByStart(timeSlices))
+	for _, timeSlice := range timeSlices {
+		if timeSlice.Contains(*t) {
+			return ErrTimeSliceOverlap
+		}
+	}
 	return nil
 }
 
@@ -82,12 +132,10 @@ func (m *memory) timeSliceCreate(t data.TimeSlicePartial) (*data.TimeSlice, erro
 		return nil, err
 	}
 	timeSlice := &data.TimeSlice{
-		ID: id,
-		Audit: data.Audit{
-			LastUpdated:   time.Now().UnixNano(),
-			LastUpdatedBy: lastUpdatedBy,
-			Version:       1,
-		},
+		ID:            id,
+		LastUpdated:   time.Now().UnixNano(),
+		LastUpdatedBy: lastUpdatedBy,
+		Version:       1,
 	}
 	switch {
 	default:
@@ -229,12 +277,10 @@ func (m *memory) TimerCreate(t data.TimerPartial) (*data.Timer, error) {
 		return nil, err
 	}
 	timer := &data.Timer{
-		ID: id,
-		Audit: data.Audit{
-			LastUpdated:   time.Now().UnixNano(),
-			LastUpdatedBy: lastUpdatedBy,
-			Version:       1,
-		},
+		ID:            id,
+		LastUpdated:   time.Now().UnixNano(),
+		LastUpdatedBy: lastUpdatedBy,
+		Version:       1,
 	}
 	if archived := t.Archived; archived != nil {
 		timer.Archived = *archived
