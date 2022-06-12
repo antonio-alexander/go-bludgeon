@@ -31,9 +31,7 @@ RUN \
 
 WORKDIR /go/src/github.com/antonio-alexander
 
-RUN \
-    git clone --depth=1 --branch ${BRANCH} ${REPO} \
-    && rm -r /go/src/github.com/antonio-alexander/go-bludgeon/.git
+RUN git clone --depth=1 --branch ${BRANCH} ${REPO}
 
 WORKDIR /swagger
 

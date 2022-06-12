@@ -23,29 +23,46 @@ env:
   PLATFORM_ARMV7: linux/arm/v7
 
 jobs:
-  version:
+  environment:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository code
+      - name: Checkout repository code
         uses: actions/checkout@v2
+      - name: Get target branch name
+        run: |
+          git_branch_target=`echo $GITHUB_BASE_REF | sed 's/refs\\///'`
+          git_branch_target=`echo $git_branch_target | sed 's/refs\/heads\///'`
+          git_branch_target=`echo $git_branch_target | sed 's/refs\/tags\///'`
+          echo $git_branch_target
+          echo "git_branch_target=$git_branch_target" >> $GITHUB_ENV
+      - name: Get source branch name
+        run: |
+          git_branch_source=$GITHUB_HEAD_REF
+          echo $git_branch_source
+          echo "git_branch_source=$git_branch_source" >> $GITHUB_ENV
       - name: Get version
         run: |
-          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/employees/version.json | jq '.Version' | sed 's/"//g'`
+          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version
           echo "version=$version" >> $GITHUB_ENV
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp
           echo ${{ env.version }} >> /tmp/version
+          echo ${{ env.git_branch_target }} >> /tmp/git_branch_target
+          echo ${{ env.git_branch_source }} >> /tmp/git_branch_source
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: artifacts
           path: |
             /tmp/version
+            /tmp/git_branch_target
+            /tmp/git_branch_source
 
   version_validate:
-    if: github.event_name == 'pull_request' && github.base_ref == 'refs/heads/main'
-    needs: version
+    if: github.base_ref == 'refs/heads/main'
+    needs: [environment]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,22 +72,24 @@ jobs:
         with:
           name: artifacts
           path: /tmp
-      - name: Get version
+      - name: Get environment
         run: |
           version=`cat /tmp/version`
           echo "version=$version" >> $GITHUB_ENV
+          git_branch_target=`cat /tmp/git_branch_target`
+          echo "git_branch_target=$git_branch_target" >> $GITHUB_ENV
       - name: Check out repository code
         uses: actions/checkout@v2
         with:
           ref: ${{ github.base_ref }}
       - name: Get base version
         run: |
-          base_version=`cat /home/runner/work/go-bludgeon/go-bludgeon/employees/version.json | jq '.Version' | sed 's/"//g'`
-          echo "base_version=$base_version" >> $GITHUB_ENV
+          version_base=`cat /home/runner/work/go-bludgeon/go-bludgeon/employees/version.json | jq '.Version' | sed 's/"//g'`
+          echo "version_base=$version_base" >> $GITHUB_ENV
       - name: Compare versions
         run: |
-          echo "Comparing version \"$version\" to base version \"$base_version\""
-          if [ "$version" = "$base_version" ]; then
+          echo "Comparing version \"${{ env.version }}\" to base version \"${{ env.version_base }}\""
+          if [ "${{ env.version }}" = "${{ env.version_base }}" ]; then
                echo "versions equal, verions must be different"
                exit 1
           fi
@@ -115,30 +134,34 @@ jobs:
             /tmp/go-bludgeon-employees.out
 
   docker_build_images:
-    needs: [go_test, version]
+    needs: [go_test, environment]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version`
+          echo "version=$version" >> $GITHUB_ENV
+          git_branch_source=`cat /tmp/git_branch_source`
+          echo "git_branch_source=$git_branch_source" >> $GITHUB_ENV
       - name: Check out repository code
         uses: actions/checkout@v2
-      - name: Get Version
-        run: |
-          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/employees/version.json | jq '.Version' | sed 's/"//g'`
-          echo "version=$version" >> $GITHUB_ENV
       - name: Build docker employees
         run: |
-          github_ref=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
-          github_ref=`echo $github_ref | sed 's/refs\/tags\///'`
           cd employees
-          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
-          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
+          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_branch_source }}  --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
+          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_branch_source }}  --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp
           docker save -o /tmp/go-bludgeon-employees_amd64-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }}
           docker save -o /tmp/go-bludgeon-employees_armv7-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }}
-          echo ${{ env.version }} >> /tmp/version
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -146,7 +169,6 @@ jobs:
           path: |
             /tmp/go-bludgeon-employees_amd64-${{ env.version }}.tar.gz
             /tmp/go-bludgeon-employees_armv7-${{ env.version }}.tar.gz
-            /tmp/version
           retention-days: 1
       - name: Docker clean-up
         run: |
@@ -242,7 +264,7 @@ jobs:
             /tmp/go-bludgeon-employees_client.out
 
   swagger_validate:
-    needs: ["version"]
+    needs: [environment]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -270,7 +292,7 @@ jobs:
 
   swagger_generate:
     # if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
-    needs: swagger_validate
+    needs: [swagger_validate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -305,7 +327,7 @@ jobs:
 
   git_push_tag:
     if: github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main'
-    needs: [go_test_client, go_lint]
+    needs: [go_test_client, go_lint, environment]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -315,7 +337,7 @@ jobs:
         with:
           name: artifacts
           path: /tmp
-      - name: Get version
+      - name: Get environment
         run: |
           version=`cat /tmp/version`
           echo "version=$version" >> $GITHUB_ENV
