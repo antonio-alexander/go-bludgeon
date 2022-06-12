@@ -9,7 +9,7 @@ on:
       - "cmd/godocs/**"
       - "timers/**"
       - "employees/**"
-      - ".github/workflows/docs.yml"
+      - ".github/workflows/godocs.yml"
   pull_request:
     paths:
       - "cmd/godocs/**"
@@ -89,16 +89,16 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
-      - name: Get Version
+      - name: Get version
         run: |
           version=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
           echo "version=$version" >> $GITHUB_ENV
       - name: Build docker images
         run: |
-          github_ref=${GITHUB_REF##refs/heads/}
-          github_ref=${GITHUB_REF##refs/tags/}
-          docker build -f ./cmd/godocs/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-godocs:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg BRANCH=$GITHUB_BASE_REF --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
-          docker build -f ./cmd/godocs/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-godocs:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg BRANCH=$GITHUB_BASE_REF --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
+          github_ref=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
+          github_ref=`echo $github_ref | sed 's/refs\/tags\///'`
+          docker build -f ./cmd/godocs/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-godocs:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
+          docker build -f ./cmd/godocs/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-godocs:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp

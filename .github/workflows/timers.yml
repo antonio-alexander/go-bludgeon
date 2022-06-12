@@ -128,8 +128,8 @@ jobs:
           echo "version=$version" >> $GITHUB_ENV
       - name: Build docker timers
         run: |
-          github_ref=${GITHUB_REF##refs/heads/}
-          github_ref=${GITHUB_REF##refs/tags/}
+          github_ref=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
+          github_ref=`echo $github_ref | sed 's/refs\/tags\///'`
           cd timers
           docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
           docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7

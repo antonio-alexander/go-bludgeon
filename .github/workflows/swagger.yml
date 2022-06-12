@@ -95,8 +95,8 @@ jobs:
           echo "version=$version" >> $GITHUB_ENV
       - name: Build docker images
         run: |
-          github_ref=${GITHUB_REF##refs/heads/}
-          github_ref=${GITHUB_REF##refs/tags/}
+          github_ref=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
+          github_ref=`echo $github_ref | sed 's/refs\/tags\///'`
           docker build -f ./cmd/swagger/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-swagger:amd64_${{ env.version }} --no-cache --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg BRANCH=$GITHUB_BASE_REF --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
       - name: Generate build artifacts
         run: |
