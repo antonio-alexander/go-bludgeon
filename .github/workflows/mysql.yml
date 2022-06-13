@@ -25,29 +25,46 @@ env:
   PLATFORM_ARMV7: linux/arm/v7
 
 jobs:
-  version:
+  environment:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository code
+      - name: Checkout repository code
         uses: actions/checkout@v2
+      - name: Get target branch name
+        run: |
+          git_branch_target=`echo $GITHUB_BASE_REF | sed 's/refs\\///'`
+          git_branch_target=`echo $git_branch_target | sed 's/refs\/heads\///'`
+          git_branch_target=`echo $git_branch_target | sed 's/refs\/tags\///'`
+          echo $git_branch_target
+          echo "git_branch_target=$git_branch_target" >> $GITHUB_ENV
+      - name: Get source branch name
+        run: |
+          git_branch_source=$GITHUB_HEAD_REF
+          echo $git_branch_source
+          echo "git_branch_source=$git_branch_source" >> $GITHUB_ENV
       - name: Get version
         run: |
           version=`cat /home/runner/work/go-bludgeon/go-bludgeon/mysql/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version
           echo "version=$version" >> $GITHUB_ENV
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp
           echo ${{ env.version }} >> /tmp/version
+          echo ${{ env.git_branch_target }} >> /tmp/git_branch_target
+          echo ${{ env.git_branch_source }} >> /tmp/git_branch_source
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: artifacts
           path: |
             /tmp/version
+            /tmp/git_branch_target
+            /tmp/git_branch_source
 
   version_validate:
     if: github.event_name == 'pull_request' && github.base_ref == 'refs/heads/main'
-    needs: version
+    needs: [environment]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -57,7 +74,7 @@ jobs:
         with:
           name: artifacts
           path: /tmp
-      - name: Get version
+      - name: Get environment
         run: |
           version=`cat /tmp/version`
           echo "version=$version" >> $GITHUB_ENV
@@ -79,7 +96,7 @@ jobs:
 
   git_push_tag:
     if: github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main'
-    needs: [version]
+    needs: [environment]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -89,7 +106,7 @@ jobs:
         with:
           name: artifacts
           path: /tmp
-      - name: Get version
+      - name: Get environment
         run: |
           version=`cat /tmp/version`
           echo "version=$version" >> $GITHUB_ENV
@@ -105,30 +122,32 @@ jobs:
           CUSTOM_TAG: mysql/v${{ env.version }}
 
   docker_build_images:
-    needs: [version]
+    needs: [environment]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version`
+          echo "version=$version" >> $GITHUB_ENV
       - name: Check out repository code
         uses: actions/checkout@v2
-      - name: Get Version
-        run: |
-          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/mysql/version.json | jq '.Version' | sed 's/"//g'`
-          echo "version=$version" >> $GITHUB_ENV
       - name: Build docker mysql
         run: |
-          github_ref=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
-          github_ref=`echo $github_ref | sed 's/refs\/tags\///'`
           cd mysql
-          docker build --no-cache -f ./cmd/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
-          docker build --no-cache -f ./cmd/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=$github_ref --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
+          docker build --no-cache -f ./cmd/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_branch_source }} --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
+          docker build --no-cache -f ./cmd/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_branch_source }} --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp
           docker save -o /tmp/go-bludgeon-mysql_amd64-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:amd64_${{ env.version }}
           docker save -o /tmp/go-bludgeon-mysql_armv7-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mysql:armv7_${{ env.version }}
-          echo ${{ env.version }} >> /tmp/version
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -136,7 +155,6 @@ jobs:
           path: |
             /tmp/go-bludgeon-mysql_amd64-${{ env.version }}.tar.gz
             /tmp/go-bludgeon-mysql_armv7-${{ env.version }}.tar.gz
-            /tmp/version
           retention-days: 1
       - name: Docker clean-up
         run: |
@@ -145,7 +163,7 @@ jobs:
 
   docker_push_images:
     if: github.event_name == 'release' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-    needs: [version, docker_build_images]
+    needs: [environment, docker_build_images]
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -155,7 +173,7 @@ jobs:
         with:
           name: artifacts
           path: /tmp
-      - name: Get Version
+      - name: Get environment
         run: |
           version=`cat /tmp/version`
           echo "version=$version" >> $GITHUB_ENV

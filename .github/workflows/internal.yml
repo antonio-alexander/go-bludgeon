@@ -24,29 +24,46 @@ env:
   PLATFORM_ARMV7: linux/arm/v7
 
 jobs:
-  version:
+  environment:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository code
+      - name: Checkout repository code
         uses: actions/checkout@v2
+      - name: Get target branch name
+        run: |
+          git_branch_target=`echo $GITHUB_BASE_REF | sed 's/refs\\///'`
+          git_branch_target=`echo $git_branch_target | sed 's/refs\/heads\///'`
+          git_branch_target=`echo $git_branch_target | sed 's/refs\/tags\///'`
+          echo $git_branch_target
+          echo "git_branch_target=$git_branch_target" >> $GITHUB_ENV
+      - name: Get source branch name
+        run: |
+          git_branch_source=$GITHUB_HEAD_REF
+          echo $git_branch_source
+          echo "git_branch_source=$git_branch_source" >> $GITHUB_ENV
       - name: Get version
         run: |
-          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/internal/version.json | jq '.Version' | sed 's/"//g'`
+          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version
           echo "version=$version" >> $GITHUB_ENV
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp
           echo ${{ env.version }} >> /tmp/version
+          echo ${{ env.git_branch_target }} >> /tmp/git_branch_target
+          echo ${{ env.git_branch_source }} >> /tmp/git_branch_source
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: artifacts
           path: |
             /tmp/version
+            /tmp/git_branch_target
+            /tmp/git_branch_source
 
   version_validate:
     if: github.event_name == 'pull_request' && github.base_ref == 'refs/heads/main'
-    needs: version
+    needs: [environment]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -56,7 +73,7 @@ jobs:
         with:
           name: artifacts
           path: /tmp
-      - name: Get version
+      - name: Get environment
         run: |
           version=`cat /tmp/version`
           echo "version=$version" >> $GITHUB_ENV
@@ -116,7 +133,7 @@ jobs:
 
   git_tag_push:
     if: github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main'
-    needs: [go_test, go_lint]
+    needs: [go_test, go_lint, environment]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -126,7 +143,7 @@ jobs:
         with:
           name: artifacts
           path: /tmp
-      - name: Get version
+      - name: Get environment
         run: |
           version=`cat /tmp/version`
           echo "version=$version" >> $GITHUB_ENV
