@@ -12,86 +12,43 @@ on:
     paths:
       - "internal/**"
       - ".github/workflows/internal.yml"
-  release:
-    types: [published]
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  GITHUB_SHA: ${{ github.sha }}
-  GITHUB_REF: ${{ github.ref }}
-  GITHUB_BASE_REF: ${{ github.base_ref }}
-  PLATFORM_AMD64: linux/amd64
-  PLATFORM_ARMV7: linux/arm/v7
 
 jobs:
   environment:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    env:
+      GITHUB_HEAD_REF: ${{ github.head_ref }}
+      GITHUB_BASE_REF: ${{ github.base_ref }}
     steps:
-      - name: Checkout repository code
+      - name: Checkout repository code (source)
         uses: actions/checkout@v2
-      - name: Get target branch name
+      - name: Get source version
         run: |
-          git_branch_target=`echo $GITHUB_BASE_REF | sed 's/refs\\///'`
-          git_branch_target=`echo $git_branch_target | sed 's/refs\/heads\///'`
-          git_branch_target=`echo $git_branch_target | sed 's/refs\/tags\///'`
-          echo $git_branch_target
-          echo "git_branch_target=$git_branch_target" >> $GITHUB_ENV
-      - name: Get source branch name
+          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version_source
+          echo "version_source=$version_source" >> $GITHUB_ENV
+      - name: Checkout repository code (target)
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.base_ref }}
+      - name: Get target version
         run: |
-          git_branch_source=$GITHUB_HEAD_REF
-          echo $git_branch_source
-          echo "git_branch_source=$git_branch_source" >> $GITHUB_ENV
-      - name: Get version
-        run: |
-          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
-          echo $version
-          echo "version=$version" >> $GITHUB_ENV
+          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version_target
+          echo "version_target=$version_target" >> $GITHUB_ENV
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp
-          echo ${{ env.version }} >> /tmp/version
-          echo ${{ env.git_branch_target }} >> /tmp/git_branch_target
-          echo ${{ env.git_branch_source }} >> /tmp/git_branch_source
+          echo ${{ env.version_source }} >> /tmp/version_source
+          echo ${{ env.version_target }} >> /tmp/version_target
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: artifacts
           path: |
-            /tmp/version
-            /tmp/git_branch_target
-            /tmp/git_branch_source
-
-  version_validate:
-    if: github.event_name == 'pull_request' && github.base_ref == 'refs/heads/main'
-    needs: [environment]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get environment
-        run: |
-          version=`cat /tmp/version`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Check out repository code
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.base_ref }}
-      - name: Get base version
-        run: |
-          base_version=`cat /home/runner/work/go-bludgeon/go-bludgeon/internal/version.json | jq '.Version' | sed 's/"//g'`
-          echo "base_version=$base_version" >> $GITHUB_ENV
-      - name: Compare versions
-        run: |
-          echo "Comparing version \"$version\" to base version \"$base_version\""
-          if [ "$version" = "$base_version" ]; then
-               echo "versions equal, verions must be different"
-               exit 1
-          fi
+            /tmp/version_source
+            /tmp/version_target
 
   go_lint:
     runs-on: ubuntu-latest
@@ -108,6 +65,7 @@ jobs:
           args: --verbose
 
   go_test:
+    needs: [go_lint]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -118,7 +76,7 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.16
-      - name: test internal
+      - name: Test timers (exclude client)
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/internal
           go mod download
@@ -131,9 +89,37 @@ jobs:
             /tmp/go-bludgeon-internal.log
             /tmp/go-bludgeon-internal.out
 
-  git_tag_push:
-    if: github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main'
-    needs: [go_test, go_lint, environment]
+  version_validate:
+    if: github.base_ref == 'refs/heads/main'
+    needs: [environment]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version_source=`cat /tmp/version_source`
+          echo "version_source=$version_source" >> $GITHUB_ENV
+          version_target=`cat /tmp/version_target`
+          echo "version_target=$version_target" >> $GITHUB_ENV
+      - name: Compare versions
+        run: |
+          echo "Comparing version \"${{ env.version_source }}\" to target version \"${{ env.version_target }}\""
+          if [ "${{ env.version_source }}" = "${{ env.version_target }}" ]; then
+               echo "versions are the same, versions must be different"
+               exit 1
+          fi
+
+  git_push_tag:
+    if: ${{ always() &&
+      (github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main') &&
+      (needs.go_test.result=='success' && needs.go_lint.result=='success' && needs.environment.result=='success') }}
+    needs: [environment, go_test, go_lint]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -145,7 +131,7 @@ jobs:
           path: /tmp
       - name: Get environment
         run: |
-          version=`cat /tmp/version`
+          version=`cat /tmp/version_source`
           echo "version=$version" >> $GITHUB_ENV
       - name: Check out repository code
         uses: actions/checkout@v2

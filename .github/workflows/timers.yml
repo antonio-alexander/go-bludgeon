@@ -12,85 +12,114 @@ on:
     paths:
       - "timers/**"
       - ".github/workflows/timers.yml"
-  release:
-    types: [published]
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  GITHUB_SHA: ${{ github.sha }}
-  GITHUB_REF: ${{ github.ref }}
-  PLATFORM_AMD64: linux/amd64
-  PLATFORM_ARMV7: linux/arm/v7
 
 jobs:
-  environment:
+  environment_push:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    env:
+      GITHUB_SHA: ${{ github.sha }}
+      GITHUB_REF: ${{ github.ref }}
     steps:
+      - name: Get git source
+        run: |
+          git_source=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
+          git_source=`echo $git_source | sed 's/refs\/tags\///'`
+          git_source=`echo $git_source | sed 's/refs\\///'`
+          echo $git_source
+          echo "git_source=$git_source" >> $GITHUB_ENV
+      - name: Get git SHA
+        run: |
+          git_sha=`echo $GITHUB_SHA`
+          echo $git_sha
+          echo "git_sha=$git_sha" >> $GITHUB_ENV
       - name: Checkout repository code
         uses: actions/checkout@v2
-      - name: Get target branch name
-        run: |
-          git_branch_target=`echo $GITHUB_BASE_REF | sed 's/refs\\///'`
-          git_branch_target=`echo $git_branch_target | sed 's/refs\/heads\///'`
-          git_branch_target=`echo $git_branch_target | sed 's/refs\/tags\///'`
-          echo $git_branch_target
-          echo "git_branch_target=$git_branch_target" >> $GITHUB_ENV
-      - name: Get source branch name
-        run: |
-          git_branch_source=$GITHUB_HEAD_REF
-          echo $git_branch_source
-          echo "git_branch_source=$git_branch_source" >> $GITHUB_ENV
       - name: Get version
         run: |
-          version=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
-          echo $version
-          echo "version=$version" >> $GITHUB_ENV
+          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/timers/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version_source
+          echo "version_source=$version_source" >> $GITHUB_ENV
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp
-          echo ${{ env.version }} >> /tmp/version
-          echo ${{ env.git_branch_target }} >> /tmp/git_branch_target
-          echo ${{ env.git_branch_source }} >> /tmp/git_branch_source
+          echo ${{ env.version_source }} >> /tmp/version_source
+          echo ${{ env.git_source }} >> /tmp/git_source
+          echo ${{ env.git_sha }} >> /tmp/git_sha
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: artifacts
           path: |
-            /tmp/version
-            /tmp/git_branch_target
-            /tmp/git_branch_source
+            /tmp/version_source
+            /tmp/git_source
+            /tmp/git_sha
 
-  version_validate:
-    if: github.event_name == 'pull_request' && github.base_ref == 'refs/heads/main'
-    needs: [environment]
+  environment_pull_request:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    env:
+      GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+      GITHUB_HEAD_REF: ${{ github.head_ref }}
+      GITHUB_BASE_REF: ${{ github.base_ref }}
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get version
+      - name: Get git target
         run: |
-          version=`cat /tmp/version`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Check out repository code
+          git_target=`echo $GITHUB_BASE_REF | sed 's/refs\/heads\///'`
+          git_target=`echo $git_target | sed 's/refs\/tags\///'`
+          git_target=`echo $git_target| sed 's/refs\\///'`
+          echo $git_target
+          echo "git_target=$git_target" >> $GITHUB_ENV
+      - name: Get git source
+        run: |
+          git_source=`echo $GITHUB_HEAD_REF | sed 's/refs\/heads\///'`
+          git_source=`echo $git_source | sed 's/refs\/tags\///'`
+          git_source=`echo $git_source | sed 's/refs\\///'`
+          echo $git_source
+          echo "git_source=$git_source" >> $GITHUB_ENV
+      - name: Get git SHA
+        run: |
+          git_sha=`echo $GITHUB_SHA`
+          echo $git_sha
+          echo "git_sha=$git_sha" >> $GITHUB_ENV
+      - name: Checkout repository code (source)
+        uses: actions/checkout@v2
+      - name: Get source version
+        run: |
+          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/timers/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version_source
+          echo "version_source=$version_source" >> $GITHUB_ENV
+      - name: Checkout repository code (target)
         uses: actions/checkout@v2
         with:
           ref: ${{ github.base_ref }}
-      - name: Get base version
+      - name: Get target version
         run: |
-          base_version=`cat /home/runner/work/go-bludgeon/go-bludgeon/timers/version.json | jq '.Version' | sed 's/"//g'`
-          echo "base_version=$base_version" >> $GITHUB_ENV
-      - name: Compare versions
+          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/timers/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version_target
+          echo "version_target=$version_target" >> $GITHUB_ENV
+      - name: Generate build artifacts
         run: |
-          echo "Comparing version \"$version\" to base version \"$base_version\""
-          if [ "$version" = "$base_version" ]; then
-               echo "versions equal, verions must be different"
-               exit 1
-          fi
+          mkdir -p /tmp
+          echo ${{ env.version_source }} >> /tmp/version_source
+          echo ${{ env.version_target }} >> /tmp/version_target
+          echo ${{ env.git_target }} >> /tmp/git_target
+          echo ${{ env.git_source }} >> /tmp/git_source
+          echo ${{ env.git_sha }} >> /tmp/git_sha
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts
+          path: |
+            /tmp/version_source
+            /tmp/version_target
+            /tmp/git_target
+            /tmp/git_source
+            /tmp/git_sha
 
   go_lint:
     runs-on: ubuntu-latest
@@ -107,6 +136,7 @@ jobs:
           args: --verbose
 
   go_test:
+    needs: [go_lint]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -132,10 +162,17 @@ jobs:
             /tmp/go-bludgeon-timers.out
 
   docker_build_images:
-    needs: [go_test, environment]
+    if: ${{ always() &&
+      (needs.environment_push.result=='success' || needs.environment_pull_request.result=='success') &&
+      needs.go_test.result=='success' && needs.swagger_validate.result=='success' }}
+    needs:
+      [go_test, swagger_validate, environment_push, environment_pull_request]
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      PLATFORM_AMD64: linux/amd64
+      PLATFORM_ARMV7: linux/arm/v7
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v2
@@ -144,17 +181,17 @@ jobs:
           path: /tmp
       - name: Get environment
         run: |
-          version=`cat /tmp/version`
+          version=`cat /tmp/version_source`
           echo "version=$version" >> $GITHUB_ENV
-          git_branch_source=`cat /tmp/git_branch_source`
-          echo "git_branch_source=$git_branch_source" >> $GITHUB_ENV
+          git_source=`cat /tmp/git_source`
+          echo "git_source=$git_source" >> $GITHUB_ENV
       - name: Check out repository code
         uses: actions/checkout@v2
       - name: Build docker timers
         run: |
           cd timers
-          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_branch_source }}  --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
-          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_branch_source }}  --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
+          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_source }}  --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
+          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_source }}  --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp
@@ -173,8 +210,169 @@ jobs:
           docker image prune -f
           docker container prune -f
 
+  go_test_client:
+    if: ${{ always() && needs.docker_build_images.result=='success' }}
+    needs: [docker_build_images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Load Docker Images
+        run: |
+          docker load -i /tmp/go-bludgeon-timers_amd64-${{ env.version }}.tar.gz
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+      - name: Test timers client
+        run: |
+          cd /home/runner/work/go-bludgeon/go-bludgeon/timers/client
+          go mod download
+          docker compose up -d
+          go test -v ./... -coverprofile /tmp/go-bludgeon-timers_client.out | tee /tmp/go-bludgeon-timers_client.log
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts
+          path: |
+            /tmp/go-bludgeon-timers_client.log
+            /tmp/go-bludgeon-timers_client.out
+
+  swagger_validate:
+    if: ${{ always() &&
+      (needs.environment_push.result=='success' || needs.environment_pull_request.result=='success') }}
+    needs: [environment_push, environment_pull_request]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+      - name: Validate swagger spec
+        run: |
+          cd /home/runner/work/go-bludgeon/go-bludgeon/timers
+          go mod download
+          make validate-swagger
+
+  swagger_generate:
+    if: ${{ always() && needs.swagger_validate.result=='success' }}
+    needs: [swagger_validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+      - name: generate swagger.json
+        run: |
+          cd /home/runner/work/go-bludgeon/go-bludgeon/timers
+          go mod download
+          make swagger
+          mv ./cmd/service/swagger.json /tmp/swagger.json
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts
+          path: |
+            /tmp/swagger.json
+
+  version_validate:
+    if: github.base_ref == 'refs/heads/main'
+    needs: [environment_pull_request]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version_source=`cat /tmp/version_source`
+          echo "version_source=$version_source" >> $GITHUB_ENV
+          version_target=`cat /tmp/version_target`
+          echo "version_target=$version_target" >> $GITHUB_ENV
+      - name: Compare versions
+        run: |
+          echo "Comparing version \"${{ env.version_source }}\" to target version \"${{ env.version_target }}\""
+          if [ "${{ env.version_source }}" = "${{ env.version_target }}" ]; then
+               echo "versions are the same, versions must be different"
+               exit 1
+          fi
+
+  git_push_tag:
+    if: ${{ always() &&
+      (github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main') &&
+      (needs.go_test_client.result=='success' && needs.go_lint.result=='success') }}
+    needs: [go_test_client, go_lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+      - name: Push/Update version
+        uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          CUSTOM_TAG: timers/v${{ env.version }}
+
   docker_push_images:
-    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    if: ${{ always() &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') &&
+      needs.docker_build_images.result=='success' && needs.go_test_client.result=='success' }}
     needs: [go_test_client, docker_build_images]
     runs-on: ubuntu-latest
     permissions:
@@ -185,9 +383,9 @@ jobs:
         with:
           name: artifacts
           path: /tmp
-      - name: Get Version
+      - name: Get environment
         run: |
-          version=`cat /tmp/version`
+          version=`cat /tmp/version_source`
           echo "version=$version" >> $GITHUB_ENV
       - name: Login to ghcr.io
         uses: docker/login-action@v1
@@ -221,131 +419,3 @@ jobs:
         run: |
           docker image prune -f
           docker container prune -f
-
-  go_test_client:
-    needs: docker_build_images
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get Version
-        run: |
-          version=`cat /tmp/version`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Load Docker Images
-        run: |
-          docker load -i /tmp/go-bludgeon-timers_amd64-${{ env.version }}.tar.gz
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest
-      - name: Check out repository code
-        uses: actions/checkout@v2
-      - name: Setup Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.16
-      - name: Test timers client
-        run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/timers/client
-          go mod download
-          docker compose up -d
-          go test -v ./... -coverprofile /tmp/go-bludgeon-timers_client.out | tee /tmp/go-bludgeon-timers_client.log
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: artifacts
-          path: |
-            /tmp/go-bludgeon-timers_client.log
-            /tmp/go-bludgeon-timers_client.out
-
-  swagger_validate:
-    needs: go_test_client
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get Version
-        run: |
-          version=`cat /tmp/version`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Check out repository code
-        uses: actions/checkout@v2
-      - name: Setup Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.16
-      - name: Validate swagger spec
-        run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/timers
-          go mod download
-          make validate-swagger
-
-  swagger_generate:
-    # if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
-    needs: swagger_validate
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get Version
-        run: |
-          version=`cat /tmp/version`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Check out repository code
-        uses: actions/checkout@v2
-      - name: Setup Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.16
-      - name: generate swagger.json
-        run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/timers
-          go mod download
-          make swagger
-          cp ./cmd/service/swagger.json /tmp/swagger.json
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: artifacts
-          path: |
-            /tmp/swagger.json
-
-  git_push_tag:
-    if: github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main'
-    needs: [go_test_client, go_lint, environment]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get environment
-        run: |
-          version=`cat /tmp/version`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Check out repository code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: "0"
-      - name: Push/Update version
-        uses: anothrNick/github-tag-action@1.36.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: true
-          CUSTOM_TAG: timers/v${{ env.version }}
