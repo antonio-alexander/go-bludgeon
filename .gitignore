@@ -22,3 +22,5 @@ __debug_bin
 #temporary files
 tmp/*
 !tmp/.gitkeep
+internal/data/*
+!internal/data/.gitkeep
