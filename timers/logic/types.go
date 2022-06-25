@@ -29,6 +29,7 @@ type Logic interface {
 	//TimersRead can be used to read one or more timers depending
 	// on search values provided
 	TimersRead(search data.TimerSearch) ([]*data.Timer, error)
+
 	//TimerStart can be used to start a given timer or do nothing
 	// if the timer is already started
 	TimerStart(id string) (*data.Timer, error)
