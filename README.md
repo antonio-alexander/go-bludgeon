@@ -4,8 +4,18 @@ go-bludgeon is a collection of microservices used to track time for one or more 
 
 ## Getting Started
 
+To get started, use the [docker-compose.yml](./docker-compose.yml) to pull the most recent images and to get everything up and running. The Swagger and Godocs images can be used to read the most recent documentation and swagger can execute each endpoint with examples.
+
+> Keep in mind that this docker-compose CAN'T be used to build anything.
+
+## MySQL
+
+The MySQL image contains all of sql required for all of the mysql/database, its used when mysql is enabled as a data store, for more information look at the mysql [README.md](./mysql/README.md)
+
 ## Employees
+
+The employees service is used to manage the employees object, for more information look at the employees [README.md](./employees/README.md).
 
 ## Timers
 
-## MySQL
+The timers service is used to manage objects related to timers, for more information look at the employees [README.md](./timers/README.md).

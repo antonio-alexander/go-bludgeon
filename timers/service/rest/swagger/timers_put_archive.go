@@ -5,7 +5,7 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/timers/data"
 )
 
-// swagger:route PUT /timers/{id} timers update_timers
+// swagger:route PUT /timers/{id}/archive timers update_timers_archive
 // Update a timer.
 //
 //     Consumes:
@@ -17,26 +17,26 @@ import (
 //     Schemes: http
 //
 // responses:
-//   200: TimersPutResponseOK
-//   500: TimersPutResponseError
+//   200: TimersPutArchiveResponseOK
+//   500: TimersPutArchiveResponseError
 
 // This is the response when an timer is successfully updated, it will include all items of timer that are user-editable as well as other items that are not user editable such as audit information and email address which can't be edited post creation.
-// swagger:response TimersPutResponseOK
-type TimersPutResponseOK struct {
+// swagger:response TimersPutArchiveResponseOK
+type TimersPutArchiveResponseOK struct {
 	// in:body
 	Body data.Timer
 }
 
 // This is the general response when a non-specific error occurs
-// swagger:response TimersPutResponseError
-type TimersPutResponseError struct {
+// swagger:response TimersPutArchiveResponseError
+type TimersPutArchiveResponseError struct {
 	// in:body
 	Body errors.Error
 }
 
 //These parameters must be provided for creation, email address is required
-// swagger:parameters update_timers
-type TimersPutParams struct {
+// swagger:parameters update_timers_archive
+type TimersPutArchiveParams struct {
 	// in:path
 	ID string `json:"id"`
 

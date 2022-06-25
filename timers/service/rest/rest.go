@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -148,23 +149,75 @@ func (s *restServer) endpointTimerSubmit() func(http.ResponseWriter, *http.Reque
 		var timer *data.Timer
 		var bytes []byte
 		var err error
-		var contract struct {
-			Finish int64 `json:"finish_time,omitempty"`
-		}
+		var timerPartial data.TimerPartial
 
 		id := idFromPath(mux.Vars(request))
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			defer request.Body.Close()
-			if err = json.Unmarshal(bytes, &contract); err == nil {
+			if err = json.Unmarshal(bytes, &timerPartial); err == nil {
 				var finishTime time.Time
 
-				if contract.Finish > 0 {
-					finishTime = time.Unix(0, contract.Finish)
+				if timerPartial.Finish != nil && *timerPartial.Finish > 0 {
+					finishTime = time.Unix(0, *timerPartial.Finish)
 				} else {
 					finishTime = time.Now()
 				}
 				if timer, err = s.TimerSubmit(id, &finishTime); err == nil {
 					bytes, err = json.Marshal(&timer)
+				}
+			}
+		}
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error("timer submit -  %s", err)
+		}
+	}
+}
+
+func (s *restServer) endpointTimerUpdateComment() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var timer *data.Timer
+		var bytes []byte
+		var err error
+		var timerPartial data.TimerPartial
+
+		id := idFromPath(mux.Vars(request))
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			defer request.Body.Close()
+			if err = json.Unmarshal(bytes, &timerPartial); err == nil {
+				if timerPartial.Comment == nil {
+					//REVIEW: should this error be here?
+					err = errors.New("No comment provided")
+				} else {
+					if timer, err = s.TimerUpdateComment(id, *timerPartial.Comment); err == nil {
+						bytes, err = json.Marshal(&timer)
+					}
+				}
+			}
+		}
+		if err = handleResponse(writer, err, bytes); err != nil {
+			s.Error("timer submit -  %s", err)
+		}
+	}
+}
+
+func (s *restServer) endpointTimerUpdateArchive() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var timer *data.Timer
+		var bytes []byte
+		var err error
+		var timerPartial data.TimerPartial
+
+		id := idFromPath(mux.Vars(request))
+		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+			defer request.Body.Close()
+			if err = json.Unmarshal(bytes, &timerPartial); err == nil {
+				if timerPartial.Archived == nil {
+					//REVIEW: should this error be here?
+					err = errors.New("No archive provided")
+				} else {
+					if timer, err = s.TimerArchive(id, *timerPartial.Archived); err == nil {
+						bytes, err = json.Marshal(&timer)
+					}
 				}
 			}
 		}
@@ -270,6 +323,8 @@ func (s *restServer) buildRoutes() {
 		{Route: data.RouteTimersIDStart, Method: http.MethodPut, HandleFx: s.endpointTimerStart()},
 		{Route: data.RouteTimersIDStop, Method: http.MethodPut, HandleFx: s.endpointTimerStop()},
 		{Route: data.RouteTimersIDSubmit, Method: http.MethodPut, HandleFx: s.endpointTimerSubmit()},
+		{Route: data.RouteTimersIDComment, Method: http.MethodPut, HandleFx: s.endpointTimerUpdateComment()},
+		{Route: data.RouteTimersIDArchive, Method: http.MethodPut, HandleFx: s.endpointTimerUpdateArchive()},
 		//time slice
 		{Route: data.RouteTimeSlices, Method: http.MethodPost, HandleFx: s.endpointTimeSliceCreate()},
 		{Route: data.RouteTimeSlicesID, Method: http.MethodGet, HandleFx: s.endpointTimeSliceRead()},

@@ -57,7 +57,7 @@ services:
       BLUDGEON_META_TYPE: "mysql"
       BLUDGEON_REST_ADDRESS: ""
       BLUDGEON_REST_PORT: "8080"
-      BLUDGEON_META__FILE: "data/bludgeon.json"
+      BLUDGEON_META_FILE: "data/bludgeon.json"
       BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal"
       BLUDGEON_CORS_DEBUG: "true"
       DATABASE_HOST: "mysql"
