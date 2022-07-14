@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// swagger:model TimerSearch
 //TimerSearch can be used to inclusively search for one or more
 // timers
 type TimerSearch struct {

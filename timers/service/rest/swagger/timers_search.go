@@ -32,7 +32,7 @@ type TimersSearchResponseNotFound struct {
 	Body errors.Error
 }
 
-// swagger:parameters TimerSearchParams
+// swagger:parameters timers search_timers
 type TimersSearchParams struct {
 	data.TimerSearch
 }

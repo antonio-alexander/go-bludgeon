@@ -32,7 +32,7 @@ type TimeSlicesSearchResponseNotFound struct {
 	Body errors.Error
 }
 
-// swagger:parameters TimeSliceSearchParams
+// swagger:parameters time_slices search_time_slices
 type TimeSlicesSearchParams struct {
 	data.TimeSliceSearch
 }

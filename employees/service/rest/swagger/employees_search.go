@@ -24,7 +24,7 @@ type EmployeeSearchResponseOk struct {
 	Body []data.Employee
 }
 
-// swagger:parameters EmployeeSearchParams
+// swagger:parameters employees search
 type EmployeeSearchParams struct {
 	data.EmployeeSearch
 }
