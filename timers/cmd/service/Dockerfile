@@ -1,5 +1,5 @@
 #---------------------------------------------------------------------------------------------------
-# bludgeon-server [Dockerfile]
+# bludgeon-timers [Dockerfile]
 # 
 # Reference: https://stackoverflow.com/questions/63178036/how-to-find-commit-hash-from-within-a-running-docker-image
 # commit: git rev-parse HEAD
@@ -20,6 +20,8 @@ ARG GO_ARM=7
 
 FROM golang:alpine AS build
 
+ENV GOPROXY=https://proxy.golang.org,direct
+
 ARG GIT_BRANCH
 ARG GIT_COMMIT
 ARG GO_ARCH
@@ -29,15 +31,13 @@ WORKDIR /go/src/go-bludgeon/timers
 
 COPY . /go/src/go-bludgeon/timers
 
-RUN apk add jq
-
-RUN \
-    VERSION=`cat /go/src/go-bludgeon/timers/version.json | jq '.Version' | sed 's/"//g'` \
+RUN go mod download
+RUN VERSION=`cat ./version.json| grep Version | sed 's/"//g' | sed 's/  Version: //g'` \
     && cd cmd/service \
     && env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux go build -ldflags \
-    "-X github.com/antonio-alexander/go-bludgeon/timers/cmd/service/internal.Version=${VERSION} \
-    -X github.com/antonio-alexander/go-bludgeon/timers/cmd/service/internal.GitCommit=${GIT_COMMIT} \
-    -X github.com/antonio-alexander/go-bludgeon/timers/cmd/service/internal.GitBranch=${GIT_BRANCH}" \
+    "-X github.com/antonio-alexander/go-bludgeon/timers/cmd/internal.Version=$VERSION \
+    -X github.com/antonio-alexander/go-bludgeon/timers/cmd/internal.GitCommit=$GIT_COMMIT \
+    -X github.com/antonio-alexander/go-bludgeon/timers/cmd/internal.GitBranch=$GIT_BRANCH" \
     -o bludgeon-timers \
     && chmod +X bludgeon-timers \
     && tar -czvf bludgeon-timers.tar.gz ./bludgeon-timers
@@ -50,11 +50,13 @@ ARG GIT_COMMIT
 WORKDIR /app
 
 COPY --from=build /go/src/go-bludgeon/timers/cmd/service/bludgeon-timers.tar.gz /app/bludgeon-timers.tar.gz
-COPY --from=build /go/src/go-bludgeon/timers/cmd/service/config/bludgeon_server_config-default.json /app/config/bludgeon_server_config-default.json
+COPY --from=build /go/src/go-bludgeon/timers/cmd/service/config/default.json /app/config/default.json
 
 LABEL antonio-alexander.git.branch=${GIT_BRANCH}
 LABEL antonio-alexander.git.commit=${GIT_COMMIT}
 LABEL org.opencontainers.image.source=https://github.com/antonio-alexander/go-bludgeon
+
+EXPOSE 8080 2345
 
 CMD tar -xzf bludgeon-timers.tar.gz && ./bludgeon-timers
 

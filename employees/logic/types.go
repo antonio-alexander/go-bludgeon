@@ -6,6 +6,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const LogAlias string = "Logic"
+
 const PanicEmployeeMetaNotSet string = "employee meta not set"
 
 var ErrEmployeeIDNotProvided = errors.New("employee id not provided")

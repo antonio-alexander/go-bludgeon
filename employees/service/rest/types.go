@@ -1,4 +1,4 @@
-package rest
+package service
 
 //error constants specific to the rest service
 const (

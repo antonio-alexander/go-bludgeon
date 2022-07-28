@@ -20,27 +20,27 @@ ARG GO_ARM=7
 
 FROM golang:alpine AS build
 
+ENV GOPROXY=https://proxy.golang.org,direct
+
 ARG GIT_BRANCH
 ARG GIT_COMMIT
 ARG GO_ARCH
 ARG GO_ARM
 
-WORKDIR /go/src/go-bludgeon/employee
+WORKDIR /go/src/go-bludgeon/employees
 
-COPY . /go/src/go-bludgeon/employee
+COPY . /go/src/go-bludgeon/employees
 
-RUN apk add jq
-
-RUN \
-    VERSION=`cat /go/src/go-bludgeon/employee/version.json | jq '.Version' | sed 's/"//g'` \
+RUN go mod download
+RUN VERSION=`cat ./version.json| grep Version | sed 's/"//g' | sed 's/  Version: //g'` \
     && cd cmd/service \
     && env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux go build -ldflags \
-    "-X github.com/antonio-alexander/go-bludgeon/employee/cmd/service/internal.Version=${VERSION} \
-    -X github.com/antonio-alexander/go-bludgeon/employee/cmd/service/internal.GitCommit=${GIT_COMMIT} \
-    -X github.com/antonio-alexander/go-bludgeon/employee/cmd/service/internal.GitBranch=${GIT_BRANCH}" \
-    -o bludgeon-employee \
-    && chmod +X bludgeon-employee \
-    && tar -czvf bludgeon-employee.tar.gz ./bludgeon-employee
+    "-X github.com/antonio-alexander/go-bludgeon/employees/cmd/internal.Version=$VERSION \
+    -X github.com/antonio-alexander/go-bludgeon/employees/cmd/internal.GitCommit=$GIT_COMMIT \
+    -X github.com/antonio-alexander/go-bludgeon/employees/cmd/internal.GitBranch=$GIT_BRANCH" \
+    -o bludgeon-employees \
+    && chmod +X bludgeon-employees \
+    && tar -czvf bludgeon-employees.tar.gz ./bludgeon-employees
 
 FROM --platform=${PLATFORM} alpine:latest
 
@@ -49,8 +49,8 @@ ARG GIT_COMMIT
 
 WORKDIR /app
 
-COPY --from=build /go/src/go-bludgeon/employee/cmd/service/bludgeon-employee.tar.gz /app/bludgeon-employee.tar.gz
-COPY --from=build /go/src/go-bludgeon/employee/cmd/service/config/bludgeon_server_config-default.json /app/config/bludgeon_server_config-default.json
+COPY --from=build /go/src/go-bludgeon/employees/cmd/service/bludgeon-employees.tar.gz /app/bludgeon-employees.tar.gz
+COPY --from=build /go/src/go-bludgeon/employees/cmd/service/config/default.json /app/config/default.json
 
 LABEL antonio-alexander.git.branch=${GIT_BRANCH}
 LABEL antonio-alexander.git.commit=${GIT_COMMIT}
@@ -58,5 +58,5 @@ LABEL org.opencontainers.image.source=https://github.com/antonio-alexander/go-bl
 
 EXPOSE 8080 2345
 
-CMD tar -xzf bludgeon-employee.tar.gz && ./bludgeon-employee
+CMD tar -xzf bludgeon-employees.tar.gz && ./bludgeon-employees
 

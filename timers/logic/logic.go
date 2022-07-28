@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -43,12 +44,12 @@ func New(parameters ...interface{}) Logic {
 }
 
 //TimerSubmit can be used to stop a timer and set completed to true
-func (l *logic) TimerSubmit(id string, submitTime *time.Time) (*data.Timer, error) {
+func (l *logic) TimerSubmit(ctx context.Context, id string, submitTime *time.Time) (*data.Timer, error) {
 	if submitTime == nil || submitTime.UnixNano() <= 0 {
 		submitTime = new(time.Time)
 		*submitTime = time.Now()
 	}
-	timer, err := l.Timer.TimerSubmit(id, submitTime.UnixNano())
+	timer, err := l.Timer.TimerSubmit(ctx, id, submitTime.UnixNano())
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +58,8 @@ func (l *logic) TimerSubmit(id string, submitTime *time.Time) (*data.Timer, erro
 
 //TimerUpdateCommnet will only update the comment for timer with
 // the provided id
-func (l *logic) TimerUpdateComment(id, comment string) (*data.Timer, error) {
-	timer, err := l.Timer.TimerUpdate(id, data.TimerPartial{
+func (l *logic) TimerUpdateComment(ctx context.Context, id, comment string) (*data.Timer, error) {
+	timer, err := l.Timer.TimerUpdate(ctx, id, data.TimerPartial{
 		Comment: &comment,
 	})
 	if err != nil {
@@ -69,8 +70,8 @@ func (l *logic) TimerUpdateComment(id, comment string) (*data.Timer, error) {
 
 //TimerArchive will only update the archive for timer with
 // the provided id
-func (l *logic) TimerArchive(id string, archived bool) (*data.Timer, error) {
-	timer, err := l.Timer.TimerUpdate(id, data.TimerPartial{
+func (l *logic) TimerArchive(ctx context.Context, id string, archived bool) (*data.Timer, error) {
+	timer, err := l.Timer.TimerUpdate(ctx, id, data.TimerPartial{
 		Archived: &archived,
 	})
 	if err != nil {

@@ -1,0 +1,168 @@
+/* 
+    go_bludgeon_timers defines a set of types for use with the timers service
+*/
+
+syntax = "proto3";
+   
+package go_bludgeon_timers;
+
+option go_package = "github.com/antonio-alexander/go-bludgeon/timers/data/pb";
+
+// TimeSlices
+service TimeSlices {
+    // time_slice_create
+    rpc time_slice_create(TimeSliceCreateRequest) returns (TimeSliceCreateResponse) {}
+
+    // time_slice_read
+    rpc time_slice_read(TimeSliceReadRequest) returns (TimeSliceReadResponse) {}
+
+    // time_slice_update
+    rpc time_slice_update(TimeSliceUpdateRequest) returns (TimeSliceUpdateResponse) {}
+
+    // time_slice_delete
+    rpc time_slice_delete(TimeSliceDeleteRequest) returns (TimeSliceDeleteResponse) {}
+
+    // time_slices_read
+    rpc time_slices_read(TimeSlicesReadRequest) returns (TimeSlicesReadResponse) {}
+}
+
+// TimeSliceCreateRequest
+message TimeSliceCreateRequest {
+    // time_slice_partial
+    TimeSlicePartial time_slice_partial = 1;
+}
+
+// TimeSliceCreateResponse
+message TimeSliceCreateResponse {
+    // time_slice
+    TimeSlice time_slice = 1;
+}
+
+// TimeSliceReadRequest
+message TimeSliceReadRequest {
+    // id
+    string id = 1;
+}
+
+// TimeSliceReadResponse
+message TimeSliceReadResponse {
+    // time_slice
+    TimeSlice time_slice = 1;
+}
+
+// TimeSliceUpdateRequest
+message TimeSliceUpdateRequest {
+    // id
+    string id = 1;
+
+    // time_slice_partial
+    TimeSlicePartial time_slice_partial = 2;
+}
+
+// TimeSliceUpdateResponse
+message TimeSliceUpdateResponse {
+    // time_slice
+    TimeSlice time_slice = 1;
+}
+
+// TimeSliceDeleteRequest
+message TimeSliceDeleteRequest {
+    // id
+    string id = 1;
+}
+
+// TimeSliceDeleteResponse
+message TimeSliceDeleteResponse {
+//
+}
+
+// TimeSlicesReadRequest
+message TimeSlicesReadRequest {
+    // time_slice_search
+    TimeSliceSearch time_slice_search = 1;
+}
+
+// TimeSlicesReadResponse
+message TimeSlicesReadResponse {
+    // time_slices
+    repeated TimeSlice time_slices = 1;
+}
+
+// TimeSlicePartial
+message TimeSlicePartial {
+    // timer_id_oneof
+    oneof timer_id_oneof {
+        // timer_id
+        string timer_id = 1;
+    }
+    
+    // completed_oneof 
+    oneof completed_oneof {
+        // completed_oneof
+        bool completed = 2;
+    }
+
+    // start_oneof
+    oneof start_oneof {
+        // start
+        int64 start = 3;
+    }
+
+    // finish_oneof
+    oneof finish_oneof {
+        // finish
+        int64 finish = 4;
+    }
+}
+
+// TimeSlice
+message TimeSlice {
+    // completed
+    bool completed = 1;
+
+    // start
+    int64 start = 2;
+
+    // finish
+    int64 finish = 3;
+
+    // elapsed_time
+    int64 elapsed_time = 4;
+
+    // id
+    string id = 5;
+
+    // timer_id
+    string timer_id = 6;
+
+    // last_updated
+    int64 last_updated = 7;
+
+    // last_updated_by
+    string last_updated_by = 8;
+
+    // version
+    int32 version = 9;
+}
+
+
+// TimeSliceSearch
+message TimeSliceSearch {
+    // completed_oneof
+    oneof completed_oneof {
+        // completed
+        bool completed = 1;
+    }
+
+    // timer_id_oneof
+    oneof timer_id_oneof {
+        // timer_id
+        string timer_id = 2;
+    }
+
+    // timer_ids
+    repeated string timer_ids = 3;
+
+    // ids
+    repeated string ids = 4;
+}

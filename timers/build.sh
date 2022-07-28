@@ -32,10 +32,10 @@ case "$1" in
         -X github.com/antonio-alexander/go-bludgeon/timers/cmd/internal.GitBranch=${GIT_BRANCH}" \
         -o $OUTPUT_FILE
     ;;
-    "latest") docker build -f ./cmd/service/Dockerfile . -t ${REGISTRY}/${IMAGE_NAME}:latest --build-arg GIT_COMMIT=${GIT_COMMIT} \
+    "latest") docker build -f ./cmd/service/Dockerfile . -t ${REGISTRY}-${IMAGE_NAME}:latest --build-arg GIT_COMMIT=${GIT_COMMIT} \
         --build-arg GIT_BRANCH=${GIT_BRANCH} --build-arg PLATFORM=${PLATFORM_ARCH} --build-arg GO_ARCH=${GO_ARCH}
     ;;
-    *) docker build -f ./cmd/service/Dockerfile . -t ${REGISTRY}/${IMAGE_NAME}:${GO_ARCH}_${VERSION} --build-arg GIT_COMMIT=${GIT_COMMIT} \
+    *) docker build -f ./cmd/service/Dockerfile . -t ${REGISTRY}-${IMAGE_NAME}:${GO_ARCH}_${VERSION} --build-arg GIT_COMMIT=${GIT_COMMIT} \
         --build-arg GIT_BRANCH=${GIT_BRANCH} --build-arg PLATFORM=${PLATFORM_ARCH} --build-arg GO_ARCH=${GO_ARCH}
     ;;
 esac

@@ -1,7 +1,8 @@
-package client
+package restclient
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -15,11 +16,6 @@ type client struct {
 	*http.Client
 	logger.Logger
 	config *Configuration
-}
-
-type Client interface {
-	Initialize(config *Configuration) error
-	DoRequest(uri, method string, data []byte) ([]byte, error)
 }
 
 func New(parameters ...interface{}) interface {
@@ -57,8 +53,8 @@ func (c *client) Initialize(config *Configuration) error {
 	return nil
 }
 
-func (c *client) DoRequest(uri, method string, data []byte) ([]byte, error) {
-	request, err := http.NewRequest(method, uri, bytes.NewBuffer(data))
+func (c *client) DoRequest(ctx context.Context, uri, method string, data []byte) ([]byte, error) {
+	request, err := http.NewRequestWithContext(ctx, method, uri, bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
 	}

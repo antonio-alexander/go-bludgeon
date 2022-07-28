@@ -1,4 +1,4 @@
-package server
+package restserver
 
 import (
 	"context"
@@ -13,6 +13,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/cors"
 )
+
+const LogAlias string = "HttpServer"
 
 type server struct {
 	sync.RWMutex
@@ -51,6 +53,9 @@ func New(parameters ...interface{}) interface {
 			panic(err)
 		}
 	}
+	if s.Logger == nil {
+		s.Logger = logger.New()
+	}
 	return s
 }
 
@@ -66,14 +71,18 @@ func (s *server) launchServer() {
 			AllowedMethods:   s.config.AllowedMethods,
 			Debug:            s.config.CorsDebug,
 		}).Handler(s.Router)
-		s.Debug("HttpServer: CORS configured with Allow Credentials: %t", s.config.AllowCredentials)
-		s.Debug("HttpServer: CORS configured with Allowed Origins: %s", strings.Join(s.config.AllowedOrigins, ","))
-		s.Debug("HttpServer: CORS configured with Allowed Methods: %s", strings.Join(s.config.AllowedMethods, ","))
-		s.Debug("HttpServer: CORS configured with Debug: %t", s.config.CorsDebug)
+		if s.config.AllowCredentials {
+			s.Debug("%s CORS configured with Allow Credentials", LogAlias)
+		}
+		if s.config.CorsDebug {
+			s.Debug("%s CORS configured with Debug", LogAlias)
+		}
+		s.Debug("%s CORS configured with Allowed Origins \"%s\"", LogAlias, strings.Join(s.config.AllowedOrigins, ","))
+		s.Debug("%s CORS configured with Allowed Methods \"%s\"", LogAlias, strings.Join(s.config.AllowedMethods, ","))
 		close(started)
 		if err := s.Server.ListenAndServe(); err != nil {
 			if err != http.ErrServerClosed {
-				s.Debug("HttpServer: ListenAndServe() error: %s", err)
+				s.Error("%s %s", LogAlias, err)
 			}
 		}
 		//REVIEW: Do we need to account for a situation where the rest server kills itself
@@ -97,7 +106,7 @@ func (s *server) Start(config *Configuration) (err error) {
 	s.Server.Addr = fmt.Sprintf("%s:%s", s.config.Address, s.config.Port)
 	s.launchServer()
 	s.started = true
-	s.Info("HttpServer: started, listening on %s:%s", s.config.Address, s.config.Port)
+	s.Info("%s listening on %s:%s", LogAlias, s.config.Address, s.config.Port)
 	return
 }
 
@@ -110,10 +119,10 @@ func (s *server) Stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout)
 	defer cancel()
 	if err := s.Server.Shutdown(ctx); err != nil {
-		s.Error("HttpServer: stopping - %s", err)
+		s.Error("%s %s", LogAlias, err)
 	}
 	close(s.stopper)
 	s.Wait()
 	s.started = false
-	s.Info("HttpServer: stopped")
+	s.Info("%s stopped", LogAlias)
 }

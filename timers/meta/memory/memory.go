@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"sort"
 	"sync"
 	"time"
@@ -8,6 +9,8 @@ import (
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 	data "github.com/antonio-alexander/go-bludgeon/timers/data"
 	meta "github.com/antonio-alexander/go-bludgeon/timers/meta"
+
+	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
 
 	"github.com/pkg/errors"
 )
@@ -25,7 +28,7 @@ type Memory interface {
 	meta.Timer
 	meta.TimeSlice
 	meta.Serializer
-	meta.Shutdown
+	internal_meta.Owner
 }
 
 func New(parameters ...interface{}) Memory {
@@ -231,13 +234,13 @@ func (m *memory) Shutdown() {
 	m.timeSlices = nil
 }
 
-func (m *memory) TimeSliceCreate(t data.TimeSlicePartial) (*data.TimeSlice, error) {
+func (m *memory) TimeSliceCreate(ctx context.Context, t data.TimeSlicePartial) (*data.TimeSlice, error) {
 	m.Lock()
 	defer m.Unlock()
 	return m.timeSliceCreate(t)
 }
 
-func (m *memory) TimeSliceRead(id string) (*data.TimeSlice, error) {
+func (m *memory) TimeSliceRead(ctx context.Context, id string) (*data.TimeSlice, error) {
 	m.RLock()
 	defer m.RUnlock()
 	timeSlice, ok := m.timeSlices[id]
@@ -247,13 +250,13 @@ func (m *memory) TimeSliceRead(id string) (*data.TimeSlice, error) {
 	return copyTimeSlice(timeSlice), nil
 }
 
-func (m *memory) TimeSliceUpdate(id string, t data.TimeSlicePartial) (*data.TimeSlice, error) {
+func (m *memory) TimeSliceUpdate(ctx context.Context, id string, t data.TimeSlicePartial) (*data.TimeSlice, error) {
 	m.Lock()
 	defer m.Unlock()
 	return m.timeSliceUpdate(id, t)
 }
 
-func (m *memory) TimeSliceDelete(id string) error {
+func (m *memory) TimeSliceDelete(ctx context.Context, id string) error {
 	m.Lock()
 	defer m.Unlock()
 	if _, ok := m.timeSlices[id]; !ok {
@@ -263,13 +266,13 @@ func (m *memory) TimeSliceDelete(id string) error {
 	return nil
 }
 
-func (m *memory) TimeSlicesRead(search data.TimeSliceSearch) ([]*data.TimeSlice, error) {
+func (m *memory) TimeSlicesRead(ctx context.Context, search data.TimeSliceSearch) ([]*data.TimeSlice, error) {
 	m.RLock()
 	defer m.RUnlock()
 	return m.timeSlicesRead(search)
 }
 
-func (m *memory) TimerCreate(t data.TimerPartial) (*data.Timer, error) {
+func (m *memory) TimerCreate(ctx context.Context, t data.TimerPartial) (*data.Timer, error) {
 	m.Lock()
 	defer m.Unlock()
 	id, err := generateID()
@@ -298,7 +301,7 @@ func (m *memory) TimerCreate(t data.TimerPartial) (*data.Timer, error) {
 	return copyTimer(timer), nil
 }
 
-func (m *memory) TimerRead(id string) (*data.Timer, error) {
+func (m *memory) TimerRead(ctx context.Context, id string) (*data.Timer, error) {
 	m.RLock()
 	defer m.RUnlock()
 	timer, ok := m.timers[id]
@@ -315,7 +318,7 @@ func (m *memory) TimerRead(id string) (*data.Timer, error) {
 	return copyTimer(timer), nil
 }
 
-func (m *memory) TimerUpdate(id string, t data.TimerPartial) (*data.Timer, error) {
+func (m *memory) TimerUpdate(ctx context.Context, id string, t data.TimerPartial) (*data.Timer, error) {
 	m.Lock()
 	defer m.Unlock()
 	timer, ok := m.timers[id]
@@ -341,7 +344,7 @@ func (m *memory) TimerUpdate(id string, t data.TimerPartial) (*data.Timer, error
 	return copyTimer(timer), nil
 }
 
-func (m *memory) TimerDelete(id string) error {
+func (m *memory) TimerDelete(ctx context.Context, id string) error {
 	m.Lock()
 	defer m.Unlock()
 	_, ok := m.timers[id]
@@ -357,7 +360,7 @@ func (m *memory) TimerDelete(id string) error {
 	return nil
 }
 
-func (m *memory) TimersRead(search data.TimerSearch) ([]*data.Timer, error) {
+func (m *memory) TimersRead(ctx context.Context, search data.TimerSearch) ([]*data.Timer, error) {
 	m.RLock()
 	defer m.RUnlock()
 	searchFx := func(t *data.Timer) bool {
@@ -408,7 +411,7 @@ func (m *memory) TimersRead(search data.TimerSearch) ([]*data.Timer, error) {
 	return timers, nil
 }
 
-func (m *memory) TimerStart(id string) (*data.Timer, error) {
+func (m *memory) TimerStart(ctx context.Context, id string) (*data.Timer, error) {
 	m.Lock()
 	defer m.Unlock()
 	timer, ok := m.timers[id]
@@ -442,14 +445,14 @@ func (m *memory) TimerStart(id string) (*data.Timer, error) {
 	return copyTimer(timer), nil
 }
 
-func (m *memory) TimerStop(id string) (*data.Timer, error) {
+func (m *memory) TimerStop(ctx context.Context, id string) (*data.Timer, error) {
 	m.Lock()
 	defer m.Unlock()
 	return m.timerStop(id)
 }
 
 //TimerSubmit can be used to stop a timer and set completed to true
-func (m *memory) TimerSubmit(id string, finishTime int64) (*data.Timer, error) {
+func (m *memory) TimerSubmit(ctx context.Context, id string, finishTime int64) (*data.Timer, error) {
 	m.Lock()
 	defer m.Unlock()
 	timer, err := m.timerStop(id)

@@ -6,4 +6,4 @@
 	Package rest provides a concret implementation of the employees service using
 	REST.
 */
-package rest
+package service

@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -21,9 +22,9 @@ func rowsAffected(result sql.Result, errIfNoRowsAffected error) error {
 	return nil
 }
 
-func employeeRead(db interface {
-	Exec(query string, args ...interface{}) (sql.Result, error)
-	QueryRow(query string, args ...interface{}) *sql.Row
+func employeeRead(ctx context.Context, db interface {
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }, id interface{}) (*data.Employee, error) {
 	var condition string
 
@@ -36,7 +37,7 @@ func employeeRead(db interface {
 	query := fmt.Sprintf(`SELECT employee_id, first_name, last_name, email_address,
 		version, last_updated, last_updated_by FROM %s WHERE %s;`,
 		tableEmployeesV1, condition)
-	row := db.QueryRow(query, id)
+	row := db.QueryRowContext(ctx, query, id)
 	employee := &data.Employee{}
 	firstName, lastName := sql.NullString{}, sql.NullString{}
 	if err := row.Scan(

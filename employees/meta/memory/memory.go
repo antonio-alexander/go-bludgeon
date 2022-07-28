@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -8,6 +9,8 @@ import (
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
 	meta "github.com/antonio-alexander/go-bludgeon/employees/meta"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+
+	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
 
 	"github.com/pkg/errors"
 )
@@ -21,7 +24,7 @@ type memory struct {
 }
 
 func New(parameters ...interface{}) interface {
-	meta.Owner
+	internal_meta.Owner
 	meta.Employee
 	meta.Serializer
 } {
@@ -68,7 +71,7 @@ func (m *memory) Shutdown() {
 	m.employees = nil
 }
 
-func (m *memory) EmployeeCreate(e data.EmployeePartial) (*data.Employee, error) {
+func (m *memory) EmployeeCreate(ctx context.Context, e data.EmployeePartial) (*data.Employee, error) {
 	m.Lock()
 	defer m.Unlock()
 	if err := m.validateEmployee(e, true); err != nil {
@@ -96,7 +99,7 @@ func (m *memory) EmployeeCreate(e data.EmployeePartial) (*data.Employee, error) 
 	return copyEmployee(employee), nil
 }
 
-func (m *memory) EmployeeRead(id string) (*data.Employee, error) {
+func (m *memory) EmployeeRead(ctx context.Context, id string) (*data.Employee, error) {
 	m.RLock()
 	defer m.RUnlock()
 	employee, ok := m.employees[id]
@@ -106,7 +109,7 @@ func (m *memory) EmployeeRead(id string) (*data.Employee, error) {
 	return copyEmployee(employee), nil
 }
 
-func (m *memory) EmployeeUpdate(id string, e data.EmployeePartial) (*data.Employee, error) {
+func (m *memory) EmployeeUpdate(ctx context.Context, id string, e data.EmployeePartial) (*data.Employee, error) {
 	m.Lock()
 	defer m.Unlock()
 	updated := false
@@ -137,7 +140,7 @@ func (m *memory) EmployeeUpdate(id string, e data.EmployeePartial) (*data.Employ
 	return copyEmployee(employee), nil
 }
 
-func (m *memory) EmployeeDelete(id string) error {
+func (m *memory) EmployeeDelete(ctx context.Context, id string) error {
 	m.Lock()
 	defer m.Unlock()
 	if _, ok := m.employees[id]; !ok {
@@ -147,7 +150,7 @@ func (m *memory) EmployeeDelete(id string) error {
 	return nil
 }
 
-func (m *memory) EmployeesRead(search data.EmployeeSearch) ([]*data.Employee, error) {
+func (m *memory) EmployeesRead(ctx context.Context, search data.EmployeeSearch) ([]*data.Employee, error) {
 	m.RLock()
 	defer m.RUnlock()
 	searchFx := func(e *data.Employee) bool {

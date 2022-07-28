@@ -1,20 +1,21 @@
 package rest
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/antonio-alexander/go-bludgeon/employees/data"
-	"github.com/antonio-alexander/go-bludgeon/internal/logger"
-	"github.com/antonio-alexander/go-bludgeon/internal/rest/client"
+	data "github.com/antonio-alexander/go-bludgeon/employees/data"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	restclient "github.com/antonio-alexander/go-bludgeon/internal/rest/client"
 )
 
 const urif string = "http://%s:%s%s"
 
 type rest struct {
-	client.Client
+	restclient.Client
 	logger.Logger
 	config *Configuration
 }
@@ -28,7 +29,7 @@ func New(parameters ...interface{}) interface {
 	//create a rest pointer, and range over the parameters
 	// if configuration is provided, initialize (panic on
 	// error)
-	r := &rest{Client: client.New()}
+	r := &rest{Client: restclient.New()}
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
 		case *Configuration:
@@ -60,13 +61,13 @@ func (r *rest) Initialize(config *Configuration) error {
 //EmployeeCreate can be used to create a single Employee
 // the employee email address is required and must be unique
 // at the time of creation
-func (r *rest) EmployeeCreate(employeePartial data.EmployeePartial) (*data.Employee, error) {
+func (r *rest) EmployeeCreate(ctx context.Context, employeePartial data.EmployeePartial) (*data.Employee, error) {
 	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port, data.RouteEmployees)
 	bytes, err := json.Marshal(employeePartial)
 	if err != nil {
 		return nil, err
 	}
-	bytes, err = r.DoRequest(uri, http.MethodPost, bytes)
+	bytes, err = r.DoRequest(ctx, uri, http.MethodPost, bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -79,10 +80,10 @@ func (r *rest) EmployeeCreate(employeePartial data.EmployeePartial) (*data.Emplo
 
 //EmployeeRead can be used to read a single employee given a
 // valid id
-func (r *rest) EmployeeRead(id string) (*data.Employee, error) {
+func (r *rest) EmployeeRead(ctx context.Context, id string) (*data.Employee, error) {
 	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
 		fmt.Sprintf(data.RouteEmployeesIDf, id))
-	bytes, err := r.DoRequest(uri, http.MethodGet, nil)
+	bytes, err := r.DoRequest(ctx, uri, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -94,14 +95,14 @@ func (r *rest) EmployeeRead(id string) (*data.Employee, error) {
 }
 
 //EmployeeUpdate can be used to update the properties of a given employee
-func (r *rest) EmployeeUpdate(id string, employeePartial data.EmployeePartial) (*data.Employee, error) {
+func (r *rest) EmployeeUpdate(ctx context.Context, id string, employeePartial data.EmployeePartial) (*data.Employee, error) {
 	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
 		fmt.Sprintf(data.RouteEmployeesIDf, id))
 	bytes, err := json.Marshal(employeePartial)
 	if err != nil {
 		return nil, err
 	}
-	bytes, err = r.DoRequest(uri, http.MethodPut, bytes)
+	bytes, err = r.DoRequest(ctx, uri, http.MethodPut, bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -114,10 +115,10 @@ func (r *rest) EmployeeUpdate(id string, employeePartial data.EmployeePartial) (
 
 //EmployeeDelete can be used to delete a single employee given a
 // valid id
-func (r *rest) EmployeeDelete(id string) error {
+func (r *rest) EmployeeDelete(ctx context.Context, id string) error {
 	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
 		fmt.Sprintf(data.RouteEmployeesIDf, id))
-	if _, err := r.DoRequest(uri, http.MethodDelete, nil); err != nil {
+	if _, err := r.DoRequest(ctx, uri, http.MethodDelete, nil); err != nil {
 		return err
 	}
 	return nil
@@ -125,10 +126,10 @@ func (r *rest) EmployeeDelete(id string) error {
 
 //EmployeesRead can be used to read one or more employees, given a set of
 // search parameters
-func (r *rest) EmployeesRead(search data.EmployeeSearch) ([]*data.Employee, error) {
+func (r *rest) EmployeesRead(ctx context.Context, search data.EmployeeSearch) ([]*data.Employee, error) {
 	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
 		data.RouteEmployeesSearch+search.ToParams())
-	bytes, err := r.DoRequest(uri, http.MethodGet, nil)
+	bytes, err := r.DoRequest(ctx, uri, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,272 @@
+/* 
+    go_bludgeon_timers defines a set of types for use with the timers service
+*/
+
+syntax = "proto3";
+   
+package go_bludgeon_timers;
+  
+option go_package = "github.com/antonio-alexander/go-bludgeon/timers/data/pb";
+
+// Timers
+service Timers {
+    // timer_create
+    rpc timer_create(TimerCreateRequest) returns (TimerCreateResponse) {}
+
+    // timer_read
+    rpc timer_read(TimerReadRequest) returns (TimerReadResponse) {}
+    
+    // timer_delete
+    rpc timer_delete(TimerDeleteRequest) returns (TimerDeleteResponse) {}
+
+    // timers_read
+    rpc timers_read(TimersReadRequest) returns (TimersReadResponse) {}
+
+    // timer_update_comment
+    rpc timer_update_comment(TimerUpdateCommentRequest) returns (TimerUpdateCommentResponse) {}
+
+    // timer_archive
+    rpc timer_archive(TimerArchiveRequest) returns (TimerArchiveResponse) {}
+
+    // timer_start
+    rpc timer_start(TimerStartRequest) returns (TimerStartResponse) {}
+
+    // timer_stop
+    rpc timer_stop(TimerStopRequest) returns (TimerStopResponse) {}
+        
+    // timer_submit
+    rpc timer_submit(TimerSubmitRequest) returns (TimerSubmitResponse) {}
+}
+
+// TimerCreateRequest
+message TimerCreateRequest {
+    // timer_partial
+    TimerPartial timer_partial = 1;
+}
+
+// TimerCreateResponse
+message TimerCreateResponse {
+    // timer
+    Timer timer = 1;
+}
+
+// TimerReadRequest
+message TimerReadRequest {
+    // id
+    string id = 1;
+}
+
+// TimerReadResponse
+message TimerReadResponse {
+    // timer
+    Timer timer = 1;
+}
+
+// TimerUpdateRequest
+message TimerUpdateRequest {
+    // id
+    string id = 1;
+
+    // timer_partial
+    TimerPartial timer_partial = 2;
+}
+
+// TimerUpdateResponse
+message TimerUpdateResponse {
+    // timer
+    Timer timer = 1;
+}
+
+// TimerDeleteRequest
+message TimerDeleteRequest {
+    // id
+    string id = 1;
+}
+
+// TimerDeleteResponse
+message TimerDeleteResponse {
+    //
+}
+
+// TimersReadRequest
+message TimersReadRequest {
+    // timer_search
+    TimerSearch timer_search = 1;
+}
+
+// TimersReadResponse
+message TimersReadResponse {
+    // timers
+    repeated Timer timers = 1;
+}
+
+// TimerStartRequest
+message TimerStartRequest {
+    // id
+    string id = 1;
+}
+
+// TimerStartResponse
+message TimerStartResponse {
+    // timer
+    Timer timer = 1;
+}
+
+// TimerStopRequest
+message TimerStopRequest {
+    // id
+    string id = 1;
+}
+
+// TimerStopResponse
+message TimerStopResponse {
+    // timer
+    Timer timer = 1;
+}
+
+// TimerSubmitRequest
+message TimerSubmitRequest {
+    // id
+    string id = 1;
+
+    // fnish_oneof
+    oneof finish_oneof {
+        // finish
+        int64 finish = 2;
+    }
+}
+
+// TimerSubmitResponse
+message TimerSubmitResponse {
+    // timer
+    Timer timer = 1;
+}
+
+// TimerUpdateCommentRequest
+message TimerUpdateCommentRequest {
+    // id
+    string id = 1;
+
+    // comment
+    string comment = 2;
+}
+
+// TimerUpdateCommentResponse
+message TimerUpdateCommentResponse {
+    // timer
+    Timer timer = 1;
+}
+
+// TimerArchiveRequest
+message TimerArchiveRequest {
+    // id
+    string id = 1;
+
+    // archive
+    bool archive = 2;
+}
+
+// TimerArchiveResponse
+message TimerArchiveResponse {
+    // timer
+    Timer timer = 1;
+}
+
+// TimerSearch
+message TimerSearch {
+    // employee_id_oneof
+    oneof employee_id_oneof {
+        // employee_id
+        string employee_id = 1;
+    }
+
+    // employee_ids
+    repeated string employee_ids = 2;
+
+    // completed_oneof
+    oneof completed_oneof {
+        // completed
+        bool completed = 3;
+    }
+
+    // archived_oneof
+    oneof archived_oneof {
+        // archived
+        bool archived = 4;
+    }
+
+    // ids
+    repeated string ids = 5;
+}
+
+// TimerPartial
+message TimerPartial {
+    // completed_oneof 
+    oneof completed_oneof {
+        // completed_oneof
+        bool completed = 1;
+    }
+
+    // archived_oneof
+    oneof archived_oneof {
+        // archived
+        bool archived = 2;
+    }
+
+    // employee_id_oneof
+    oneof employee_id_oneof {
+        // employee_id
+        string employee_id = 3;
+    }
+
+    // comment_oneof
+    oneof comment_oneof {
+        // comment
+        string comment = 4;
+    }
+
+    // finish_oneof
+    oneof finish_oneof {
+        // finish
+        int64 finish = 5;
+    }
+}
+
+// Timer
+message Timer {
+    // completed
+    bool completed = 1;
+
+    // archived
+    bool archived = 2;
+
+    // start
+    int64 start = 3;
+
+    // finish
+    int64 finish = 4;
+
+    // elapsed_time
+    int64 elapsed_time = 5;
+
+    // employee_id
+    string employee_id = 6;
+
+    // active_time_slice_id
+    string active_time_slice_id = 7;
+
+    // id
+    string id = 8;
+
+    // comment
+    string comment = 9;
+
+    // last_updated
+    int64 last_updated = 10;
+
+    // last_updated_by
+    string last_updated_by = 11;
+
+    // version
+    int32 version = 12;
+}

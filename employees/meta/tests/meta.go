@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -29,11 +30,13 @@ func randomString(n int) string {
 
 func TestEmployeeCRUD(m meta.Employee) func(*testing.T) {
 	return func(t *testing.T) {
-		//create
 		firstName := randomString(15)
 		lastName := randomString(15)
 		emailAddress := randomString(20) + "@foobar.duck"
-		employee, err := m.EmployeeCreate(data.EmployeePartial{
+		ctx := context.TODO()
+
+		//create
+		employee, err := m.EmployeeCreate(ctx, data.EmployeePartial{
 			FirstName:    &firstName,
 			LastName:     &lastName,
 			EmailAddress: &emailAddress,
@@ -43,12 +46,14 @@ func TestEmployeeCRUD(m meta.Employee) func(*testing.T) {
 		assert.Equal(t, firstName, employee.FirstName)
 		assert.Equal(t, lastName, employee.LastName)
 		assert.Equal(t, emailAddress, employee.EmailAddress)
+
 		//read
-		employeeRead, err := m.EmployeeRead(employee.ID)
+		employeeRead, err := m.EmployeeRead(ctx, employee.ID)
 		assert.Nil(t, err)
 		assert.Equal(t, employee, employeeRead)
+
 		//read multiple
-		employeesRead, err := m.EmployeesRead(data.EmployeeSearch{
+		employeesRead, err := m.EmployeesRead(ctx, data.EmployeeSearch{
 			FirstName:    &firstName,
 			LastName:     &lastName,
 			EmailAddress: &emailAddress,
@@ -65,12 +70,13 @@ func TestEmployeeCRUD(m meta.Employee) func(*testing.T) {
 		})
 		assert.Contains(t, employeesRead, employee)
 		*employee = *employeeRead
+
 		//update
 		//KIM: if we don't sleep, the tests below will fail for
 		// last_updated
 		firstName = randomString(25)
 		time.Sleep(time.Second)
-		employeeUpdated, err := m.EmployeeUpdate(employee.ID, data.EmployeePartial{
+		employeeUpdated, err := m.EmployeeUpdate(ctx, employee.ID, data.EmployeePartial{
 			FirstName: &firstName,
 		})
 		assert.Nil(t, err)
@@ -78,14 +84,15 @@ func TestEmployeeCRUD(m meta.Employee) func(*testing.T) {
 		assert.Greater(t, employeeUpdated.Version, employee.Version)
 		assert.Greater(t, employeeUpdated.LastUpdated, employee.LastUpdated)
 		//delete
-		err = m.EmployeeDelete(employee.ID)
+		err = m.EmployeeDelete(ctx, employee.ID)
 		assert.Nil(t, err)
-		err = m.EmployeeDelete(employee.ID)
+		err = m.EmployeeDelete(ctx, employee.ID)
 		assert.NotNil(t, err)
-		_, err = m.EmployeeRead(employee.ID)
+		_, err = m.EmployeeRead(ctx, employee.ID)
 		assert.NotNil(t, err)
+
 		//read
-		employeesRead, err = m.EmployeesRead(data.EmployeeSearch{
+		employeesRead, err = m.EmployeesRead(ctx, data.EmployeeSearch{
 			FirstName:    &firstName,
 			LastName:     &lastName,
 			EmailAddress: &emailAddress,

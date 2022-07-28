@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -26,9 +27,11 @@ func rowsAffected(result sql.Result, customErr error) error {
 	return nil
 }
 
-func timeSliceCreate(db interface {
+func timeSliceCreate(ctx context.Context, db interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }, timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
 	var columns, values []string
 	var args []interface{}
@@ -63,16 +66,18 @@ func timeSliceCreate(db interface {
 	if err != nil {
 		return nil, err
 	}
-	timeSlice, err := timeSliceRead(db, activeSliceID)
+	timeSlice, err := timeSliceRead(ctx, db, activeSliceID)
 	if err != nil {
 		return nil, err
 	}
 	return timeSlice, nil
 }
 
-func timeSliceUpdate(db interface {
+func timeSliceUpdate(ctx context.Context, db interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }, id interface{}, timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
 	var args []interface{}
 	var updates []string
@@ -101,19 +106,22 @@ func timeSliceUpdate(db interface {
 	}
 	args = append(args, id)
 	query := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = ?;`, tableTimeSlices, strings.Join(updates, ","), column)
-	_, err := db.Exec(query, args...)
+	_, err := db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
-	timeSlice, err := timeSliceRead(db, id)
+	timeSlice, err := timeSliceRead(ctx, db, id)
 	if err != nil {
 		return nil, err
 	}
 	return timeSlice, nil
 }
 
-func timeSliceRead(db interface {
+func timeSliceRead(ctx context.Context, db interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }, id interface{}) (*data.TimeSlice, error) {
 	var value string
 	switch id.(type) {
@@ -125,7 +133,7 @@ func timeSliceRead(db interface {
 	query := fmt.Sprintf(`SELECT time_slice_id, start, finish, completed, elapsed_time, timer_id,
 		version, last_updated, last_updated_by FROM %s WHERE time_slice_id = %s`,
 		tableTimeSlicesV1, value)
-	row := db.QueryRow(query, id)
+	row := db.QueryRowContext(ctx, query, id)
 	timeSlice := &data.TimeSlice{}
 	start, finish := sql.NullInt64{}, sql.NullInt64{}
 	elapsed_time := sql.NullInt64{}
@@ -147,8 +155,11 @@ func timeSliceRead(db interface {
 	return timeSlice, nil
 }
 
-func timerRead(db interface {
+func timerRead(ctx context.Context, db interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }, id interface{}) (*data.Timer, error) {
 	var condition string
 
@@ -161,7 +172,7 @@ func timerRead(db interface {
 	query := fmt.Sprintf(`SELECT timer_id, start, finish, elapsed_time, comment, archived, completed, 
 		employee_id, active_time_slice_id, version, last_updated, last_updated_by FROM %s WHERE %s;`,
 		tableTimersV1, condition)
-	row := db.QueryRow(query, id)
+	row := db.QueryRowContext(ctx, query, id)
 	timer := &data.Timer{}
 	employeeID, activeTimeSliceID := sql.NullString{}, sql.NullString{}
 	start, finish := sql.NullInt64{}, sql.NullInt64{}
@@ -188,9 +199,11 @@ func timerRead(db interface {
 	return timer, nil
 }
 
-func timerUpdate(db interface {
+func timerUpdate(ctx context.Context, db interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }, id string, timerPartial data.TimerPartial) (*data.Timer, error) {
 	var args []interface{}
 	var updates []string
@@ -220,25 +233,27 @@ func timerUpdate(db interface {
 	}
 	args = append(args, id)
 	query := fmt.Sprintf(`UPDATE %s SET %s WHERE id = ?;`, tableTimers, strings.Join(updates, ","))
-	result, err := db.Exec(query, args...)
+	result, err := db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	if err := rowsAffected(result, meta.ErrTimerNotFound); err != nil {
 		return nil, err
 	}
-	timer, err := timerRead(db, id)
+	timer, err := timerRead(ctx, db, id)
 	if err != nil {
 		return nil, err
 	}
 	return timer, nil
 }
 
-func timerStop(db interface {
+func timerStop(ctx context.Context, db interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }, id string) (*data.Timer, error) {
-	timer, err := timerRead(db, id)
+	timer, err := timerRead(ctx, db, id)
 	if err != nil {
 		return nil, err
 	}
@@ -246,12 +261,12 @@ func timerStop(db interface {
 		return timer, nil
 	}
 	finish := time.Now().UnixNano()
-	if _, err := timeSliceUpdate(db, timer.ActiveTimeSliceID, data.TimeSlicePartial{
+	if _, err := timeSliceUpdate(ctx, db, timer.ActiveTimeSliceID, data.TimeSlicePartial{
 		Finish: &finish,
 	}); err != nil {
 		return nil, err
 	}
-	if timer, err = timerRead(db, id); err != nil {
+	if timer, err = timerRead(ctx, db, id); err != nil {
 		return nil, err
 	}
 	return timer, nil

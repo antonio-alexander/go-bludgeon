@@ -1,6 +1,7 @@
 package meta
 
 import (
+	"context"
 	"strings"
 
 	"github.com/antonio-alexander/go-bludgeon/internal/errors"
@@ -80,59 +81,53 @@ type Timer interface {
 	//TimerCreate can be used to create a timer, although
 	// all fields are available, the only fields that will
 	// actually be set are: timer_id and comment
-	TimerCreate(timer data.TimerPartial) (*data.Timer, error)
+	TimerCreate(ctx context.Context, timer data.TimerPartial) (*data.Timer, error)
 
 	//TimerRead can be used to read the current value of a given
 	// timer, values such as start/finish and elapsed time are
 	// "calculated" values rather than values that can be set
-	TimerRead(id string) (*data.Timer, error)
+	TimerRead(ctx context.Context, id string) (*data.Timer, error)
 
 	//TimerStart can be used to start a given timer or do nothing
 	// if the timer is already started
-	TimerStart(id string) (*data.Timer, error)
+	TimerStart(ctx context.Context, id string) (*data.Timer, error)
 
 	//TimerStop can be used to stop a given timer or do nothing
 	// if the timer is not started
-	TimerStop(id string) (*data.Timer, error)
+	TimerStop(ctx context.Context, id string) (*data.Timer, error)
 
 	//TimerUpdate can be used to update values a given timer
 	// not associated with timer operations, values such as:
 	// comment, archived and completed
-	TimerUpdate(id string, timer data.TimerPartial) (*data.Timer, error)
+	TimerUpdate(ctx context.Context, id string, timer data.TimerPartial) (*data.Timer, error)
 
 	//TimerSubmit can be used to stop a timer and set completed to true
-	TimerSubmit(id string, finishTime int64) (*data.Timer, error)
+	TimerSubmit(ctx context.Context, id string, finishTime int64) (*data.Timer, error)
 
 	//TimerDelete can be used to delete a timer if it exists
-	TimerDelete(id string) error
+	TimerDelete(ctx context.Context, id string) error
 
 	//TimersRead can be used to read one or more timers depending
 	// on search values provided
-	TimersRead(search data.TimerSearch) ([]*data.Timer, error)
+	TimersRead(ctx context.Context, search data.TimerSearch) ([]*data.Timer, error)
 }
 
 //TimeSlice provides an interface that can be used to interact with time slices
 type TimeSlice interface {
 	//TimeSliceCreate can be used to create a single time
 	// slice
-	TimeSliceCreate(t data.TimeSlicePartial) (*data.TimeSlice, error)
+	TimeSliceCreate(ctx context.Context, t data.TimeSlicePartial) (*data.TimeSlice, error)
 
 	//TimeSliceRead can be used to read an existing time slice
-	TimeSliceRead(id string) (*data.TimeSlice, error)
+	TimeSliceRead(ctx context.Context, id string) (*data.TimeSlice, error)
 
 	//TimeSliceUpdate can be used to update an existing time slice
-	TimeSliceUpdate(id string, t data.TimeSlicePartial) (*data.TimeSlice, error)
+	TimeSliceUpdate(ctx context.Context, id string, t data.TimeSlicePartial) (*data.TimeSlice, error)
 
 	//TimeSliceDelete can be used to delete an existing time slice
-	TimeSliceDelete(id string) error
+	TimeSliceDelete(ctx context.Context, id string) error
 
 	//TimeSlicesRead can be used to read zero or more time slices depending on the
 	// search criteria
-	TimeSlicesRead(search data.TimeSliceSearch) ([]*data.TimeSlice, error)
-}
-
-//Shutdown provides a function that can be used to deconstruct
-// a pointer
-type Shutdown interface {
-	Shutdown()
+	TimeSlicesRead(ctx context.Context, search data.TimeSliceSearch) ([]*data.TimeSlice, error)
 }
