@@ -3,7 +3,7 @@ module github.com/antonio-alexander/go-bludgeon/timers
 go 1.16
 
 require (
-	github.com/antonio-alexander/go-bludgeon/internal v1.1.1-0.20220806174217-637ebd265969
+	github.com/antonio-alexander/go-bludgeon/internal v1.2.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
