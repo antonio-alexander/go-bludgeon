@@ -1,33 +1,21 @@
-package internal
+package config
 
 import (
 	"encoding/json"
 	"io/fs"
 	"io/ioutil"
+	"strconv"
 
-	meta "github.com/antonio-alexander/go-bludgeon/employees/meta"
-	service "github.com/antonio-alexander/go-bludgeon/employees/service"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
 
+	service_grpc "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
 	service_rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 
-	meta_file "github.com/antonio-alexander/go-bludgeon/employees/meta/file"
-	meta_mysql "github.com/antonio-alexander/go-bludgeon/employees/meta/mysql"
+	meta_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
+	meta_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
 
 	"github.com/pkg/errors"
-)
-
-const ErrMetaTypeEmpty string = "meta type empty"
-
-const (
-	DefaultConfigFile string       = "bludgeon_service_config.json"
-	DefaultConfigPath string       = "config"
-	DefaultMetaType   meta.Type    = meta.TypeFile
-	DefaultServerType service.Type = service.TypeREST
-)
-
-const (
-	EnvNameServiceType string = "BLUDGEON_SERVICE_TYPE"
-	EnvNameMetaType    string = "BLUDGEON_META_TYPE"
 )
 
 type ConfigurationMeta struct {
@@ -37,25 +25,28 @@ type ConfigurationMeta struct {
 }
 
 type ConfigurationServer struct {
-	Type service.Type                `json:"type"`
-	Rest *service_rest.Configuration `json:"rest"`
+	RestEnabled bool                        `json:"rest_enabled"`
+	Rest        *service_rest.Configuration `json:"rest"`
+	GrpcEnabled bool                        `json:"grpc_enabled"`
+	Grpc        *service_grpc.Configuration `json:"grpc"`
 }
 
 type Configuration struct {
-	Meta   ConfigurationMeta   `json:"meta"`
-	Server ConfigurationServer `json:"service"`
+	Logger *logger.Configuration `json:"logger"`
+	Meta   ConfigurationMeta     `json:"meta"`
+	Server ConfigurationServer   `json:"service"`
 }
 
 func NewConfiguration() *Configuration {
 	return &Configuration{
+		Logger: new(logger.Configuration),
 		Meta: ConfigurationMeta{
-			Type:  "",
 			File:  new(meta_file.Configuration),
 			Mysql: new(meta_mysql.Configuration),
 		},
 		Server: ConfigurationServer{
-			Type: "",
-			Rest: &service_rest.Configuration{},
+			Rest: new(service_rest.Configuration),
+			Grpc: new(service_grpc.Configuration),
 		},
 	}
 }
@@ -69,7 +60,6 @@ func (c *Configuration) Read(configFile string) error {
 }
 
 func (c *Configuration) Write(configFile string) error {
-	//REVIEW: do we need to ensure that the path exists?
 	bytes, err := json.MarshalIndent(&c, "", "  ")
 	if err != nil {
 		return err
@@ -79,19 +69,32 @@ func (c *Configuration) Write(configFile string) error {
 
 func (c *Configuration) Default(pwd string) {
 	c.Meta.Type = DefaultMetaType
+	c.Logger.Default()
 	c.Meta.File.Default(pwd)
 	c.Meta.Mysql.Default()
-	c.Server.Type = DefaultServerType
 	c.Server.Rest.Default()
+	c.Server.Grpc.Default()
 }
 
 func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
 	if metaType, ok := envs[EnvNameMetaType]; ok {
 		c.Meta.Type = meta.AtoType(metaType)
 	}
-	c.Server.Rest.FromEnv(pwd, envs)
+	if s, ok := envs[EnvNameServiceRestEnabled]; ok {
+		if restEnabled, err := strconv.ParseBool(s); err == nil {
+			c.Server.RestEnabled = restEnabled
+		}
+	}
+	if s, ok := envs[EnvNameServiceGrpcEnabled]; ok {
+		if grpcEnabled, err := strconv.ParseBool(s); err == nil {
+			c.Server.GrpcEnabled = grpcEnabled
+		}
+	}
+	c.Logger.FromEnv(pwd, envs)
 	c.Meta.File.FromEnv(pwd, envs)
 	c.Meta.Mysql.FromEnv(pwd, envs)
+	c.Server.Rest.FromEnv(pwd, envs)
+	c.Server.Grpc.FromEnv(pwd, envs)
 }
 
 func (c *Configuration) Validate() (err error) {
@@ -99,6 +102,9 @@ func (c *Configuration) Validate() (err error) {
 		return errors.New(ErrMetaTypeEmpty)
 	}
 	if err = c.Server.Rest.Validate(); err != nil {
+		return
+	}
+	if err = c.Server.Grpc.Validate(); err != nil {
 		return
 	}
 	if err = c.Meta.File.Validate(); err != nil {

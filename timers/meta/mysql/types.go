@@ -1,8 +1,10 @@
 package mysql
 
 import (
+	timers "github.com/antonio-alexander/go-bludgeon/timers/meta"
+
+	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
 	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
-	"github.com/antonio-alexander/go-bludgeon/timers/meta"
 )
 
 //Configuration provides parameters to control the functionality of the
@@ -14,11 +16,11 @@ type Configuration struct {
 
 //MySQL combines all the methods implemented by the underlying pointer
 type MySQL interface {
-	meta.Timer
-	meta.TimeSlice
-	meta.Shutdown
+	timers.Timer
+	timers.TimeSlice
+	internal_meta.Owner
 
 	//Initialize will configure and prepare the underlying pointer to
 	// execute its business logic
-	Initialize(config *Configuration) (err error)
+	Initialize(config *internal_mysql.Configuration) (err error)
 }

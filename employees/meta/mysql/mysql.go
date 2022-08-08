@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -28,14 +29,14 @@ type mysql struct {
 }
 
 func New(parameters ...interface{}) MySQL {
-	var config *Configuration
+	var config *internal_mysql.Configuration
 
 	m := &mysql{
 		DB: internal_mysql.New(parameters...),
 	}
 	for _, p := range parameters {
 		switch p := p.(type) {
-		case *Configuration:
+		case *internal_mysql.Configuration:
 			config = p
 		case logger.Logger:
 			m.Logger = p
@@ -49,19 +50,19 @@ func New(parameters ...interface{}) MySQL {
 	return m
 }
 
-func (m *mysql) Initialize(config *Configuration) error {
+func (m *mysql) Initialize(config *internal_mysql.Configuration) error {
 	m.Lock()
 	defer m.Unlock()
 	if config == nil {
 		return errors.New("config is nil")
 	}
-	if err := m.DB.Initialize(&config.Configuration); err != nil {
+	if err := m.DB.Initialize(config); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *mysql) EmployeeCreate(employeePartial data.EmployeePartial) (*data.Employee, error) {
+func (m *mysql) EmployeeCreate(ctx context.Context, employeePartial data.EmployeePartial) (*data.Employee, error) {
 	var args []interface{}
 	var columns []string
 	var values []string
@@ -86,7 +87,7 @@ func (m *mysql) EmployeeCreate(employeePartial data.EmployeePartial) (*data.Empl
 		return nil, err
 	}
 	query := fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s);", tableEmployees, strings.Join(columns, ","), strings.Join(values, ","))
-	result, err := tx.Exec(query, args...)
+	result, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		switch err := err.(type) {
 		default:
@@ -107,7 +108,7 @@ func (m *mysql) EmployeeCreate(employeePartial data.EmployeePartial) (*data.Empl
 	if err != nil {
 		return nil, err
 	}
-	employee, err := employeeRead(tx, id)
+	employee, err := employeeRead(ctx, tx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -117,11 +118,11 @@ func (m *mysql) EmployeeCreate(employeePartial data.EmployeePartial) (*data.Empl
 	return employee, nil
 }
 
-func (m *mysql) EmployeeRead(id string) (*data.Employee, error) {
-	return employeeRead(m, id)
+func (m *mysql) EmployeeRead(ctx context.Context, id string) (*data.Employee, error) {
+	return employeeRead(ctx, m, id)
 }
 
-func (m *mysql) EmployeeUpdate(id string, employeePartial data.EmployeePartial) (*data.Employee, error) {
+func (m *mysql) EmployeeUpdate(ctx context.Context, id string, employeePartial data.EmployeePartial) (*data.Employee, error) {
 	var args []interface{}
 	var updates []string
 
@@ -147,7 +148,7 @@ func (m *mysql) EmployeeUpdate(id string, employeePartial data.EmployeePartial) 
 	defer tx.Rollback()
 	args = append(args, id)
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE id=?;", tableEmployees, strings.Join(updates, ","))
-	result, err := tx.Exec(query, args...)
+	result, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		switch err := err.(type) {
 		default:
@@ -164,7 +165,7 @@ func (m *mysql) EmployeeUpdate(id string, employeePartial data.EmployeePartial) 
 	if err := rowsAffected(result, meta.ErrEmployeeNotUpdated); err != nil {
 		return nil, err
 	}
-	employee, err := employeeRead(tx, id)
+	employee, err := employeeRead(ctx, tx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -174,16 +175,16 @@ func (m *mysql) EmployeeUpdate(id string, employeePartial data.EmployeePartial) 
 	return employee, nil
 }
 
-func (m *mysql) EmployeeDelete(id string) error {
+func (m *mysql) EmployeeDelete(ctx context.Context, id string) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", tableEmployees)
-	result, err := m.Exec(query, id)
+	result, err := m.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
 	return rowsAffected(result, meta.ErrEmployeeNotFound)
 }
 
-func (m *mysql) EmployeesRead(search data.EmployeeSearch) ([]*data.Employee, error) {
+func (m *mysql) EmployeesRead(ctx context.Context, search data.EmployeeSearch) ([]*data.Employee, error) {
 	var searchParameters []string
 	var args []interface{}
 	var query string
@@ -240,7 +241,7 @@ func (m *mysql) EmployeesRead(search data.EmployeeSearch) ([]*data.Employee, err
 		query = fmt.Sprintf(`SELECT employee_id, first_name, last_name, email_address,
 		version, last_updated, last_updated_by FROM %s`, tableEmployeesV1)
 	}
-	rows, err := m.Query(query, args...)
+	rows, err := m.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

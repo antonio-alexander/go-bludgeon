@@ -164,9 +164,16 @@ jobs:
   docker_build_images:
     if: ${{ always() &&
       (needs.environment_push.result=='success' || needs.environment_pull_request.result=='success') &&
-      needs.go_test.result=='success' && needs.swagger_validate.result=='success' }}
+      needs.go_test.result=='success' && needs.swagger_validate.result=='success' &&
+      needs.proto_validate.result=='success'}}
     needs:
-      [go_test, swagger_validate, environment_push, environment_pull_request]
+      [
+        environment_push,
+        environment_pull_request,
+        go_test,
+        swagger_validate,
+        proto_validate,
+      ]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -279,43 +286,93 @@ jobs:
           go mod download
           make validate-swagger
 
-  swagger_generate:
-    if: ${{ always() && needs.swagger_validate.result=='success' }}
-    needs: [swagger_validate]
+  proto_lint:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get environment
-        run: |
-          version=`cat /tmp/version_source`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Check out repository code
-        uses: actions/checkout@v2
-      - name: Setup Go
-        uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: 1.16
-      - name: generate swagger.json
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      - name: Lint Protos
+        uses: yoheimuta/action-protolint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          level: error
+          protolint_version: "0.38.3"
+          protolint_flags: -config_path=./timers/.protolint.yaml ./timers/data/pb/*.proto
+
+  proto_validate:
+    needs: [proto_lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          version: "3.20.1"
+      - name: Install protoc-gen-go
         run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/timers
-          go mod download
-          make swagger
-          mv ./cmd/service/swagger.json /tmp/swagger.json
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
+      - name: Install protoc-gen-go-grpc
+        run: |
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
+      - name: Checkout repository code
+        uses: actions/checkout@v2
+      - name: Build protos
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/
+        run: |
+          protoc -I="./pb" --go_opt=paths=source_relative --go_out="/tmp" --go-grpc_opt=paths=source_relative --go-grpc_out="/tmp" ./pb/*.proto
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: artifacts
           path: |
-            /tmp/swagger.json
+            /tmp/timers.pb.go
+            /tmp/timers_grpc.pb.go
+      - name: Compare timers.pb.go
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
+        run: |
+          if cmp --silent -- "./timers.pb.go" "/tmp/timers.pb.go"; then
+            echo "generated proto files are identical"
+          else
+            echo "one or more proto files generated don't match"
+            exit 1
+          fi
+      - name: Compare timers_grpc.pb.go
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
+        run: |
+          if cmp --silent -- "./timers_grpc.pb.go" "/tmp/timers_grpc.pb.go"; then
+          echo "generated proto files are identical"
+          else
+          echo "one or more proto files generated don't match"
+          exit 1
+          fi
+      - name: Compare timeslices.pb.go
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
+        run: |
+          if cmp --silent -- "./timeslices.pb.go" "/tmp/timeslices.pb.go"; then
+            echo "generated proto files are identical"
+          else
+            echo "one or more proto files generated don't match"
+            exit 1
+          fi
+      - name: Compare timeslices_grpc.pb.go
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
+        run: |
+          if cmp --silent -- "./timeslices_grpc.pb.go" "/tmp/timeslices_grpc.pb.go"; then
+          echo "generated proto files are identical"
+          else
+          echo "one or more proto files generated don't match"
+          exit 1
+          fi
 
   version_validate:
-    if: github.base_ref == 'refs/heads/main'
+    if: ${{ always() &&
+      (github.base_ref == 'refs/heads/main' || github.base_ref == 'refs/heads/develop') }}
     needs: [environment_pull_request]
     runs-on: ubuntu-latest
     permissions:

@@ -1,5 +1,5 @@
 #---------------------------------------------------------------------------------------------------
-# bludgeon-timer [Dockerfile.Debug]
+# bludgeon-employee [Dockerfile.Debug]
 # 
 # Reference: https://stackoverflow.com/questions/63178036/how-to-find-commit-hash-from-within-a-running-docker-image
 # commit: git rev-parse HEAD
@@ -25,23 +25,23 @@ ARG GIT_COMMIT
 ARG GO_ARCH
 ARG GO_ARM
 
-WORKDIR /go/src/go-bludgeon/timer
+WORKDIR /go/src/go-bludgeon/employee
 
-COPY . /go/src/go-bludgeon/timer
+COPY . /go/src/go-bludgeon/employee
 
 RUN \
     apk add --no-cache ca-certificates jq dpkg gcc git musl-dev \
     && go get github.com/go-delve/delve/cmd/dlv@v1.8.3
 
 RUN \
-    VERSION=`cat /go/src/go-bludgeon/timer/version.json | jq '.Version' | sed 's/"//g'` \
+    VERSION=`cat /go/src/go-bludgeon/employee/version.json | jq '.Version' | sed 's/"//g'` \
     && cd cmd/service \
     && env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux go build -gcflags "all=-N -l" -ldflags \
-    "-X github.com/antonio-alexander/go-bludgeon/timer/cmd/service/internal.Version=${VERSION} \
-    -X github.com/antonio-alexander/go-bludgeon/timer/cmd/service/internal.GitCommit=${GIT_COMMIT} \
-    -X github.com/antonio-alexander/go-bludgeon/timer/cmd/service/internal.GitBranch=${GIT_BRANCH}" \
-    -o bludgeon-timer \
-    && chmod +X bludgeon-timer
+    "-X github.com/antonio-alexander/go-bludgeon/employee/cmd/service/internal.Version=${VERSION} \
+    -X github.com/antonio-alexander/go-bludgeon/employee/cmd/service/internal.GitCommit=${GIT_COMMIT} \
+    -X github.com/antonio-alexander/go-bludgeon/employee/cmd/service/internal.GitBranch=${GIT_BRANCH}" \
+    -o bludgeon-employee \
+    && chmod +X bludgeon-employee
 
 FROM --platform=${PLATFORM} alpine:latest
 
@@ -50,8 +50,8 @@ ARG GIT_COMMIT
 
 WORKDIR /app
 
-COPY --from=build /go/src/go-bludgeon/timer/cmd/service/bludgeon-timer /app/bludgeon-timer
-COPY --from=build /go/src/go-bludgeon/timer/cmd/service/config/bludgeon_server_config-default.json /app/config/bludgeon_server_config-default.json
+COPY --from=build /go/src/go-bludgeon/employee/cmd/service/bludgeon-employee /app/bludgeon-employee
+COPY --from=build /go/src/go-bludgeon/employee/cmd/service/config/bludgeon_server_config-default.json /app/config/bludgeon_server_config-default.json
 
 LABEL antonio-alexander.git.branch=${GIT_BRANCH}-debug
 LABEL antonio-alexander.git.commit=${GIT_COMMIT}-debug
@@ -59,4 +59,4 @@ LABEL org.opencontainers.image.source=https://github.com/antonio-alexander/go-bl
 
 EXPOSE 8080 2345
 
-CMD dlv exec /app/bludgeon-timer --headless --listen=":2345" --log --api-version=2 --check-go-version=false
+CMD dlv exec /app/bludgeon-employee --headless --listen=":2345" --log --api-version=2 --check-go-version=false

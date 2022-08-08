@@ -57,23 +57,26 @@ func (t *TimeSlice) Validate() bool {
 }
 
 func (t *TimeSlice) Contains(tC TimeSlice) bool {
-	//validate both the time slices
+	//both time slices must have a non zero start and if
+	// the finish is non zero it must be greater or equal to start
 	if t.Start == 0 || (t.Finish > 0 && t.Finish <= t.Start) ||
 		tC.Start == 0 || (tC.Finish > 0 && tC.Finish <= tC.Start) {
-		//both time slices must have a non zero start and if
-		// the finish is non zero it must be greater or equal to start
 		return false
 	}
-	if t.Finish == 0 {
+	switch {
+	default:
+		//start must be greater than the finish
+		contains := tC.Start <= t.Finish
+		return contains
+	case t.Finish == 0:
 		//finish and start must be less than start
-		return tC.Start < t.Start && tC.Finish < t.Start
-	}
-	if tC.Finish == 0 {
+		contains := tC.Start >= t.Start || tC.Finish >= t.Start
+		return contains
+	case tC.Finish == 0:
 		//start must be greater than finish and start
-		return tC.Start > t.Finish && tC.Start > t.Start
+		contains := tC.Start <= t.Finish || tC.Start <= t.Start
+		return contains
 	}
-	//start must be greater than the finish
-	return tC.Start > t.Finish
 }
 
 // swagger:model TimeSlicePartial

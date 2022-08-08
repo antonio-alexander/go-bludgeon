@@ -12,9 +12,6 @@ on:
       - ".github/workflows/godocs.yml"
   pull_request:
     paths:
-      - "timers/**"
-      - "employees/**"
-      - "cmd/godocs/**"
       - ".github/workflows/godocs.yml"
 
 env:

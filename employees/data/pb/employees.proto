@@ -1,0 +1,192 @@
+/* 
+    go_bludgeon_employees defines a set of types for use with the employees service
+*/
+
+syntax = "proto3";
+   
+package go_bludgeon_employees;
+  
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/antonio-alexander/go-bludgeon/employees/data/pb";
+
+// Employees
+service Employees {
+    // employee_create
+    rpc employee_create (EmployeeCreateRequest) returns (EmployeeCreateResponse) {}
+
+    // employee_read
+    rpc employee_read (EmployeeReadRequest) returns (EmployeeReadResponse) {}
+
+    // employees_read
+    rpc employees_read (EmployeesReadRequest) returns (EmployeesReadResponse) {}
+
+    // employee_update
+    rpc employee_update (EmployeeUpdateRequest) returns (EmployeeUpdateResponse) {}
+
+    // employee_delete
+    rpc employee_delete (EmployeeDeleteRequest) returns (EmployeeDeleteResponse) {}
+}
+
+// EmployeeCreateRequest
+message EmployeeCreateRequest {
+    // employee_partial
+    EmployeePartial employee_partial = 1;
+}
+
+// EmployeeCreateResponse
+message EmployeeCreateResponse {
+    // employee
+    Employee employee = 1;
+}
+
+// EmployeeReadRequest
+message EmployeeReadRequest {
+    // id
+    string id = 1;
+}
+
+// EmployeeReadResponse
+message EmployeeReadResponse {
+    // employee
+    Employee employee = 1;
+}
+
+// EmployeesReadRequest
+message EmployeesReadRequest {
+    // employee_search
+    EmployeeSearch employee_search = 1;
+}
+
+// EmployeesReadResponse
+message EmployeesReadResponse {
+    // employees
+    repeated Employee employees = 1;
+}
+
+// EmployeeUpdateRequest
+message EmployeeUpdateRequest {
+    // id
+    string id = 1;
+
+    // employee_partial
+    EmployeePartial employee_partial = 2;
+}
+
+// EmployeeUpdateResponse
+message EmployeeUpdateResponse {
+    // employee
+    Employee employee = 1;
+}
+
+// EmployeeDeleteRequest
+message EmployeeDeleteRequest {
+    // id
+    string id = 1;
+}
+
+// EmployeeDeleteResponse
+message EmployeeDeleteResponse {
+//
+}
+
+// EmployeePartial
+message EmployeePartial {
+    // first_name_oneof 
+    oneof first_name_oneof {
+        // first_name
+        string first_name = 1;
+    }
+
+    // last_name_oneof
+    oneof last_name_oneof {
+        // last_name
+        string last_name = 2;
+    }
+
+    // email_addressoneof
+    oneof email_address_oneof {
+        // email_address
+        string email_address = 3;
+    }
+}
+
+// Employee
+message Employee {
+    // id
+    string id = 1;
+
+    // first_name
+    string first_name = 2;
+
+    // last_name
+    string last_name = 3;
+
+    // email_address
+    string email_address = 4;
+
+    // last_udpated
+    int64 last_udpated = 5;
+
+    // last_updated_by
+    string last_updated_by = 6;
+
+    // version
+    int32 version = 7;
+}
+
+// EmployeeSearch
+message EmployeeSearch {
+    // ids
+    repeated string ids = 1;
+
+    // first_names
+    repeated string first_names = 2;
+
+    // first_name_oneof
+    oneof first_name_oneof {
+        // first_name
+        string first_name = 3;
+    }
+
+    // last_names
+    repeated string last_names = 4;
+
+
+    // last_name_oneof
+    oneof last_name_oneof {
+        // last_name
+        string last_name = 5;
+    }
+
+    // email_addressoneof
+    oneof email_address_oneof {
+        // email_address
+        string email_address = 6;
+    }
+
+    // email_addresses
+    repeated string email_addresses = 7;
+}
+
+// Wrapper describes a basic data type for conversion of any
+// other data type
+message Wrapper {
+    // type is a string identifying the type of payload
+    string type = 1;
+
+    // payload describes the payload as protobuf.any
+    google.protobuf.Any payload = 2;
+}
+
+// Bytes makes it easier to provide
+message Bytes {
+    // bytes describes the payload
+    bytes bytes = 1;
+}
+
+// Error
+message Error {
+    // error
+    string error = 1;
+}

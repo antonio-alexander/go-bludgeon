@@ -12,9 +12,6 @@ on:
       - ".github/workflows/swagger.yml"
   pull_request:
     paths:
-      - "timers/**"
-      - "employees/**"
-      - "cmd/swagger/**"
       - ".github/workflows/swagger.yml"
 
 env:

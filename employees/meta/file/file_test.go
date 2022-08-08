@@ -9,10 +9,12 @@ import (
 	tests "github.com/antonio-alexander/go-bludgeon/employees/meta/tests"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 
+	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
+
 	"github.com/stretchr/testify/assert"
 )
 
-var config *meta.Configuration
+var config *internal_file.Configuration
 
 func init() {
 	pwd, _ := os.Getwd()
@@ -22,7 +24,7 @@ func init() {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	config = new(meta.Configuration)
+	config = new(internal_file.Configuration)
 	config.Default(pwd)
 	config.FromEnv(pwd, envs)
 }

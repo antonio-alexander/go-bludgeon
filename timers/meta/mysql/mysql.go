@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -38,13 +39,13 @@ type mysql struct {
 // with timers, if Configuration provided as a parameter, it will
 // attempt to Initialize (and panic on error)
 func New(parameters ...interface{}) MySQL {
-	var config *Configuration
+	var config *internal_mysql.Configuration
 	m := &mysql{
 		DB: internal_mysql.New(parameters...),
 	}
 	for _, p := range parameters {
 		switch p := p.(type) {
-		case *Configuration:
+		case *internal_mysql.Configuration:
 			config = p
 		case logger.Logger:
 			m.Logger = p
@@ -58,13 +59,13 @@ func New(parameters ...interface{}) MySQL {
 	return m
 }
 
-func (m *mysql) Initialize(config *Configuration) error {
+func (m *mysql) Initialize(config *internal_mysql.Configuration) error {
 	m.Lock()
 	defer m.Unlock()
 	if config == nil {
 		return errors.New("config is nil")
 	}
-	if err := m.DB.Initialize(&config.Configuration); err != nil {
+	if err := m.DB.Initialize(config); err != nil {
 		return err
 	}
 	return nil
@@ -73,7 +74,7 @@ func (m *mysql) Initialize(config *Configuration) error {
 //TimerCreate can be used to create a timer, although
 // all fields are available, the only fields that will
 // actually be set are: timer_id and comment
-func (m *mysql) TimerCreate(timerValues data.TimerPartial) (*data.Timer, error) {
+func (m *mysql) TimerCreate(ctx context.Context, timerValues data.TimerPartial) (*data.Timer, error) {
 	tx, err := m.Begin()
 	if err != nil {
 		return nil, err
@@ -103,7 +104,7 @@ func (m *mysql) TimerCreate(timerValues data.TimerPartial) (*data.Timer, error) 
 		args = append(args, comment)
 	}
 	query := fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s);", tableTimers, strings.Join(columns, ","), strings.Join(values, ","))
-	result, err := tx.Exec(query, args...)
+	result, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +112,7 @@ func (m *mysql) TimerCreate(timerValues data.TimerPartial) (*data.Timer, error) 
 	if err != nil {
 		return nil, err
 	}
-	timer, err := timerRead(tx, timerID)
+	timer, err := timerRead(ctx, tx, timerID)
 	if err != nil {
 		return nil, err
 	}
@@ -124,20 +125,20 @@ func (m *mysql) TimerCreate(timerValues data.TimerPartial) (*data.Timer, error) 
 //TimerRead can be used to read the current value of a given
 // timer, values such as start/finish and elapsed time are
 // "calculated" values rather than values that can be set
-func (m *mysql) TimerRead(id string) (*data.Timer, error) {
-	return timerRead(m, id)
+func (m *mysql) TimerRead(ctx context.Context, id string) (*data.Timer, error) {
+	return timerRead(ctx, m, id)
 }
 
 //TimerUpdate can be used to update values a given timer
 // not associated with timer operations, values such as:
 // comment, archived and completed
-func (m *mysql) TimerUpdate(id string, timerPartial data.TimerPartial) (*data.Timer, error) {
+func (m *mysql) TimerUpdate(ctx context.Context, id string, timerPartial data.TimerPartial) (*data.Timer, error) {
 	tx, err := m.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	timer, err := timerUpdate(tx, id, timerPartial)
+	timer, err := timerUpdate(ctx, tx, id, timerPartial)
 	if err != nil {
 		return nil, err
 	}
@@ -148,9 +149,9 @@ func (m *mysql) TimerUpdate(id string, timerPartial data.TimerPartial) (*data.Ti
 }
 
 //TimerDelete can be used to delete a timer if it exists
-func (m *mysql) TimerDelete(id string) error {
+func (m *mysql) TimerDelete(ctx context.Context, id string) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", tableTimers)
-	result, err := m.Exec(query, id)
+	result, err := m.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
@@ -159,7 +160,7 @@ func (m *mysql) TimerDelete(id string) error {
 
 //TimersRead can be used to read one or more timers depending
 // on search values provided
-func (m *mysql) TimersRead(search data.TimerSearch) ([]*data.Timer, error) {
+func (m *mysql) TimersRead(ctx context.Context, search data.TimerSearch) ([]*data.Timer, error) {
 	var searchParameters []string
 	var args []interface{}
 	var query string
@@ -193,7 +194,7 @@ func (m *mysql) TimersRead(search data.TimerSearch) ([]*data.Timer, error) {
 		employee_id, active_time_slice_id, version, last_updated, last_updated_by FROM %s`,
 			tableTimersV1)
 	}
-	rows, err := m.Query(query, args...)
+	rows, err := m.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -230,21 +231,21 @@ func (m *mysql) TimersRead(search data.TimerSearch) ([]*data.Timer, error) {
 
 //TimerStart can be used to start a given timer or do nothing
 // if the timer is already started
-func (m *mysql) TimerStart(id string) (*data.Timer, error) {
+func (m *mysql) TimerStart(ctx context.Context, id string) (*data.Timer, error) {
 	tx, err := m.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 	start := time.Now().UnixNano()
-	if _, err = timeSliceCreate(tx, data.TimeSlicePartial{
+	if _, err = timeSliceCreate(ctx, tx, data.TimeSlicePartial{
 		TimerID: &id,
 		Start:   &start,
 	}); err != nil {
 		//KIM: this will fail if an active time slice already exists
 		return nil, err
 	}
-	timer, err := timerRead(tx, id)
+	timer, err := timerRead(ctx, tx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -256,13 +257,13 @@ func (m *mysql) TimerStart(id string) (*data.Timer, error) {
 
 //TimerStop can be used to stop a given timer or do nothing
 // if the timer is not started
-func (m *mysql) TimerStop(id string) (*data.Timer, error) {
+func (m *mysql) TimerStop(ctx context.Context, id string) (*data.Timer, error) {
 	tx, err := m.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	timer, err := timerStop(tx, id)
+	timer, err := timerStop(ctx, tx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -273,17 +274,17 @@ func (m *mysql) TimerStop(id string) (*data.Timer, error) {
 }
 
 //TimerSubmit can be used to stop a timer and set completed to true
-func (m *mysql) TimerSubmit(id string, finishTime int64) (*data.Timer, error) {
+func (m *mysql) TimerSubmit(ctx context.Context, id string, finishTime int64) (*data.Timer, error) {
 	tx, err := m.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err := timerStop(tx, id); err != nil {
+	if _, err := timerStop(ctx, tx, id); err != nil {
 		return nil, err
 	}
 	completed := true
-	timer, err := timerUpdate(tx, id, data.TimerPartial{
+	timer, err := timerUpdate(ctx, tx, id, data.TimerPartial{
 		Completed: &completed,
 	})
 	if err != nil {
@@ -297,24 +298,24 @@ func (m *mysql) TimerSubmit(id string, finishTime int64) (*data.Timer, error) {
 
 //TimeSliceCreate can be used to create a single time
 // slice
-func (m *mysql) TimeSliceCreate(timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
-	return timeSliceCreate(m, timeSlicePartial)
+func (m *mysql) TimeSliceCreate(ctx context.Context, timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
+	return timeSliceCreate(ctx, m, timeSlicePartial)
 }
 
 //TimeSliceRead can be used to read an existing time slice
-func (m *mysql) TimeSliceRead(timeSliceID string) (*data.TimeSlice, error) {
-	return timeSliceRead(m, timeSliceID)
+func (m *mysql) TimeSliceRead(ctx context.Context, timeSliceID string) (*data.TimeSlice, error) {
+	return timeSliceRead(ctx, m, timeSliceID)
 }
 
 //TimeSliceUpdate can be used to update an existing time slice
-func (m *mysql) TimeSliceUpdate(timeSliceID string, timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
-	return timeSliceUpdate(m, timeSliceID, timeSlicePartial)
+func (m *mysql) TimeSliceUpdate(ctx context.Context, timeSliceID string, timeSlicePartial data.TimeSlicePartial) (*data.TimeSlice, error) {
+	return timeSliceUpdate(ctx, m, timeSliceID, timeSlicePartial)
 }
 
 //TimeSliceDelete can be used to delete an existing time slice
-func (m *mysql) TimeSliceDelete(timeSliceID string) error {
+func (m *mysql) TimeSliceDelete(ctx context.Context, timeSliceID string) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE id=?", tableTimeSlices)
-	result, err := m.Exec(query, timeSliceID)
+	result, err := m.ExecContext(ctx, query, timeSliceID)
 	if err != nil {
 		return err
 	}
@@ -323,7 +324,7 @@ func (m *mysql) TimeSliceDelete(timeSliceID string) error {
 
 //TimeSlicesRead can be used to read zero or more time slices depending on the
 // search criteria
-func (m *mysql) TimeSlicesRead(search data.TimeSliceSearch) ([]*data.TimeSlice, error) {
+func (m *mysql) TimeSlicesRead(ctx context.Context, search data.TimeSliceSearch) ([]*data.TimeSlice, error) {
 	var searchParameters []string
 	var args []interface{}
 
@@ -346,7 +347,7 @@ func (m *mysql) TimeSlicesRead(search data.TimeSliceSearch) ([]*data.TimeSlice, 
 	query := fmt.Sprintf(`SELECT time_slice_id, start, finish, completed, elapsed_time, timer_id,
 		version, last_updated, last_updated_by FROM %s WHERE %s`,
 		tableTimeSlicesV1, strings.Join(searchParameters, " AND "))
-	rows, err := m.Query(query, args...)
+	rows, err := m.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

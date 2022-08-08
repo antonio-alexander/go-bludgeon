@@ -1,6 +1,7 @@
 package memory_test
 
 import (
+	"context"
 	"testing"
 
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
@@ -10,11 +11,12 @@ import (
 )
 
 func TestMetaMemory(t *testing.T) {
+	ctx := context.TODO()
 	m := metamemory.New(
 		logger.New(),
 	)
-	t.Run("Timer CRUD", tests.TestTimerCRUD(m))
-	t.Run("Timers Read", tests.TestTimersRead(m))
-	t.Run("Timer Logic", tests.TestTimerLogic(m))
+	t.Run("Timer CRUD", tests.TestTimerCRUD(ctx, m))
+	t.Run("Timers Read", tests.TestTimersRead(ctx, m))
+	t.Run("Timer Logic", tests.TestTimerLogic(ctx, m))
 	m.Shutdown()
 }

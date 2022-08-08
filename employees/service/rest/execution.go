@@ -1,4 +1,4 @@
-package rest
+package service
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/antonio-alexander/go-bludgeon/employees/data"
 	"github.com/antonio-alexander/go-bludgeon/employees/meta"
+
 	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
 
 	"github.com/pkg/errors"

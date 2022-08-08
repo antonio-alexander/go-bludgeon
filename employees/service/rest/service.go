@@ -1,14 +1,14 @@
-package rest
+package service
 
 import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
 
-	"github.com/antonio-alexander/go-bludgeon/employees/data"
-	"github.com/antonio-alexander/go-bludgeon/employees/logic"
-	"github.com/antonio-alexander/go-bludgeon/internal/logger"
-	"github.com/antonio-alexander/go-bludgeon/internal/rest/server"
+	data "github.com/antonio-alexander/go-bludgeon/employees/data"
+	logic "github.com/antonio-alexander/go-bludgeon/employees/logic"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	restserver "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 
 	"github.com/gorilla/mux"
 )
@@ -16,18 +16,16 @@ import (
 type restServer struct {
 	logger.Logger
 	logic  logic.Logic
-	router server.Router
+	router restserver.Router
 }
 
-func New(parameters ...interface{}) interface {
-	//
-} {
+func New(parameters ...interface{}) interface{} {
 	s := &restServer{}
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
 		case logic.Logic:
 			s.logic = p
-		case server.Router:
+		case restserver.Router:
 			s.router = p
 		case logger.Logger:
 			s.Logger = p
@@ -38,6 +36,9 @@ func New(parameters ...interface{}) interface {
 		panic("logic not set")
 	case s.router == nil:
 		panic("router not set")
+	}
+	if s.Logger == nil {
+		s.Logger = logger.New()
 	}
 	s.buildRoutes()
 	return s
@@ -50,9 +51,10 @@ func (s *restServer) endpointEmployeeCreate() func(http.ResponseWriter, *http.Re
 		var bytes []byte
 		var err error
 
+		ctx := request.Context()
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &employeePartial); err == nil {
-				if employee, err = s.logic.EmployeeCreate(employeePartial); err == nil {
+				if employee, err = s.logic.EmployeeCreate(ctx, employeePartial); err == nil {
 					bytes, err = json.Marshal(employee)
 				}
 			}
@@ -69,9 +71,10 @@ func (s *restServer) endpointEmployeeRead() func(http.ResponseWriter, *http.Requ
 		var bytes []byte
 		var err error
 
+		ctx := request.Context()
 		id := idFromPath(mux.Vars(request))
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
-			if employee, err = s.logic.EmployeeRead(id); err == nil {
+			if employee, err = s.logic.EmployeeRead(ctx, id); err == nil {
 				bytes, err = json.Marshal(employee)
 			}
 		}
@@ -88,9 +91,10 @@ func (s *restServer) endpointEmployeesRead() func(http.ResponseWriter, *http.Req
 		var err error
 		var search data.EmployeeSearch
 
+		ctx := request.Context()
 		search.FromParams(request.URL.Query())
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
-			if employees, err = s.logic.EmployeesRead(search); err == nil {
+			if employees, err = s.logic.EmployeesRead(ctx, search); err == nil {
 				bytes, err = json.Marshal(employees)
 			}
 		}
@@ -107,10 +111,11 @@ func (s *restServer) endpointEmployeeUpdate() func(http.ResponseWriter, *http.Re
 		var bytes []byte
 		var err error
 
+		ctx := request.Context()
 		id := idFromPath(mux.Vars(request))
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &employeePartial); err == nil {
-				if employee, err = s.logic.EmployeeUpdate(id, employeePartial); err == nil {
+				if employee, err = s.logic.EmployeeUpdate(ctx, id, employeePartial); err == nil {
 					bytes, err = json.Marshal(employee)
 				}
 			}
@@ -126,8 +131,9 @@ func (s *restServer) endpointEmployeeDelete() func(http.ResponseWriter, *http.Re
 		var bytes []byte
 		var err error
 
+		ctx := request.Context()
 		id := idFromPath(mux.Vars(request))
-		err = s.logic.EmployeeDelete(id)
+		err = s.logic.EmployeeDelete(ctx, id)
 		if err = handleResponse(writer, err, bytes); err != nil {
 			s.Error("employee delete -  %s", err)
 		}
@@ -135,7 +141,7 @@ func (s *restServer) endpointEmployeeDelete() func(http.ResponseWriter, *http.Re
 }
 
 func (s *restServer) buildRoutes() {
-	for _, route := range []server.HandleFuncConfig{
+	for _, route := range []restserver.HandleFuncConfig{
 		{Route: data.RouteEmployees, Method: http.MethodPost, HandleFx: s.endpointEmployeeCreate()},
 		{Route: data.RouteEmployeesSearch, Method: http.MethodGet, HandleFx: s.endpointEmployeesRead()},
 		{Route: data.RouteEmployeesID, Method: http.MethodGet, HandleFx: s.endpointEmployeeRead()},

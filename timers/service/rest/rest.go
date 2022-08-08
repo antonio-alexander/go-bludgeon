@@ -56,7 +56,7 @@ func (s *restServer) endpointTimerCreate() func(http.ResponseWriter, *http.Reque
 
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &timerPartial); err == nil {
-				if timer, err = s.TimerCreate(timerPartial); err == nil {
+				if timer, err = s.TimerCreate(request.Context(), timerPartial); err == nil {
 					bytes, err = json.Marshal(timer)
 				}
 			}
@@ -74,7 +74,7 @@ func (s *restServer) endpointTimerRead() func(http.ResponseWriter, *http.Request
 		var err error
 
 		id := idFromPath(mux.Vars(request))
-		if timer, err = s.TimerRead(id); err == nil {
+		if timer, err = s.TimerRead(request.Context(), id); err == nil {
 			bytes, err = json.Marshal(timer)
 		}
 		if err = handleResponse(writer, err, bytes); err != nil {
@@ -91,7 +91,7 @@ func (s *restServer) endpointTimersRead() func(http.ResponseWriter, *http.Reques
 		var err error
 
 		search.FromParams(request.URL.Query())
-		if timers, err = s.TimersRead(search); err == nil {
+		if timers, err = s.TimersRead(request.Context(), search); err == nil {
 			bytes, err = json.Marshal(timers)
 		}
 		if err = handleResponse(writer, err, bytes); err != nil {
@@ -105,7 +105,7 @@ func (s *restServer) endpointTimerDelete() func(http.ResponseWriter, *http.Reque
 		var err error
 
 		id := idFromPath(mux.Vars(request))
-		err = s.TimerDelete(id)
+		err = s.TimerDelete(request.Context(), id)
 		if err = handleResponse(writer, err, nil); err != nil {
 			s.Error("timer delete -  %s", err)
 		}
@@ -119,7 +119,7 @@ func (s *restServer) endpointTimerStart() func(http.ResponseWriter, *http.Reques
 		var err error
 
 		id := idFromPath(mux.Vars(request))
-		if timer, err = s.TimerStart(id); err == nil {
+		if timer, err = s.TimerStart(request.Context(), id); err == nil {
 			bytes, err = json.Marshal(&timer)
 		}
 		if err = handleResponse(writer, err, bytes); err != nil {
@@ -135,7 +135,7 @@ func (s *restServer) endpointTimerStop() func(http.ResponseWriter, *http.Request
 		var err error
 
 		id := idFromPath(mux.Vars(request))
-		if timer, err = s.TimerStop(id); err == nil {
+		if timer, err = s.TimerStop(request.Context(), id); err == nil {
 			bytes, err = json.Marshal(&timer)
 		}
 		if err = handleResponse(writer, err, bytes); err != nil {
@@ -162,7 +162,7 @@ func (s *restServer) endpointTimerSubmit() func(http.ResponseWriter, *http.Reque
 				} else {
 					finishTime = time.Now()
 				}
-				if timer, err = s.TimerSubmit(id, &finishTime); err == nil {
+				if timer, err = s.TimerSubmit(request.Context(), id, &finishTime); err == nil {
 					bytes, err = json.Marshal(&timer)
 				}
 			}
@@ -188,7 +188,7 @@ func (s *restServer) endpointTimerUpdateComment() func(http.ResponseWriter, *htt
 					//REVIEW: should this error be here?
 					err = errors.New("No comment provided")
 				} else {
-					if timer, err = s.TimerUpdateComment(id, *timerPartial.Comment); err == nil {
+					if timer, err = s.TimerUpdateComment(request.Context(), id, *timerPartial.Comment); err == nil {
 						bytes, err = json.Marshal(&timer)
 					}
 				}
@@ -215,7 +215,7 @@ func (s *restServer) endpointTimerUpdateArchive() func(http.ResponseWriter, *htt
 					//REVIEW: should this error be here?
 					err = errors.New("No archive provided")
 				} else {
-					if timer, err = s.TimerArchive(id, *timerPartial.Archived); err == nil {
+					if timer, err = s.TimerArchive(request.Context(), id, *timerPartial.Archived); err == nil {
 						bytes, err = json.Marshal(&timer)
 					}
 				}
@@ -236,7 +236,7 @@ func (s *restServer) endpointTimeSliceCreate() func(http.ResponseWriter, *http.R
 
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &timeSlicePartial); err == nil {
-				if timeSlice, err = s.TimeSliceCreate(timeSlicePartial); err == nil {
+				if timeSlice, err = s.TimeSliceCreate(request.Context(), timeSlicePartial); err == nil {
 					bytes, err = json.Marshal(timeSlice)
 				}
 			}
@@ -254,7 +254,7 @@ func (s *restServer) endpointTimeSliceRead() func(http.ResponseWriter, *http.Req
 		var err error
 
 		id := idFromPath(mux.Vars(request))
-		if timeSlice, err = s.TimeSliceRead(id); err == nil {
+		if timeSlice, err = s.TimeSliceRead(request.Context(), id); err == nil {
 			bytes, err = json.Marshal(timeSlice)
 		}
 		if err = handleResponse(writer, err, bytes); err != nil {
@@ -271,7 +271,7 @@ func (s *restServer) endpointTimeSlicesRead() func(http.ResponseWriter, *http.Re
 		var err error
 
 		search.FromParams(request.URL.Query())
-		if timeSlices, err = s.TimeSlicesRead(search); err == nil {
+		if timeSlices, err = s.TimeSlicesRead(request.Context(), search); err == nil {
 			bytes, err = json.Marshal(timeSlices)
 		}
 		if err = handleResponse(writer, err, bytes); err != nil {
@@ -290,7 +290,7 @@ func (s *restServer) endpointTimeSliceUpdate() func(http.ResponseWriter, *http.R
 		id := idFromPath(mux.Vars(request))
 		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &timeSlicePartial); err == nil {
-				if timeSlice, err = s.TimeSliceUpdate(id, timeSlicePartial); err == nil {
+				if timeSlice, err = s.TimeSliceUpdate(request.Context(), id, timeSlicePartial); err == nil {
 					bytes, err = json.Marshal(timeSlice)
 				}
 			}
@@ -306,7 +306,7 @@ func (s *restServer) endpointTimeSliceDelete() func(http.ResponseWriter, *http.R
 		var err error
 
 		id := idFromPath(mux.Vars(request))
-		err = s.TimeSliceDelete(id)
+		err = s.TimeSliceDelete(request.Context(), id)
 		if err = handleResponse(writer, err, nil); err != nil {
 			s.Error("timer delete -  %s", err)
 		}

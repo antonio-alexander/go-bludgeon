@@ -23,11 +23,17 @@ services:
     restart: "always"
     ports:
       - "8082:8080"
+      - "8083:8081"
     environment:
+      BLUDGEON_LOG_LEVEL: "trace"
       BLUDGEON_SERVICE_TYPE: "rest"
       BLUDGEON_META_TYPE: "mysql"
+      BLUDGEON_REST_ENABLED: "true"
       BLUDGEON_REST_ADDRESS: ""
       BLUDGEON_REST_PORT: "8080"
+      BLUDGEON_GRPC_ENABLED: "true"
+      BLUDGEON_GRPC_ADDRESS: ""
+      BLUDGEON_GRPC_PORT: "8081"
       BLUDGEON_META__FILE: "data/bludgeon.json"
       BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal"
       BLUDGEON_CORS_DEBUG: "true"
@@ -41,9 +47,13 @@ services:
     container_name: "timers"
     hostname: "timers"
     image: ghcr.io/antonio-alexander/go-bludgeon-timers:latest
+    profiles: [ "application" ]
     restart: "always"
+    depends_on:
+      - mysql
     ports:
       - "8080:8080"
+      - "8081:8081"
     build:
       context: ./
       dockerfile: ./cmd/service/Dockerfile
@@ -53,10 +63,15 @@ services:
         # - GO_ARCH=arm
         # - GO_ARM=7
     environment:
+      BLUDGEON_LOG_LEVEL: "trace"
       BLUDGEON_SERVICE_TYPE: "rest"
       BLUDGEON_META_TYPE: "mysql"
+      BLUDGEON_REST_ENABLED: "true"
       BLUDGEON_REST_ADDRESS: ""
       BLUDGEON_REST_PORT: "8080"
+      BLUDGEON_GRPC_ENABLED: "true"
+      BLUDGEON_GRPC_ADDRESS: ""
+      BLUDGEON_GRPC_PORT: "8081"
       BLUDGEON_META_FILE: "data/bludgeon.json"
       BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal"
       BLUDGEON_CORS_DEBUG: "true"

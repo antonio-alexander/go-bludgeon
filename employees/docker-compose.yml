@@ -10,19 +10,21 @@ services:
       - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: bludgeon
-      MYSQL_DATABASE: bludgeon
-      MYSQL_USER: bludgeon
-      MYSQL_PASSWORD: bludgeon
+      MYSQL_DATABASE: ${DATABASE_NAME}
+      MYSQL_USER: ${DATABASE_USER}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
 
   employees:
     container_name: "employees"
     hostname: "employees"
+    profiles: [ "application" ]
     image: ghcr.io/antonio-alexander/go-bludgeon-employees:latest
     depends_on:
       - mysql
     restart: "always"
     ports:
       - "8080:8080"
+      - "8081:8081"
     build:
       context: ./
       dockerfile: ./cmd/service/Dockerfile
@@ -32,15 +34,22 @@ services:
         # - GO_ARCH=arm
         # - GO_ARM=7
     environment:
+      BLUDGEON_LOG_LEVEL: "trace"
       BLUDGEON_SERVICE_TYPE: "rest"
       BLUDGEON_META_TYPE: "mysql"
-      BLUDGEON_REST_ADDRESS: "0.0.0.0"
-      BLUDGEON_REST_PORT: "8080"
+      # BLUDGEON_META_TYPE: "file"
+      # BLUDGEON_META_TYPE: "memory"
       BLUDGEON_META__FILE: "data/bludgeon.json"
-      BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal"
-      BLUDGEON_CORS_DEBUG: "true"
-      DATABASE_HOST: "mysql"
-      DATABASE_PORT: "3306"
-      DATABASE_NAME: "bludgeon"
-      DATABASE_USER: "bludgeon"
-      DATABASE_PASSWORD: "bludgeon"
+      BLUDGEON_REST_ENABLED: "true"
+      BLUDGEON_REST_ADDRESS: ""
+      BLUDGEON_REST_PORT: "8080"
+      BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal:8082,http://localhost:8082"
+      BLUDGEON_CORS_DEBUG: "false"
+      BLUDGEON_GRPC_ENABLED: "true"
+      BLUDGEON_GRPC_ADDRESS: ""
+      BLUDGEON_GRPC_PORT: "8081"
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE_PORT: ${DATABASE_PORT}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}

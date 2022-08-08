@@ -1,0 +1,96 @@
+package service
+
+import (
+	"context"
+	"sync"
+
+	pb "github.com/antonio-alexander/go-bludgeon/employees/data/pb"
+	logic "github.com/antonio-alexander/go-bludgeon/employees/logic"
+	grpcserver "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+
+	"google.golang.org/grpc"
+)
+
+type grpcService struct {
+	sync.RWMutex
+	sync.WaitGroup
+	logger.Logger
+	pb.UnimplementedEmployeesServer
+	logic  logic.Logic
+	server interface {
+		grpcserver.Owner
+		grpc.ServiceRegistrar
+	}
+}
+
+//KIM: we don't need to expose this interface, but we need
+// to implement it for grpc's sake
+var _ pb.EmployeesServer = &grpcService{}
+
+type Owner interface {
+	Register()
+}
+
+func New(parameters ...interface{}) interface {
+	Owner
+} {
+	s := &grpcService{}
+	for _, parameter := range parameters {
+		switch p := parameter.(type) {
+		case interface {
+			grpcserver.Owner
+			grpc.ServiceRegistrar
+		}:
+			s.server = p
+		case logic.Logic:
+			s.logic = p
+		case logger.Logger:
+			s.Logger = p
+		}
+	}
+	if s.server == nil {
+		panic("server not set")
+	}
+	if s.Logger == nil {
+		s.Logger = logger.New()
+	}
+	return s
+}
+
+func (s *grpcService) Register() {
+	pb.RegisterEmployeesServer(s.server, s)
+}
+
+func (s *grpcService) EmployeeCreate(ctx context.Context, request *pb.EmployeeCreateRequest) (*pb.EmployeeCreateResponse, error) {
+	employee, err := s.logic.EmployeeCreate(ctx, *pb.ToEmployeePartial(request.EmployeePartial))
+	return &pb.EmployeeCreateResponse{
+		Employee: pb.FromEmployee(employee),
+	}, err
+}
+
+func (s *grpcService) EmployeeRead(ctx context.Context, request *pb.EmployeeReadRequest) (*pb.EmployeeReadResponse, error) {
+	employee, err := s.logic.EmployeeRead(ctx, request.GetId())
+	return &pb.EmployeeReadResponse{
+		Employee: pb.FromEmployee(employee),
+	}, err
+}
+
+func (s *grpcService) EmployeesRead(ctx context.Context, request *pb.EmployeesReadRequest) (*pb.EmployeesReadResponse, error) {
+	employees, err := s.logic.EmployeesRead(ctx, *pb.FromEmployeeSearch(request.GetEmployeeSearch()))
+	return &pb.EmployeesReadResponse{
+		Employees: pb.FromEmployees(employees),
+	}, err
+}
+
+func (s *grpcService) EmployeeUpdate(ctx context.Context, request *pb.EmployeeUpdateRequest) (*pb.EmployeeUpdateResponse, error) {
+	employee, err := s.logic.EmployeeUpdate(ctx, request.GetId(), *pb.ToEmployeePartial(request.GetEmployeePartial()))
+	return &pb.EmployeeUpdateResponse{
+		Employee: pb.FromEmployee(employee),
+	}, err
+}
+
+func (s *grpcService) EmployeeDelete(ctx context.Context, request *pb.EmployeeDeleteRequest) (*pb.EmployeeDeleteResponse, error) {
+	err := s.logic.EmployeeDelete(ctx, request.GetId())
+	return &pb.EmployeeDeleteResponse{}, err
+}

@@ -1,4 +1,4 @@
-package rest_test
+package service_test
 
 import (
 	"bytes"
@@ -17,9 +17,10 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/employees/logic"
 	"github.com/antonio-alexander/go-bludgeon/employees/meta"
 	"github.com/antonio-alexander/go-bludgeon/employees/meta/memory"
-	"github.com/antonio-alexander/go-bludgeon/employees/service/rest"
+	service "github.com/antonio-alexander/go-bludgeon/employees/service/rest"
 
 	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
 	internal_server "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 
 	"github.com/stretchr/testify/assert"
@@ -47,7 +48,7 @@ type restServerTest struct {
 		internal_server.Router
 	}
 	meta interface {
-		meta.Owner
+		internal_meta.Owner
 		meta.Serializer
 		meta.Employee
 	}
@@ -70,7 +71,7 @@ func init() {
 	if _, ok := envs["BLUDGEON_REST_PORT"]; ok {
 		port = envs["BLUDGEON_REST_PORT"]
 	}
-	if _, ok := envs["BLUDGEON_REST_TIMEOUT"]; ok {
+	if _, ok := envs["BLUDGEON_REST_SHUTDOWN_TIMEOUT"]; ok {
 		if i, err := strconv.Atoi(envs["BLUDGEON_REST_SHUTDOWN_TIMEOUT"]); err != nil {
 			shutdownTimeout = time.Duration(i) * time.Second
 		}
@@ -82,7 +83,7 @@ func new() *restServerTest {
 	server := internal_server.New(logger)
 	employeeMeta := memory.New()
 	employeeLogic := logic.New(logger, employeeMeta)
-	rest.New(logger, server, employeeLogic)
+	service.New(logger, server, employeeLogic)
 	return &restServerTest{
 		server: server,
 		meta:   employeeMeta,

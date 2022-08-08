@@ -1,6 +1,7 @@
 package file
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -58,10 +59,10 @@ func (m *file) Read() error {
 	return m.Deserialize(serializedData)
 }
 
-func (m *file) Initialize(config *Configuration) error {
+func (m *file) Initialize(config *internal_file.Configuration) error {
 	m.Lock()
 	defer m.Unlock()
-	if err := m.Owner.Initialize(&config.Configuration); err != nil {
+	if err := m.Owner.Initialize(config); err != nil {
 		return err
 	}
 	if err := m.Read(); err != nil {
@@ -79,10 +80,10 @@ func (m *file) Shutdown() {
 	}
 }
 
-func (m *file) TimerCreate(t data.TimerPartial) (*data.Timer, error) {
+func (m *file) TimerCreate(ctx context.Context, t data.TimerPartial) (*data.Timer, error) {
 	m.Lock()
 	defer m.Unlock()
-	timer, err := m.Timer.TimerCreate(t)
+	timer, err := m.Timer.TimerCreate(ctx, t)
 	if err != nil {
 		return nil, err
 	}
@@ -92,10 +93,10 @@ func (m *file) TimerCreate(t data.TimerPartial) (*data.Timer, error) {
 	return timer, nil
 }
 
-func (m *file) TimerUpdate(id string, t data.TimerPartial) (*data.Timer, error) {
+func (m *file) TimerUpdate(ctx context.Context, id string, t data.TimerPartial) (*data.Timer, error) {
 	m.Lock()
 	defer m.Unlock()
-	timer, err := m.Timer.TimerUpdate(id, t)
+	timer, err := m.Timer.TimerUpdate(ctx, id, t)
 	if err != nil {
 		return nil, err
 	}
@@ -105,10 +106,10 @@ func (m *file) TimerUpdate(id string, t data.TimerPartial) (*data.Timer, error) 
 	return timer, nil
 }
 
-func (m *file) TimerDelete(id string) error {
+func (m *file) TimerDelete(ctx context.Context, id string) error {
 	m.Lock()
 	defer m.Unlock()
-	if err := m.Timer.TimerDelete(id); err != nil {
+	if err := m.Timer.TimerDelete(ctx, id); err != nil {
 		return err
 	}
 	if err := m.Write(); err != nil {
@@ -117,10 +118,10 @@ func (m *file) TimerDelete(id string) error {
 	return nil
 }
 
-func (m *file) TimerStart(id string) (*data.Timer, error) {
+func (m *file) TimerStart(ctx context.Context, id string) (*data.Timer, error) {
 	m.Lock()
 	defer m.Unlock()
-	timer, err := m.Timer.TimerStart(id)
+	timer, err := m.Timer.TimerStart(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -130,10 +131,10 @@ func (m *file) TimerStart(id string) (*data.Timer, error) {
 	return timer, nil
 }
 
-func (m *file) TimerStop(id string) (*data.Timer, error) {
+func (m *file) TimerStop(ctx context.Context, id string) (*data.Timer, error) {
 	m.Lock()
 	defer m.Unlock()
-	timer, err := m.Timer.TimerStop(id)
+	timer, err := m.Timer.TimerStop(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -143,10 +144,10 @@ func (m *file) TimerStop(id string) (*data.Timer, error) {
 	return timer, nil
 }
 
-func (m *file) TimeSliceCreate(t data.TimeSlicePartial) (*data.TimeSlice, error) {
+func (m *file) TimeSliceCreate(ctx context.Context, t data.TimeSlicePartial) (*data.TimeSlice, error) {
 	m.Lock()
 	defer m.Unlock()
-	timeSlice, err := m.TimeSlice.TimeSliceCreate(t)
+	timeSlice, err := m.TimeSlice.TimeSliceCreate(ctx, t)
 	if err != nil {
 		return nil, err
 	}
@@ -156,10 +157,10 @@ func (m *file) TimeSliceCreate(t data.TimeSlicePartial) (*data.TimeSlice, error)
 	return timeSlice, nil
 }
 
-func (m *file) TimeSliceUpdate(id string, t data.TimeSlicePartial) (*data.TimeSlice, error) {
+func (m *file) TimeSliceUpdate(ctx context.Context, id string, t data.TimeSlicePartial) (*data.TimeSlice, error) {
 	m.Lock()
 	defer m.Unlock()
-	timeSlice, err := m.TimeSlice.TimeSliceUpdate(id, t)
+	timeSlice, err := m.TimeSlice.TimeSliceUpdate(ctx, id, t)
 	if err != nil {
 		return nil, err
 	}
@@ -169,10 +170,10 @@ func (m *file) TimeSliceUpdate(id string, t data.TimeSlicePartial) (*data.TimeSl
 	return timeSlice, nil
 }
 
-func (m *file) TimeSliceDelete(id string) error {
+func (m *file) TimeSliceDelete(ctx context.Context, id string) error {
 	m.Lock()
 	defer m.Unlock()
-	if err := m.TimeSlice.TimeSliceDelete(id); err != nil {
+	if err := m.TimeSlice.TimeSliceDelete(ctx, id); err != nil {
 		return err
 	}
 	if err := m.Write(); err != nil {

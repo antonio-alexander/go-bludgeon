@@ -1,6 +1,7 @@
 package rest_test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -9,15 +10,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antonio-alexander/go-bludgeon/employees/client/rest"
-	"github.com/antonio-alexander/go-bludgeon/employees/data"
-	"github.com/antonio-alexander/go-bludgeon/internal/logger"
+	restclient "github.com/antonio-alexander/go-bludgeon/employees/client/rest"
+	data "github.com/antonio-alexander/go-bludgeon/employees/data"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	config      *rest.Configuration
+	config      *restclient.Configuration
 	letterRunes []rune = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 )
 
@@ -38,33 +39,36 @@ func init() {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	config = new(rest.Configuration)
+	config = new(restclient.Configuration)
 	config.Default()
 	config.FromEnv(pwd, envs)
 	rand.Seed(time.Now().UnixNano())
 }
 
 type restClientTest struct {
-	client rest.Client
+	client restclient.Client
 }
 
 func newRestclientTest() *restClientTest {
 	logger := logger.New("bludgeon_rest_server_test")
-	client := rest.New(logger)
+	client := restclient.New(logger)
 	return &restClientTest{
 		client: client,
 	}
 }
 
-func (r *restClientTest) Initialize() error {
-	return r.client.Initialize(config)
+func (r *restClientTest) Initialize(t *testing.T) {
+	err := r.client.Initialize(config)
+	assert.Nil(t, err)
 }
 
 func (r *restClientTest) TestEmployeeOperations(t *testing.T) {
-	//create employee
+	ctx := context.TODO()
 	firstName, lastName := randomString(25), randomString(25)
 	emailAddress := fmt.Sprintf("%s@foobar.duck", randomString(25))
-	employeeCreated, err := r.client.EmployeeCreate(data.EmployeePartial{
+
+	//create employee
+	employeeCreated, err := r.client.EmployeeCreate(ctx, data.EmployeePartial{
 		FirstName:    &firstName,
 		LastName:     &lastName,
 		EmailAddress: &emailAddress,
@@ -74,12 +78,14 @@ func (r *restClientTest) TestEmployeeOperations(t *testing.T) {
 	assert.Equal(t, lastName, employeeCreated.LastName)
 	assert.Equal(t, emailAddress, employeeCreated.EmailAddress)
 	employeeID := employeeCreated.ID
+
 	//read created employee
-	employeeRead, err := r.client.EmployeeRead(employeeID)
+	employeeRead, err := r.client.EmployeeRead(ctx, employeeID)
 	assert.Nil(t, err)
 	assert.Equal(t, employeeCreated, employeeRead)
+
 	//read all employees
-	employees, err := r.client.EmployeesRead(data.EmployeeSearch{
+	employees, err := r.client.EmployeesRead(ctx, data.EmployeeSearch{
 		IDs: []string{employeeID},
 	})
 	assert.Nil(t, err)
@@ -93,32 +99,36 @@ func (r *restClientTest) TestEmployeeOperations(t *testing.T) {
 		}
 		return false
 	})
+
 	//update employee
 	updatedFirstName := randomString(25)
-	employeeUpdated, err := r.client.EmployeeUpdate(employeeID, data.EmployeePartial{
+	employeeUpdated, err := r.client.EmployeeUpdate(ctx, employeeID, data.EmployeePartial{
 		FirstName: &updatedFirstName,
 	})
 	assert.Nil(t, err)
 	assert.Equal(t, updatedFirstName, employeeUpdated.FirstName)
+
 	//read updated employee
-	employeeRead, err = r.client.EmployeeRead(employeeID)
+	employeeRead, err = r.client.EmployeeRead(ctx, employeeID)
 	assert.Nil(t, err)
 	assert.Equal(t, employeeUpdated, employeeRead)
+
 	//delete employee
-	err = r.client.EmployeeDelete(employeeID)
+	err = r.client.EmployeeDelete(ctx, employeeID)
 	assert.Nil(t, err)
+
 	//delete employee again
-	err = r.client.EmployeeDelete(employeeID)
+	err = r.client.EmployeeDelete(ctx, employeeID)
 	assert.NotNil(t, err)
+
 	//attempt to read deleted employee
-	employeeRead, err = r.client.EmployeeRead(employeeID)
+	employeeRead, err = r.client.EmployeeRead(ctx, employeeID)
 	assert.Nil(t, employeeRead)
 	assert.NotNil(t, err)
 }
 
 func TestEmployeesRestClient(t *testing.T) {
 	r := newRestclientTest()
-	err := r.Initialize()
-	assert.Nil(t, err)
+	r.Initialize(t)
 	t.Run("Test Employee Operations", r.TestEmployeeOperations)
 }

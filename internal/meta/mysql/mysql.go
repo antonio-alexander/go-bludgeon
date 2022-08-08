@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 
@@ -15,7 +17,7 @@ import (
 //common constants
 const (
 	DatabaseIsolation = sql.LevelSerializable
-	LogAlias          = "Database"
+	LogAlias          = "MySQL"
 )
 
 type Owner interface {
@@ -24,9 +26,13 @@ type Owner interface {
 }
 
 type DB struct {
-	*sql.DB                      //pointer to the database
-	logger.Logger                //logger
-	config        *Configuration //configuration
+	*sql.DB
+	sync.RWMutex
+	sync.WaitGroup
+	logger.Logger
+	stopper     chan struct{}
+	config      *Configuration
+	initialized bool
 }
 
 func New(parameters ...interface{}) *DB {
@@ -37,10 +43,52 @@ func New(parameters ...interface{}) *DB {
 			m.Logger = p
 		}
 	}
+	if m.Logger == nil {
+		m.Logger = logger.New()
+	}
 	return m
 }
 
+func (m *DB) launchPing() {
+	m.Add(1)
+	started := make(chan struct{})
+	go func() {
+		defer m.Done()
+
+		pingFx := func() bool {
+			ctx, cancel := context.WithTimeout(context.Background(), m.config.ConnectTimeout)
+			defer cancel()
+			if err := m.PingContext(ctx); err != nil {
+				m.Error("%s %s", LogAlias, err)
+				return false
+			}
+			m.Debug("%s successfully connected", LogAlias)
+			return true
+		}
+		tConnect := time.NewTicker(time.Second)
+		defer tConnect.Stop()
+		close(started)
+		if pingFx() {
+			return
+		}
+		for {
+			select {
+			case <-m.stopper:
+				return
+			case <-tConnect.C:
+				if pingFx() {
+					return
+				}
+			}
+		}
+	}()
+	<-started
+}
+
 func (m *DB) Initialize(config *Configuration) error {
+	m.Lock()
+	defer m.Unlock()
+
 	if config == nil {
 		return errors.New("configuration is nil")
 	}
@@ -55,20 +103,24 @@ func (m *DB) Initialize(config *Configuration) error {
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), config.ConnectTimeout)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		return err
-	}
+	m.stopper = make(chan struct{})
 	m.DB, m.config = db, config
+	m.initialized = true
+	m.launchPing()
 	return nil
 }
 
 func (m *DB) Shutdown() {
-	if m.DB != nil {
-		if err := m.DB.Close(); err != nil {
-			m.Error("MySQL: ", err)
-		}
+	m.Lock()
+	defer m.Unlock()
+
+	if !m.initialized {
+		return
+	}
+	close(m.stopper)
+	m.Wait()
+	if err := m.DB.Close(); err != nil {
+		m.Error("%s %s", LogAlias, err)
 	}
 	m.config.Default()
 }
