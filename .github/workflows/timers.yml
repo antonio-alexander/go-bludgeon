@@ -152,7 +152,7 @@ jobs:
           cd /home/runner/work/go-bludgeon/go-bludgeon/timers
           go mod download
           docker compose up -d mysql
-          go test -v $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-timers.out | tee /tmp/go-bludgeon-timers.log
+          go test -v $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-timers.out | tee /tmp/go-bludgeon-timers.log; test ${PIPESTATUS[0]} -eq 0
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -248,7 +248,7 @@ jobs:
           cd /home/runner/work/go-bludgeon/go-bludgeon/timers/client
           go mod download
           docker compose up -d
-          go test -v ./... -coverprofile /tmp/go-bludgeon-timers_client.out | tee /tmp/go-bludgeon-timers_client.log
+          go test -v ./... -coverprofile /tmp/go-bludgeon-timers_client.out | tee /tmp/go-bludgeon-timers_client.log; test ${PIPESTATUS[0]} -eq 0
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:

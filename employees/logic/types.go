@@ -6,11 +6,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-const LogAlias string = "Logic"
+const (
+	LogAlias                 string = "Logic"
+	PanicEmployeeMetaNotSet  string = "employee meta not set"
+	PanicChangesclientNotSet string = "changes client not set"
+)
 
-const PanicEmployeeMetaNotSet string = "employee meta not set"
-
-var ErrEmployeeIDNotProvided = errors.New("employee id not provided")
+var (
+	ServiceName              = "bludgeon_employees"
+	ChangeTypeEmployee       = "employee"
+	ChangeActionCreate       = "create"
+	ChangeActionUpdate       = "update"
+	ChangeActionDelete       = "delete"
+	ErrEmployeeIDNotProvided = errors.New("employee id not provided")
+)
 
 //Logic is an interface that provides functionality to interact with
 // Employee objects

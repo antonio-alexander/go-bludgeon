@@ -53,7 +53,7 @@ func (m *file) Write() error {
 
 func (m *file) Read() error {
 	serializedData := &meta.SerializedData{}
-	if err := m.File.Read(serializedData); err != nil {
+	if err := m.File.Read(serializedData); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return m.Deserialize(serializedData)

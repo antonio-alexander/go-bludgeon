@@ -1,4 +1,4 @@
-package client_test
+package grpc_test
 
 import (
 	"context"
@@ -10,16 +10,18 @@ import (
 	"testing"
 	"time"
 
-	rest "github.com/antonio-alexander/go-bludgeon/employees/client/rest"
+	client "github.com/antonio-alexander/go-bludgeon/employees/client/rest"
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	config      *rest.Configuration
-	letterRunes []rune = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	letterRunes      = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	configGrpcClient = new(client.Configuration)
 )
 
 func randomString(n int) string {
@@ -32,33 +34,40 @@ func randomString(n int) string {
 }
 
 func init() {
-	pwd, _ := os.Getwd()
 	envs := make(map[string]string)
 	for _, env := range os.Environ() {
 		if s := strings.Split(env, "="); len(s) > 1 {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	config = new(rest.Configuration)
-	config.Default()
-	config.FromEnv(pwd, envs)
+	configGrpcClient.Default()
+	configGrpcClient.FromEnv(envs)
 	rand.Seed(time.Now().UnixNano())
 }
 
 type restClientTest struct {
-	client rest.Client
+	client interface {
+		internal.Configurer
+		client.Client
+	}
 }
 
-func newRestclientTest() *restClientTest {
-	logger := logger.New("bludgeon_rest_server_test")
-	client := rest.New(logger)
+func newRestClientTest() *restClientTest {
+	logger := internal_logger.New()
+	logger.Configure(internal_logger.Configuration{
+		Prefix: "bludgeon_rest_server_test",
+		Level:  internal_logger.Trace,
+	})
+	client := client.New()
+	client.SetUtilities(logger)
 	return &restClientTest{
 		client: client,
 	}
 }
 
-func (r *restClientTest) Initialize() error {
-	return r.client.Initialize(config)
+func (r *restClientTest) Initialize(t *testing.T) {
+	err := r.client.Configure(configGrpcClient)
+	assert.Nil(t, err)
 }
 
 func (r *restClientTest) testEmployeeOperations(t *testing.T) {
@@ -127,8 +136,8 @@ func (r *restClientTest) testEmployeeOperations(t *testing.T) {
 }
 
 func TestEmployeesRestClient(t *testing.T) {
-	r := newRestclientTest()
-	err := r.Initialize()
-	assert.Nil(t, err)
+	r := newRestClientTest()
+
+	r.Initialize(t)
 	t.Run("Test Employee Operations", r.testEmployeeOperations)
 }

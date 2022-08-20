@@ -2,52 +2,70 @@ package file
 
 import (
 	"context"
+	"os"
 	"sync"
 
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
 	meta "github.com/antonio-alexander/go-bludgeon/employees/meta"
 	memory "github.com/antonio-alexander/go-bludgeon/employees/meta/memory"
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 
-	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
 	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
 )
 
 type file struct {
 	sync.RWMutex
-	File interface {
-		internal_file.File
-		internal_file.Owner
-	}
 	logger.Logger
+	internal.Configurer
+	internal_file.File
+	internal.Initializer
 	meta.Serializer
 	meta.Employee
-	internal_meta.Owner
 }
 
-func New(parameters ...interface{}) File {
-	var c *internal_file.Configuration
-
-	memory := memory.New(parameters)
-	file := &file{
-		Serializer: memory,
-		Employee:   memory,
-		File:       internal_file.New(parameters...),
+func New() interface {
+	meta.Employee
+	internal.Configurer
+	internal.Initializer
+	internal.Parameterizer
+} {
+	memory := memory.New()
+	internalFile := internal_file.New()
+	return &file{
+		Logger:      logger.NewNullLogger(),
+		Configurer:  internalFile,
+		File:        internalFile,
+		Initializer: internalFile,
+		Serializer:  memory,
+		Employee:    memory,
 	}
+}
+
+func (m *file) SetParameters(parameters ...interface{}) {
 	for _, p := range parameters {
 		switch p := p.(type) {
-		case *internal_file.Configuration:
-			c = p
+		case interface {
+			meta.Serializer
+			meta.Employee
+		}:
+			m.Serializer = p
+			m.Employee = p
+		case meta.Employee:
+			m.Employee = p
+		case meta.Serializer:
+			m.Serializer = p
+		}
+	}
+}
+
+func (m *file) SetUtilities(parameters ...interface{}) {
+	for _, p := range parameters {
+		switch p := p.(type) {
 		case logger.Logger:
-			file.Logger = p
+			m.Logger = p
 		}
 	}
-	if c != nil {
-		if err := file.Initialize(c); err != nil {
-			panic(err)
-		}
-	}
-	return file
 }
 
 func (m *file) write() error {
@@ -55,25 +73,25 @@ func (m *file) write() error {
 	if err != nil {
 		return err
 	}
-	return m.File.Write(serializedData)
+	return m.Write(serializedData)
 }
 
-//Initialize
-func (m *file) Initialize(config *internal_file.Configuration) error {
+// Initialize
+func (m *file) Initialize() error {
 	m.Lock()
 	defer m.Unlock()
 
-	if err := m.File.Initialize(config); err != nil {
+	if err := m.Initializer.Initialize(); err != nil {
 		return err
 	}
 	serializedData := &meta.SerializedData{}
-	if err := m.File.Read(serializedData); err != nil {
+	if err := m.Read(serializedData); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return m.Deserialize(serializedData)
 }
 
-//Shutdown
+// Shutdown
 func (m *file) Shutdown() {
 	m.Lock()
 	defer m.Unlock()
@@ -82,11 +100,11 @@ func (m *file) Shutdown() {
 		m.Error("error while shutting down: %s", err.Error())
 		return
 	}
-	if err := m.File.Write(serializedData); err != nil {
+	if err := m.Write(serializedData); err != nil {
 		m.Error("error while shutting down: %s", err.Error())
 		return
 	}
-	m.Owner.Shutdown()
+	m.Initializer.Shutdown()
 }
 
 func (m *file) EmployeeCreate(ctx context.Context, e data.EmployeePartial) (*data.Employee, error) {

@@ -4,25 +4,19 @@ import (
 	"os"
 )
 
-//Main is used to start an instance of the bludgeon employees service
+// Main is used to start an instance of the bludgeon employees service
 func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os.Signal) error {
 	config := getConfig(pwd, envs)
-	logger := getLogger(config)
+	logger, parameters := parameterize(config)
+	if err := configure(pwd, envs, append(parameters, logger)...); err != nil {
+		return err
+	}
 	logger.Info("version \"%s\" (%s@%s)", Version, GitBranch, GitCommit)
-	meta, err := startMeta(config, logger)
-	if err != nil {
+	if err := initialize(parameters...); err != nil {
 		return err
 	}
-	defer meta.Shutdown()
-	logic, err := startLogic(config, logger, meta)
-	if err != nil {
-		return err
-	}
-	stopServices, err := startServices(config, logic, logger)
-	if err != nil {
-		return err
-	}
-	defer stopServices()
+	defer func() { shutdown(parameters...) }()
+	//wait for signal, then shutdown
 	<-chSignalInt
 	return nil
 }

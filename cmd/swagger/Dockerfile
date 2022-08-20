@@ -39,7 +39,9 @@ RUN \
     cd /go/src/github.com/antonio-alexander/go-bludgeon/employees/service/rest/swagger \
     && swagger generate spec -o /swagger/swagger_employees.json --scan-models \
     && cd /go/src/github.com/antonio-alexander/go-bludgeon/timers/service/rest/swagger\
-    && swagger generate spec -o /swagger/swagger_timers.json --scan-models 
+    && swagger generate spec -o /swagger/swagger_timers.json --scan-models \
+    && cd /go/src/github.com/antonio-alexander/go-bludgeon/changes/internal/swagger\
+    && swagger generate spec -o /swagger/swagger_changes.json --scan-models 
 
 FROM --platform=${PLATFORM} swaggerapi/swagger-ui:v4.12.0
 
@@ -48,8 +50,9 @@ ARG GIT_COMMIT
 
 COPY --from=build /swagger/swagger_timers.json /usr/share/nginx/html/api/swagger_timers.json
 COPY --from=build /swagger/swagger_employees.json /usr/share/nginx/html/api/swagger_employees.json
+COPY --from=build /swagger/swagger_changes.json /usr/share/nginx/html/api/swagger_changes.json
 
-ENV URLS="[{ url: \"./api/swagger_employees.json\", name: \"Employees\" }, { url: \"./api/swagger_timers.json\", name: \"Timers\" }, ]"
+ENV URLS="[{ url: \"./api/swagger_employees.json\", name: \"Employees\" }, { url: \"./api/swagger_timers.json\", name: \"Timers\" }, { url: \"./api/swagger_changes.json\", name: \"Changes\" } ]"
 
 RUN apk add wget
 

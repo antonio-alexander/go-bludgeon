@@ -151,9 +151,10 @@ jobs:
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/employees
           go mod download
-          docker compose up -d mysql
-          go test -v $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-employees.out | tee /tmp/go-bludgeon-employees.log
+          docker compose up -d
+          go test -v $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-employees.out | tee /tmp/go-bludgeon-employees.log; test ${PIPESTATUS[0]} -eq 0
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v2
         with:
           name: artifacts
@@ -247,9 +248,10 @@ jobs:
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/employees/client
           go mod download
-          docker compose up -d
-          go test -v ./... -coverprofile /tmp/go-bludgeon-employees_client.out | tee /tmp/go-bludgeon-employees_client.log
+          docker compose --profile application up -d
+          go test -v ./... -coverprofile /tmp/go-bludgeon-employees_client.out | tee /tmp/go-bludgeon-employees_client.log; test ${PIPESTATUS[0]} -eq 0
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v2
         with:
           name: artifacts

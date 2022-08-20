@@ -2,14 +2,16 @@ package mysql
 
 import (
 	"context"
-	"errors"
+	"database/sql"
 	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/antonio-alexander/go-bludgeon/employees/data"
 	"github.com/antonio-alexander/go-bludgeon/employees/meta"
+	"github.com/antonio-alexander/go-bludgeon/internal"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
+	"github.com/pkg/errors"
 
 	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
 
@@ -19,47 +21,40 @@ import (
 const (
 	tableEmployees   string = "employees"
 	tableEmployeesV1 string = "employees_v1"
+	lastUpdatedBy    string = "bludgeon_meta_mysql"
 )
 
 type mysql struct {
 	sync.RWMutex
 	sync.WaitGroup
-	*internal_mysql.DB
 	logger.Logger
+	*internal_mysql.DB
 }
 
-func New(parameters ...interface{}) MySQL {
-	var config *internal_mysql.Configuration
-
-	m := &mysql{
-		DB: internal_mysql.New(parameters...),
+func New() interface {
+	meta.Employee
+	internal.Configurer
+	internal.Initializer
+	internal.Parameterizer
+} {
+	return &mysql{
+		DB:     internal_mysql.New(),
+		Logger: logger.NewNullLogger(),
 	}
+}
+
+func (m *mysql) SetParameters(parameters ...interface{}) {
+	m.DB.SetParameters(parameters...)
+}
+
+func (m *mysql) SetUtilities(parameters ...interface{}) {
+	m.DB.SetUtilities(parameters...)
 	for _, p := range parameters {
 		switch p := p.(type) {
-		case *internal_mysql.Configuration:
-			config = p
 		case logger.Logger:
 			m.Logger = p
 		}
 	}
-	if config != nil {
-		if err := m.Initialize(config); err != nil {
-			panic(err)
-		}
-	}
-	return m
-}
-
-func (m *mysql) Initialize(config *internal_mysql.Configuration) error {
-	m.Lock()
-	defer m.Unlock()
-	if config == nil {
-		return errors.New("config is nil")
-	}
-	if err := m.DB.Initialize(config); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (m *mysql) EmployeeCreate(ctx context.Context, employeePartial data.EmployeePartial) (*data.Employee, error) {
@@ -82,6 +77,9 @@ func (m *mysql) EmployeeCreate(ctx context.Context, employeePartial data.Employe
 		values = append(values, "?")
 		columns = append(columns, "email_address")
 	}
+	args = append(args, lastUpdatedBy)
+	values = append(values, "?")
+	columns = append(columns, "last_updated_by")
 	tx, err := m.Begin()
 	if err != nil {
 		return nil, err
@@ -141,6 +139,8 @@ func (m *mysql) EmployeeUpdate(ctx context.Context, id string, employeePartial d
 	if len(updates) <= 0 || len(args) <= 0 {
 		return nil, meta.ErrEmployeeNotUpdated
 	}
+	args = append(args, lastUpdatedBy)
+	updates = append(updates, "last_updated_by = ?")
 	tx, err := m.Begin()
 	if err != nil {
 		return nil, err
@@ -243,21 +243,24 @@ func (m *mysql) EmployeesRead(ctx context.Context, search data.EmployeeSearch) (
 	}
 	rows, err := m.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		switch {
+		default:
+			return nil, err
+		case err == sql.ErrNoRows:
+			return nil, meta.ErrEmployeeNotFound
+		case errors.Is(err, &driver_mysql.MySQLError{}):
+			err := err.(*driver_mysql.MySQLError)
+			switch err.Number {
+			default:
+				return nil, err
+			}
+		}
 	}
 	defer rows.Close()
 	var employees []*data.Employee
 	for rows.Next() {
-		employee := &data.Employee{}
-		if err := rows.Scan(
-			&employee.ID,
-			&employee.FirstName,
-			&employee.LastName,
-			&employee.EmailAddress,
-			&employee.Version,
-			&employee.LastUpdated,
-			&employee.LastUpdatedBy,
-		); err != nil {
+		employee, err := employeeScan(rows.Scan)
+		if err != nil {
 			return nil, err
 		}
 		employees = append(employees, employee)

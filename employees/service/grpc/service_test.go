@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 	"strings"
 	"testing"
 
@@ -12,23 +13,34 @@ import (
 	pb "github.com/antonio-alexander/go-bludgeon/employees/data/pb"
 	logic "github.com/antonio-alexander/go-bludgeon/employees/logic"
 	meta "github.com/antonio-alexander/go-bludgeon/employees/meta"
+	file "github.com/antonio-alexander/go-bludgeon/employees/meta/file"
 	memory "github.com/antonio-alexander/go-bludgeon/employees/meta/memory"
+	mysql "github.com/antonio-alexander/go-bludgeon/employees/meta/mysql"
 	service "github.com/antonio-alexander/go-bludgeon/employees/service/grpc"
 
+	changesclient "github.com/antonio-alexander/go-bludgeon/changes/client"
+	changesclientrest "github.com/antonio-alexander/go-bludgeon/changes/client/rest"
+
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	internal_server "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
 	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
+	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
+	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+const filename string = "bludgeon_logic.json"
+
 var (
-	address     string            = "localhost"
-	port        string            = "8081"
-	options     []grpc.DialOption = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	letterRunes []rune            = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	configMetaMysql         = new(internal_mysql.Configuration)
+	configMetaFile          = new(internal_file.Configuration)
+	configLogger            = new(internal_logger.Configuration)
+	configServer            = new(internal_server.Configuration)
+	configChangesClientRest = new(changesclientrest.Configuration)
+	letterRunes             = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 )
 
 func randomString(n int) string {
@@ -41,18 +53,27 @@ func randomString(n int) string {
 }
 
 type grpcServiceTest struct {
-	server  internal_server.Owner
-	service service.Owner
-	meta    interface {
-		internal_meta.Owner
-		meta.Serializer
-		meta.Employee
+	server interface {
+		internal.Initializer
+		internal.Configurer
+	}
+	meta interface {
+		internal.Initializer
+		internal.Configurer
 	}
 	logic interface {
 		logic.Logic
 	}
-	conn   *grpc.ClientConn
-	client pb.EmployeesClient
+	logger interface {
+		internal.Configurer
+	}
+	changesClient interface {
+		internal.Initializer
+		internal.Configurer
+		changesclient.Client
+	}
+	grpcConn *grpc.ClientConn
+	pb.EmployeesClient
 }
 
 func init() {
@@ -62,44 +83,107 @@ func init() {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	if _, ok := envs["BLUDGEON_GRPC_ADDRESS"]; ok {
-		address = envs["BLUDGEON_GRPC_ADDRESS"]
-	}
-	if _, ok := envs["BLUDGEON_GRPC_PORT"]; ok {
-		port = envs["BLUDGEON_GRPC_PORT"]
-	}
+	// options     []grpc.DialOption =
+	configLogger.Default()
+	configLogger.FromEnv(envs)
+	configMetaFile.Default()
+	configMetaFile.FromEnv(envs)
+	configMetaFile.File = path.Join("../../tmp", filename)
+	os.Remove(configMetaFile.File)
+	configMetaMysql.Default()
+	configMetaMysql.FromEnv(envs)
+	configChangesClientRest.Default()
+	configChangesClientRest.FromEnv(envs)
+	configServer.Default()
+	configServer.FromEnv(envs)
+	configServer.Address = "localhost"
+	configServer.Port = "8081"
 }
 
-func new() *grpcServiceTest {
-	logger := internal_logger.New("bludgeon_grpc_server_test")
-	conn, _ := grpc.Dial(fmt.Sprintf("%s:%s", address, port), options...)
-	meta := memory.New()
-	logic := logic.New(logger, meta)
-	client := pb.NewEmployeesClient(conn)
-	server := internal_server.New(logger)
-	service := service.New(logger, logic, server)
+func newGrpcServiceTest(metaType, protocol string) *grpcServiceTest {
+	var meta interface {
+		meta.Employee
+		internal.Initializer
+		internal.Configurer
+		internal.Parameterizer
+	}
+	var changesClient interface {
+		changesclient.Client
+		changesclient.Handler
+		internal.Initializer
+		internal.Configurer
+		internal.Parameterizer
+	}
+
+	logger := internal_logger.New()
+	logger.Configure(&internal_logger.Configuration{
+		Prefix: "bludgeon_grpc_server_test",
+		Level:  internal_logger.Trace,
+	})
+	switch metaType {
+	default:
+		meta = memory.New()
+	case "mysql":
+		meta = mysql.New()
+	case "file":
+		meta = file.New()
+	}
+	meta.SetUtilities(logger)
+	switch protocol {
+	case "rest":
+		changesClient = changesclientrest.New()
+	}
+	changesClient.SetUtilities(logger)
+	logic := logic.New()
+	logic.SetParameters(meta, changesClient)
+	logic.SetUtilities(logger)
+	service := service.New()
+	service.SetUtilities(logger)
+	service.SetParameters(logic)
+	server := internal_server.New()
+	server.SetUtilities(logger)
+	server.SetParameters(logic, service)
 	return &grpcServiceTest{
-		server:  server,
-		meta:    meta,
-		logic:   logic,
-		client:  client,
-		conn:    conn,
-		service: service,
+		server:        server,
+		meta:          meta,
+		logic:         logic,
+		logger:        logger,
+		changesClient: changesClient,
 	}
 }
 
-func (r *grpcServiceTest) initialize(t *testing.T) {
-	err := r.server.Initialize(&internal_server.Configuration{
-		Address: address,
-		Port:    port,
-		Options: []grpc.ServerOption{},
-	}, r.service.Register)
+func (r *grpcServiceTest) initialize(t *testing.T, metaType, protocol string) {
+	switch metaType {
+	case "file":
+		err := r.meta.Configure(configMetaFile)
+		assert.Nil(t, err)
+	case "mysql":
+		err := r.meta.Configure(configMetaMysql)
+		assert.Nil(t, err)
+	}
+	err := r.meta.Initialize()
 	assert.Nil(t, err)
+	switch protocol {
+	case "rest":
+		err := r.changesClient.Configure(configChangesClientRest)
+		assert.Nil(t, err)
+	}
+	err = r.changesClient.Initialize()
+	assert.Nil(t, err)
+	err = r.server.Configure(configServer)
+	assert.Nil(t, err)
+	err = r.server.Initialize()
+	assert.Nil(t, err)
+	r.grpcConn, err = grpc.Dial(fmt.Sprintf("%s:%s", configServer.Address, configServer.Port), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	assert.Nil(t, err)
+	r.EmployeesClient = pb.NewEmployeesClient(r.grpcConn)
 }
 
 func (r *grpcServiceTest) shutdown(t *testing.T) {
-	r.meta.Shutdown()
 	r.server.Shutdown()
+	r.meta.Shutdown()
+	r.changesClient.Shutdown()
+	r.grpcConn.Close()
 }
 
 func (r *grpcServiceTest) testEmployeeOperations(t *testing.T) {
@@ -108,7 +192,7 @@ func (r *grpcServiceTest) testEmployeeOperations(t *testing.T) {
 	ctx := context.TODO()
 
 	//create employee
-	employeeCreated, err := r.client.EmployeeCreate(ctx, &pb.EmployeeCreateRequest{
+	employeeCreated, err := r.EmployeeCreate(ctx, &pb.EmployeeCreateRequest{
 		EmployeePartial: pb.FromEmployeePartial(&data.EmployeePartial{
 			FirstName:    &firstName,
 			LastName:     &lastName,
@@ -118,9 +202,14 @@ func (r *grpcServiceTest) testEmployeeOperations(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, employeeCreated)
 	employeeId := employeeCreated.GetEmployee().Id
+	defer func() {
+		r.EmployeeDelete(ctx, &pb.EmployeeDeleteRequest{
+			Id: employeeId,
+		})
+	}()
 
 	//read created employee
-	employeeRead, err := r.client.EmployeeRead(ctx, &pb.EmployeeReadRequest{
+	employeeRead, err := r.EmployeeRead(ctx, &pb.EmployeeReadRequest{
 		Id: employeeId,
 	})
 	assert.Nil(t, err)
@@ -128,8 +217,10 @@ func (r *grpcServiceTest) testEmployeeOperations(t *testing.T) {
 	assert.Equal(t, employeeCreated.GetEmployee(), employeeRead.GetEmployee())
 
 	//read all employees
-	employeesRead, err := r.client.EmployeesRead(ctx, &pb.EmployeesReadRequest{
-		EmployeeSearch: &pb.EmployeeSearch{},
+	employeesRead, err := r.EmployeesRead(ctx, &pb.EmployeesReadRequest{
+		EmployeeSearch: &pb.EmployeeSearch{
+			Ids: []string{employeeId},
+		},
 	})
 	assert.Nil(t, err)
 	assert.Len(t, employeesRead.GetEmployees(), 1)
@@ -137,7 +228,7 @@ func (r *grpcServiceTest) testEmployeeOperations(t *testing.T) {
 
 	//update employee
 	updatedFirstName := randomString(25)
-	employeeUpdated, err := r.client.EmployeeUpdate(ctx, &pb.EmployeeUpdateRequest{
+	employeeUpdated, err := r.EmployeeUpdate(ctx, &pb.EmployeeUpdateRequest{
 		Id: employeeId,
 		EmployeePartial: &pb.EmployeePartial{
 			FirstNameOneof: &pb.EmployeePartial_FirstName{FirstName: updatedFirstName},
@@ -148,7 +239,7 @@ func (r *grpcServiceTest) testEmployeeOperations(t *testing.T) {
 	assert.Equal(t, updatedFirstName, employeeUpdated.Employee.GetFirstName())
 
 	//read updated employee
-	employeeRead, err = r.client.EmployeeRead(ctx, &pb.EmployeeReadRequest{
+	employeeRead, err = r.EmployeeRead(ctx, &pb.EmployeeReadRequest{
 		Id: employeeId,
 	})
 	assert.Nil(t, err)
@@ -156,28 +247,42 @@ func (r *grpcServiceTest) testEmployeeOperations(t *testing.T) {
 	assert.Equal(t, employeeUpdated.GetEmployee(), employeeRead.GetEmployee())
 
 	//delete employee
-	_, err = r.client.EmployeeDelete(ctx, &pb.EmployeeDeleteRequest{
+	_, err = r.EmployeeDelete(ctx, &pb.EmployeeDeleteRequest{
 		Id: employeeId,
 	})
 	assert.Nil(t, err)
 
 	//delete employee again
-	_, err = r.client.EmployeeDelete(ctx, &pb.EmployeeDeleteRequest{
+	_, err = r.EmployeeDelete(ctx, &pb.EmployeeDeleteRequest{
 		Id: employeeId,
 	})
 	assert.NotNil(t, err)
 
 	//attempt to read deleted employee
-	employeeRead, err = r.client.EmployeeRead(ctx, &pb.EmployeeReadRequest{
+	employeeRead, err = r.EmployeeRead(ctx, &pb.EmployeeReadRequest{
 		Id: employeeId,
 	})
 	assert.NotNil(t, err)
 	assert.Nil(t, employeeRead.GetEmployee())
 }
 
-func TestEmployeesGrpcService(t *testing.T) {
-	r := new()
-	r.initialize(t)
+func testEmployeesGrpcService(t *testing.T, metaType string) {
+	r := newGrpcServiceTest(metaType, "rest")
+
+	r.initialize(t, metaType, "rest")
+	defer r.shutdown(t)
+
 	t.Run("Test Employee Operations", r.testEmployeeOperations)
-	r.shutdown(t)
+}
+
+func TestEmployeesGrpcServiceMemory(t *testing.T) {
+	testEmployeesGrpcService(t, "memory")
+}
+
+func TestEmployeesGrpcServiceFile(t *testing.T) {
+	testEmployeesGrpcService(t, "file")
+}
+
+func TestEmployeesGrpcServiceMysql(t *testing.T) {
+	testEmployeesGrpcService(t, "mysql")
 }
