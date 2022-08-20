@@ -1,0 +1,26 @@
+{
+  "Meta": {
+    "Type": "file",
+    "File": {
+      "File": "data/bludgeon.json"
+    },
+    "Mysql": {
+      "Hostname": "127.0.0.1",
+      "Port": "3306",
+      "Username": "bludgeon",
+      "Password": "bludgeon",
+      "Database": "bludgeon",
+      "ConnectTimeout": 5000000000,
+      "QueryTimeout": 10000000000,
+      "ParseTime": true
+    }
+  },
+  "Server": {
+    "Type": "rest",
+    "Rest": {
+      "Address": "0.0.0.0",
+      "Port": "8080",
+      "Timeout": 5000000000
+    }
+  }
+}

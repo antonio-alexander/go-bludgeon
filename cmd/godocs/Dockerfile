@@ -9,35 +9,70 @@
 # 
 #---------------------------------------------------------------------------------------------------
 
-ARG GIT_BRANCH=no_git_branch_provided
+ARG GIT_BRANCH
 ARG GIT_COMMIT=no_git_commit_provided
+ARG GIT_REPO=https://github.com/antonio-alexander/go-bludgeon.git
 ARG PLATFORM=linux/amd64
 ARG GO_ARCH=amd64
 ARG GO_ARM=7
-ARG REPO=https://github.com/antonio-alexander/go-bludgeon.git
-ARG BRANCH=develop
 
-FROM --platform=${PLATFORM} golang:alpine
+FROM --platform=${PLATFORM} golang:alpine AS staging
 
 ARG GO_ARCH
 ARG GO_ARM
 ARG GIT_BRANCH
 ARG GIT_COMMIT
-ARG BRANCH
-ARG REPO
+ARG GIT_REPO
 
 RUN \
     apk add git openssh-client wget \
     && env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux \
     go install golang.org/x/tools/cmd/godoc@v0.1.10
 
-WORKDIR /go/src/github.com/antonio-alexander
+WORKDIR /go/src/github.com/antonio-alexander 
 
 RUN \
-    git clone --depth=1 --branch ${BRANCH} ${REPO} \
+    git clone --depth=1 --branch ${GIT_BRANCH} ${GIT_REPO} \
     && rm -r /go/src/github.com/antonio-alexander/go-bludgeon/.git
 
 WORKDIR /go/src/github.com/antonio-alexander/go-bludgeon
+
+RUN \
+    godoc -http :8080 > /dev/null & \
+    pid=$! \
+    && sleep 10s \
+    && wget --recursive --no-verbose \
+    --convert-links --page-requisites \
+    --adjust-extension --execute=robots=off \
+    --exclude-directories="*" \
+    --no-parent --no-clobber\
+    --directory-prefix=/tmp \
+    --no-host-directories \
+    http://localhost:8080/pkg/github.com/antonio-alexander/go-bludgeon/employees \
+    && wget --recursive --no-verbose \
+    --convert-links --page-requisites \
+    --adjust-extension --execute=robots=off \
+    --exclude-directories="*" \
+    --no-parent --no-clobber\
+    --directory-prefix=/tmp \
+    --no-host-directories \
+    http://localhost:8080/pkg/github.com/antonio-alexander/go-bludgeon/timers \
+    && wget --recursive --no-verbose \
+    --convert-links --page-requisites \
+    --adjust-extension --execute=robots=off \
+    --exclude-directories="*" \
+    --no-parent --no-clobber\
+    --directory-prefix=/tmp \
+    --no-host-directories \
+    http://localhost:8080/pkg/github.com/antonio-alexander/go-bludgeon/internal \
+    && kill -9 $pid
+
+FROM --platform=${PLATFORM} busybox:1.35
+
+WORKDIR /tmp
+
+COPY --from=staging /tmp /tmp
+COPY ./cmd/godocs/index.html /tmp/index.html
 
 LABEL antonio-alexander.git.branch=${GIT_BRANCH}
 LABEL antonio-alexander.git.commit=${GIT_COMMIT}
@@ -45,4 +80,4 @@ LABEL org.opencontainers.image.source=https://github.com/antonio-alexander/go-bl
 
 EXPOSE 8080
 
-CMD [ "godoc", "-http", ":8080" ]
+CMD ["busybox", "httpd", "-f", "-v", "-p", "8080"]
