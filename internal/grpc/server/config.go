@@ -8,9 +8,8 @@ import (
 )
 
 const (
-	ErrAddressEmpty string = "address is empty"
-	ErrPortEmpty    string = "port is empty"
-	ErrPortBadf     string = "port is a non-integer: %s"
+	ErrPortEmpty string = "port is empty"
+	ErrPortBadf  string = "port is a non-integer: %s"
 )
 
 const (
@@ -19,7 +18,7 @@ const (
 )
 
 const (
-	DefaultAddress string = "127.0.0.1"
+	DefaultAddress string = ""
 	DefaultPort    string = "8081"
 )
 
@@ -39,7 +38,7 @@ func (c *Configuration) Default() {
 	c.Port = DefaultPort
 }
 
-func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
+func (c *Configuration) FromEnv(envs map[string]string) {
 	//Get the address from the environment, then the port
 	// then the timeout
 	if address, ok := envs[EnvNameAddress]; ok {
@@ -55,9 +54,6 @@ func (c *Configuration) Validate() (err error) {
 	// check if the port is empty, and then ensure
 	// that the port is an integer, finally
 	// check if the timeout is lte 0
-	if c.Address == "" {
-		return errors.New(ErrAddressEmpty)
-	}
 	if c.Port == "" {
 		return errors.New(ErrPortEmpty)
 	}

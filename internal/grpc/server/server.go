@@ -6,6 +6,8 @@ import (
 	"net"
 	"sync"
 
+	"github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/internal/config"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"google.golang.org/grpc"
@@ -18,34 +20,19 @@ type grpcServer struct {
 	sync.WaitGroup
 	logger.Logger
 	*grpc.Server
-	config      *Configuration
-	initialized bool
+	initialized   bool
+	configured    bool
+	config        *Configuration
+	registrations []RegisterFx
 }
 
-func New(parameters ...interface{}) interface {
-	Owner
+func New() interface {
+	internal.Configurer
+	internal.Initializer
+	internal.Parameterizer
 	grpc.ServiceRegistrar
 } {
-	var config *Configuration
-
-	s := &grpcServer{}
-	for _, parameter := range parameters {
-		switch p := parameter.(type) {
-		case *Configuration:
-			config = p
-		case logger.Logger:
-			s.Logger = p
-		}
-	}
-	if config != nil {
-		if err := s.Initialize(config); err != nil {
-			panic(err)
-		}
-	}
-	if s.Logger == nil {
-		s.Logger = logger.New()
-	}
-	return s
+	return &grpcServer{Logger: logger.NewNullLogger()}
 }
 
 func (s *grpcServer) launchServe(listener net.Listener) {
@@ -63,21 +50,69 @@ func (s *grpcServer) launchServe(listener net.Listener) {
 	s.Info("%s listening on %v", LogAlias, listener.Addr())
 }
 
-func (s *grpcServer) Initialize(config *Configuration, registrations ...RegisterFx) error {
+func (s *grpcServer) SetParameters(parameters ...interface{}) {
+	for _, parameter := range parameters {
+		switch p := parameter.(type) {
+		case Registerer:
+			s.registrations = append(s.registrations, p.Register)
+		}
+	}
+}
+
+func (s *grpcServer) SetUtilities(parameters ...interface{}) {
+	for _, parameter := range parameters {
+		switch p := parameter.(type) {
+		case logger.Logger:
+			s.Logger = p
+		}
+	}
+}
+
+func (s *grpcServer) Configure(items ...interface{}) error {
+	s.Lock()
+	defer s.Unlock()
+
+	var envs map[string]string
+	var c *Configuration
+
+	for _, item := range items {
+		switch v := item.(type) {
+		case config.Envs:
+			envs = v
+		case *Configuration:
+			c = v
+		}
+	}
+	if c == nil {
+		c = new(Configuration)
+		c.Default()
+		c.FromEnv(envs)
+	}
+	if err := c.Validate(); err != nil {
+		return err
+	}
+	s.config = c
+	s.configured = true
+	return nil
+}
+
+func (s *grpcServer) Initialize() error {
 	s.Lock()
 	defer s.Unlock()
 
 	if s.initialized {
 		return errors.New("already initialized")
 	}
-	s.config = config
+	if !s.configured {
+		return errors.New("not configured")
+	}
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", s.config.Address, s.config.Port))
 	if err != nil {
 		return err
 	}
 	s.Server = grpc.NewServer(s.config.Options...)
-	for _, registration := range registrations {
-		registration()
+	for _, registration := range s.registrations {
+		registration(s.Server)
 	}
 	s.launchServe(listener)
 	s.initialized = true
@@ -93,5 +128,6 @@ func (s *grpcServer) Shutdown() {
 	}
 	s.GracefulStop()
 	s.Wait()
-	s.initialized = false
+	s.configured, s.initialized = false, false
+	s.registrations = nil
 }

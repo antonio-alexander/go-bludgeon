@@ -48,3 +48,24 @@ SELECT
     last_updated_by
 FROM
     time_slices;
+
+-- DROP VIEW IF EXISTS changes_v1;
+CREATE VIEW changes_v1 AS
+SELECT
+    id AS change_id,
+    data_id,
+    version,
+    type,
+    service,
+    action,
+    UNIX_TIMESTAMP(when_changed) AS when_changed,
+    changed_by
+FROM
+    changes;
+
+-- DROP VIEW IF EXISTS registrations_v1;
+CREATE VIEW registrations_v1 AS
+SELECT
+    id AS registration_id
+FROM
+    registrations;

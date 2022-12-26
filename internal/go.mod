@@ -3,12 +3,15 @@ module github.com/antonio-alexander/go-bludgeon/internal
 go 1.16
 
 require (
+	github.com/Shopify/sarama v1.36.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gofrs/flock v0.8.1
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/websocket v1.5.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/cors v1.8.2
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
+	github.com/stretchr/testify v1.8.0
 	google.golang.org/grpc v1.48.0
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
+	google.golang.org/protobuf v1.28.0 // indirect
 )

@@ -5,6 +5,7 @@ import (
 )
 
 const (
+	logAlias      string = "[rest_server] "
 	ErrStarted    string = "already started"
 	ErrNotStarted string = "not started"
 )
@@ -17,9 +18,4 @@ type HandleFuncConfig struct {
 	Route    string
 	Method   string
 	HandleFx func(http.ResponseWriter, *http.Request)
-}
-
-type Owner interface {
-	Start(config *Configuration) (err error)
-	Stop()
 }

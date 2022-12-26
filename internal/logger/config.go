@@ -6,7 +6,7 @@ const (
 )
 
 const (
-	DefaultLevel Level = Error
+	DefaultLevel Level = Info
 )
 
 type Configuration struct {
@@ -18,7 +18,7 @@ func (c *Configuration) Default() {
 	c.Level = DefaultLevel
 }
 
-func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
+func (c *Configuration) FromEnv(envs map[string]string) {
 	if level, ok := envs[EnvNameLevel]; ok {
 		c.Level = AtoLogLevel(level)
 	}

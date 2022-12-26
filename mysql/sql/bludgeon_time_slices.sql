@@ -6,10 +6,10 @@ USE bludgeon;
 -- DROP TABLE IF EXISTS time_slices;
 CREATE TABLE IF NOT EXISTS time_slices (
     id VARCHAR(36) PRIMARY KEY NOT NULL DEFAULT (UUID()),
-    start DATETIME DEFAULT CURRENT_TIMESTAMP(6),
-    finish DATETIME,
+    start DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+    finish DATETIME(6),
     completed BOOLEAN DEFAULT FALSE,
-    elapsed_time DATETIME AS (
+    elapsed_time DATETIME(6) AS (
         if(
             finish IS NOT NULL,
             TIMEDIFF(finish, start),
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS time_slices (
     timer_id VARCHAR(36) NOT NULL,
     aux_id BIGINT AUTO_INCREMENT,
     version INT NOT NULL DEFAULT 1,
-    last_updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    last_updated DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     last_updated_by TEXT NOT NULL DEFAULT CURRENT_USER,
     FOREIGN KEY (timer_id) REFERENCES timers(id) ON DELETE CASCADE,
     CONSTRAINT check_start_finish CHECK (finish > start OR finish IS NULL),
@@ -86,10 +86,10 @@ DELIMITER ;
 -- DROP TABLE IF EXISTS time_slices_audit;
 CREATE TABLE IF NOT EXISTS time_slices_audit (
     time_slice_id VARCHAR(36) NOT NULL,
-    start DATETIME,
-    finish DATETIME,
+    start DATETIME(6),
+    finish DATETIME(6),
     completed BOOLEAN DEFAULT false,
-    elapsed_time DATETIME AS (
+    elapsed_time DATETIME(6) AS (
         IF (
             finish IS NOT NULL,
             TIMEDIFF(finish, start),
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS time_slices_audit (
     ),
     timer_id VARCHAR(36),
     version INT NOT NULL,
-    last_updated DATETIME NOT NULL,
+    last_updated DATETIME(6) NOT NULL,
     last_updated_by TEXT NOT NULL,
     PRIMARY KEY (time_slice_id, version),
     FOREIGN KEY (time_slice_id) REFERENCES time_slices(id) ON DELETE CASCADE

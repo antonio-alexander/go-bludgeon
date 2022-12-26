@@ -19,8 +19,8 @@ const (
 )
 
 const (
-	DefaultFile        string = "data/bludgeon.json"
-	DefaultLockFile    string = "data/bludgeon.lock"
+	DefaultFile        string = "./data/bludgeon.json"
+	DefaultLockFile    string = "./data/bludgeon.lock"
 	DefaultFileLocking bool   = false
 )
 
@@ -35,8 +35,8 @@ type Configuration struct {
 	LockFile    string `json:"lock_file"`
 }
 
-func (c *Configuration) Default(pwd string) {
-	c.File = filepath.Join(pwd, DefaultFile)
+func (c *Configuration) Default() {
+	c.File = filepath.Join(DefaultFile)
 	c.FileLocking = DefaultFileLocking
 }
 
@@ -52,7 +52,7 @@ func (c *Configuration) Validate() (err error) {
 	return
 }
 
-func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
+func (c *Configuration) FromEnv(envs map[string]string) {
 	if file, ok := envs[EnvNameFile]; ok && file != "" {
 		c.File = file
 	}

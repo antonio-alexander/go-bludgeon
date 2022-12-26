@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/antonio-alexander/go-bludgeon/internal/config"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"github.com/pkg/errors"
@@ -20,33 +21,19 @@ const (
 	LogAlias          = "MySQL"
 )
 
-type Owner interface {
-	Initialize(config *Configuration) (err error)
-	Shutdown()
-}
-
 type DB struct {
 	*sql.DB
 	sync.RWMutex
 	sync.WaitGroup
 	logger.Logger
 	stopper     chan struct{}
-	config      *Configuration
 	initialized bool
+	configured  bool
+	config      *Configuration
 }
 
-func New(parameters ...interface{}) *DB {
-	m := &DB{}
-	for _, p := range parameters {
-		switch p := p.(type) {
-		case logger.Logger:
-			m.Logger = p
-		}
-	}
-	if m.Logger == nil {
-		m.Logger = logger.New()
-	}
-	return m
+func New() *DB {
+	return &DB{Logger: logger.NewNullLogger()}
 }
 
 func (m *DB) launchPing() {
@@ -85,26 +72,64 @@ func (m *DB) launchPing() {
 	<-started
 }
 
-func (m *DB) Initialize(config *Configuration) error {
+func (m *DB) SetParameters(parameters ...interface{}) {
+	//use this to set common utilities/parameters
+}
+
+func (m *DB) SetUtilities(parameters ...interface{}) {
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case logger.Logger:
+			m.Logger = p
+		}
+	}
+}
+
+func (m *DB) Configure(items ...interface{}) error {
+	m.RWMutex.Lock()
+	defer m.RWMutex.Unlock()
+
+	var envs map[string]string
+	var c *Configuration
+
+	for _, item := range items {
+		switch v := item.(type) {
+		case config.Envs:
+			envs = v
+		case *Configuration:
+			c = v
+		}
+	}
+	if c == nil {
+		c = new(Configuration)
+		c.Default()
+		c.FromEnv(envs)
+	}
+	if err := c.Validate(); err != nil {
+		return err
+	}
+	m.config = c
+	m.configured = true
+	return nil
+}
+
+func (m *DB) Initialize() error {
 	m.Lock()
 	defer m.Unlock()
 
-	if config == nil {
-		return errors.New("configuration is nil")
-	}
-	if err := config.Validate(); err != nil {
-		return err
+	if !m.configured {
+		return errors.New("not configured")
 	}
 	//EXAMPLE: [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
 	// user:password@tcp(localhost:5555)/dbname?charset=utf8
 	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=%t",
-		config.Username, config.Password, config.Hostname, config.Port, config.Database, config.ParseTime)
+		m.config.Username, m.config.Password, m.config.Hostname, m.config.Port, m.config.Database, m.config.ParseTime)
 	db, err := sql.Open("mysql", dataSourceName)
 	if err != nil {
 		return err
 	}
 	m.stopper = make(chan struct{})
-	m.DB, m.config = db, config
+	m.DB = db
 	m.initialized = true
 	m.launchPing()
 	return nil
@@ -123,4 +148,5 @@ func (m *DB) Shutdown() {
 		m.Error("%s %s", LogAlias, err)
 	}
 	m.config.Default()
+	m.configured = false
 }

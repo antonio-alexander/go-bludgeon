@@ -41,7 +41,7 @@ func (r *Configuration) Default() {
 	r.Timeout = DefaultTimeout
 }
 
-func (r *Configuration) FromEnv(pwd string, envs map[string]string) {
+func (r *Configuration) FromEnv(envs map[string]string) {
 	//Get the address from the environment, then the port
 	// then the timeout
 	if address, ok := envs[EnvNameRestAddress]; ok {

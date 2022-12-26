@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS employees (
     email_address TEXT NOT NULL,
     aux_id BIGINT AUTO_INCREMENT,
     version INT NOT NULL DEFAULT 1,
-    last_updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    last_updated DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     last_updated_by TEXT NOT NULL DEFAULT CURRENT_USER,
     INDEX(aux_id),
     UNIQUE(email_address)
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS employees_audit (
     last_name TEXT,
     email_address TEXT,
     version INT NOT NULL,
-    last_updated DATETIME NOT NULL,
+    last_updated DATETIME(6) NOT NULL,
     last_updated_by TEXT NOT NULL,
     PRIMARY KEY (employee_id, version),
     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE

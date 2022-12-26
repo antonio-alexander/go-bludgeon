@@ -14,6 +14,7 @@ mysql -uroot < /bludgeon/bludgeon_security.sql
 mysql -uroot < /bludgeon/bludgeon_employees.sql
 mysql -uroot < /bludgeon/bludgeon_timers.sql
 mysql -uroot < /bludgeon/bludgeon_time_slices.sql
+mysql -uroot < /bludgeon/bludgeon_changes.sql
 mysql -uroot < /bludgeon/bludgeon_views.sql
 
 # Tell the MySQL daemon to shutdown.

@@ -44,7 +44,7 @@ func (c *Configuration) Default() {
 	c.Options = DefaultOptions
 }
 
-func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
+func (c *Configuration) FromEnv(envs map[string]string) {
 	//Get the address from the environment, then the port
 	// then the timeout
 	if address, ok := envs[EnvNameAddress]; ok {

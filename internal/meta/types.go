@@ -50,11 +50,3 @@ func AtoType(s string) Type {
 func ErrUnsupportedMeta(metaType Type) error {
 	return errors.Errorf("unsupported meta: %s", metaType)
 }
-
-//Owner contains methods that shuold only be used by the constructor of the pointer
-// and allows use of functions that can affect the underlying pointer
-type Owner interface {
-	//Shutdown can be used to "stop" the meta and any asynchronous
-	// processes
-	Shutdown()
-}

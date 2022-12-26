@@ -14,27 +14,88 @@ on:
       - ".github/workflows/internal.yml"
 
 jobs:
-  environment:
+  environment_push:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_SHA: ${{ github.sha }}
+      GITHUB_REF: ${{ github.ref }}
+    steps:
+      - name: Get git source
+        run: |
+          git_source=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
+          git_source=`echo $git_source | sed 's/refs\/tags\///'`
+          git_source=`echo $git_source | sed 's/refs\\///'`
+          echo $git_source
+          echo "git_source=$git_source" >> $GITHUB_ENV
+      - name: Get git SHA
+        run: |
+          git_sha=`echo $GITHUB_SHA`
+          echo $git_sha
+          echo "git_sha=$git_sha" >> $GITHUB_ENV
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+      - name: Get version
+        run: |
+          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/internal/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version_source
+          echo "version_source=$version_source" >> $GITHUB_ENV
+      - name: Generate build artifacts
+        run: |
+          mkdir -p /tmp
+          echo ${{ env.version_source }} >> /tmp/version_source
+          echo ${{ env.git_source }} >> /tmp/git_source
+          echo ${{ env.git_sha }} >> /tmp/git_sha
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: |
+            /tmp/version_source
+            /tmp/git_source
+            /tmp/git_sha
+
+  environment_pull_request:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     env:
+      GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
       GITHUB_HEAD_REF: ${{ github.head_ref }}
       GITHUB_BASE_REF: ${{ github.base_ref }}
     steps:
+      - name: Get git target
+        run: |
+          git_target=`echo $GITHUB_BASE_REF | sed 's/refs\/heads\///'`
+          git_target=`echo $git_target | sed 's/refs\/tags\///'`
+          git_target=`echo $git_target| sed 's/refs\\///'`
+          echo $git_target
+          echo "git_target=$git_target" >> $GITHUB_ENV
+      - name: Get git source
+        run: |
+          git_source=`echo $GITHUB_HEAD_REF | sed 's/refs\/heads\///'`
+          git_source=`echo $git_source | sed 's/refs\/tags\///'`
+          git_source=`echo $git_source | sed 's/refs\\///'`
+          echo $git_source
+          echo "git_source=$git_source" >> $GITHUB_ENV
+      - name: Get git SHA
+        run: |
+          git_sha=`echo $GITHUB_SHA`
+          echo $git_sha
+          echo "git_sha=$git_sha" >> $GITHUB_ENV
       - name: Checkout repository code (source)
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Get source version
         run: |
-          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
+          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/internal/version.json | jq '.Version' | sed 's/"//g'`
           echo $version_source
           echo "version_source=$version_source" >> $GITHUB_ENV
       - name: Checkout repository code (target)
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.base_ref }}
       - name: Get target version
         run: |
-          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/version.json | jq '.Version' | sed 's/"//g'`
+          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/internal/version.json | jq '.Version' | sed 's/"//g'`
           echo $version_target
           echo "version_target=$version_target" >> $GITHUB_ENV
       - name: Generate build artifacts
@@ -42,13 +103,19 @@ jobs:
           mkdir -p /tmp
           echo ${{ env.version_source }} >> /tmp/version_source
           echo ${{ env.version_target }} >> /tmp/version_target
+          echo ${{ env.git_target }} >> /tmp/git_target
+          echo ${{ env.git_source }} >> /tmp/git_source
+          echo ${{ env.git_sha }} >> /tmp/git_sha
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: artifacts
           path: |
             /tmp/version_source
             /tmp/version_target
+            /tmp/git_target
+            /tmp/git_source
+            /tmp/git_sha
 
   go_lint:
     runs-on: ubuntu-latest
@@ -71,18 +138,23 @@ jobs:
       contents: read
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
           go-version: 1.16
-      - name: Test timers (exclude client)
+      - name: Test internal
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/internal
           go mod download
-          go test -v ./... -coverprofile /tmp/go-bludgeon-internal.out | tee /tmp/go-bludgeon-internal.log
+          docker compose up -d
+          go test -v ./... -coverprofile /tmp/go-bludgeon-internal.out | tee /tmp/go-bludgeon-internal.log; test ${PIPESTATUS[0]} -eq 0
+      - name: Docker clean-up
+        run: |
+          docker compose down
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        if: always()
+        uses: actions/upload-artifact@v3
         with:
           name: artifacts
           path: |
@@ -90,14 +162,16 @@ jobs:
             /tmp/go-bludgeon-internal.out
 
   version_validate:
-    if: github.base_ref == 'refs/heads/main'
-    needs: [environment]
+    if: ${{ always() &&
+      (needs.environment_push.result=='success' || needs.environment_pull_request.result=='success') &&
+      github.base_ref == 'refs/heads/main' }}
+    needs: [environment_push, environment_pull_request]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: artifacts
           path: /tmp
@@ -117,15 +191,16 @@ jobs:
 
   git_push_tag:
     if: ${{ always() &&
-      (github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main') &&
-      (needs.go_test.result=='success' && needs.go_lint.result=='success' && needs.environment.result=='success') }}
-    needs: [environment, go_test, go_lint]
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.event_name == 'release' ) &&
+      (needs.environment_push.result=='success' || needs.environment_pull_request.result=='success') &&
+      (needs.go_test.result=='success') }}
+    needs: [environment_pull_request, environment_push, go_test]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: artifacts
           path: /tmp
@@ -134,7 +209,7 @@ jobs:
           version=`cat /tmp/version_source`
           echo "version=$version" >> $GITHUB_ENV
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: "0"
       - name: Push/Update version
