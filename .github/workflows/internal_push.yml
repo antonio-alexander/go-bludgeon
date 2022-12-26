@@ -1,0 +1,120 @@
+name: internal_push
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "internal/**"
+      - ".github/workflows/internal_push.yml"
+
+jobs:
+  environment:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_SHA: ${{ github.sha }}
+      GITHUB_REF: ${{ github.ref }}
+    steps:
+      - name: Get git source
+        run: |
+          git_source=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
+          git_source=`echo $git_source | sed 's/refs\/tags\///'`
+          git_source=`echo $git_source | sed 's/refs\\///'`
+          echo $git_source
+          echo "git_source=$git_source" >> $GITHUB_ENV
+      - name: Get git SHA
+        run: |
+          git_sha=`echo $GITHUB_SHA`
+          echo $git_sha
+          echo "git_sha=$git_sha" >> $GITHUB_ENV
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+      - name: Get version
+        run: |
+          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/internal/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version_source
+          echo "version_source=$version_source" >> $GITHUB_ENV
+      - name: Generate build artifacts
+        run: |
+          mkdir -p /tmp
+          echo ${{ env.version_source }} >> /tmp/version_source
+          echo ${{ env.git_source }} >> /tmp/git_source
+          echo ${{ env.git_sha }} >> /tmp/git_sha
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: |
+            /tmp/version_source
+            /tmp/git_source
+            /tmp/git_sha
+
+  go_lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+      - uses: actions/checkout@v3
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.44.2
+          working-directory: ./internal
+          args: --verbose
+
+  go_test:
+    needs: [go_lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+      - name: Test internal
+        run: |
+          cd /home/runner/work/go-bludgeon/go-bludgeon/internal
+          go mod download
+          docker compose up -d
+          go test -v ./... -coverprofile /tmp/go-bludgeon-internal.out | tee /tmp/go-bludgeon-internal.log; test ${PIPESTATUS[0]} -eq 0
+      - name: Docker clean-up
+        run: |
+          docker compose down
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: |
+            /tmp/go-bludgeon-internal.log
+            /tmp/go-bludgeon-internal.out
+
+  git_push_tag:
+    needs: [go_test, environment]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: "0"
+      - name: Push/Update version
+        uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          CUSTOM_TAG: internal/v${{ env.version }}
