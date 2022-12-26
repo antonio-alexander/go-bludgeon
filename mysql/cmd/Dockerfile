@@ -16,13 +16,24 @@
 ARG GIT_BRANCH=no_git_branch_provided
 ARG GIT_COMMIT=no_git_commit_provided
 ARG PLATFORM=linux/amd64
+ARG MYSQL_ROOT_PASSWORD=bludgeon
+ARG MYSQL_DATABASE=bludgeon
+ARG MYSQL_USER=bludgeon
+ARG MYSQL_PASSWORD=bludgeon
 
 FROM --platform=${PLATFORM} alpine:latest
 
-ENV MYSQL_ROOT_PASSWORD=bludgeon
-ENV MYSQL_DATABASE=bludgeon
-ENV MYSQL_USER=bludgeon
-ENV MYSQL_PASSWORD=bludgeon
+ARG GIT_BRANCH GIT_COMMIT
+ARG GIT_COMMIT
+ARG MYSQL_ROOT_PASSWORD
+ARG MYSQL_DATABASE
+ARG MYSQL_USER
+ARG MYSQL_PASSWORD
+
+ENV MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+ENV MYSQL_DATABASE=${MYSQL_DATABASE}
+ENV MYSQL_USER=${MYSQL_USER}
+ENV MYSQL_PASSWORD=${MYSQL_PASSWORD}
 
 RUN \
     apk update \
@@ -43,6 +54,8 @@ RUN \
     chmod +x /bludgeon/init_bludgeon_db.sh \
     && chmod +x /docker_entrypoint.sh \
     && sh /bludgeon/init_bludgeon_db.sh
+
+HEALTHCHECK --start-period=10s --interval=5s --timeout=5s --retries=5 CMD mysqladmin ping -h localhost -u root -p$MYSQL_ROOT_PASSWORD || exit 1
 
 LABEL antonio-alexander.git.branch=${GIT_BRANCH}
 LABEL antonio-alexander.git.commit=${GIT_COMMIT}

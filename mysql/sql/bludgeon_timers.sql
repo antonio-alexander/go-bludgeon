@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS timers (
     employee_id VARCHAR(36),
     aux_id BIGINT AUTO_INCREMENT,
     version INT NOT NULL DEFAULT 1,
-    last_updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    last_updated DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     last_updated_by TEXT NOT NULL DEFAULT CURRENT_USER,
     INDEX(aux_id)
 ) ENGINE = InnoDB;
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS timers_audit (
     completed BOOLEAN,
     employee_id VARCHAR(36),
     version INT NOT NULL,
-    last_updated DATETIME NOT NULL,
+    last_updated DATETIME(6) NOT NULL,
     last_updated_by TEXT NOT NULL,
     PRIMARY KEY (timer_id, version),
     FOREIGN KEY (timer_id) REFERENCES timers(id) ON DELETE CASCADE
