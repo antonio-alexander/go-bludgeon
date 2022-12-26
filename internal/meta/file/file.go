@@ -2,7 +2,6 @@ package file
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -125,13 +124,13 @@ func (m *file) Write(item interface{}) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(m.config.File, bytes, os.ModePerm)
+	return os.WriteFile(m.config.File, bytes, os.ModePerm)
 }
 
 func (m *file) Read(item interface{}) error {
 	m.RLock()
 	defer m.RUnlock()
-	bytes, err := ioutil.ReadFile(m.config.File)
+	bytes, err := os.ReadFile(m.config.File)
 	if err != nil {
 		return err
 	}

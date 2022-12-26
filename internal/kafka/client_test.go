@@ -31,8 +31,7 @@ type kafkaClientTest struct {
 		internal.Configurer
 	}
 	logger interface {
-		internal_logger.Logger
-		internal_logger.Printer
+		internal.Configurer
 	}
 	saramaClient sarama.Client
 }
@@ -85,10 +84,6 @@ func generateId() string {
 
 func newKafkaClientTest() *kafkaClientTest {
 	logger := internal_logger.New()
-	logger.Configure(&internal_logger.Configuration{
-		Level:  internal_logger.Trace,
-		Prefix: "bludgeon_kafka_client_test",
-	})
 	kafkaClient := internal_kafka.New()
 	kafkaClient.SetUtilities(logger)
 	return &kafkaClientTest{
@@ -98,9 +93,14 @@ func newKafkaClientTest() *kafkaClientTest {
 }
 
 func (k *kafkaClientTest) initialize(t *testing.T, consumerGroup bool) {
+	err := k.logger.Configure(&internal_logger.Configuration{
+		Level:  internal_logger.Trace,
+		Prefix: "bludgeon_kafka_client_test",
+	})
+	assert.Nil(t, err)
 	kafkaConfig.ConsumerGroup = consumerGroup
 	// kafkaConfig.EnableLog = true
-	err := k.kafkaClient.Configure(nil, nil, kafkaConfig)
+	err = k.kafkaClient.Configure(nil, nil, kafkaConfig)
 	assert.Nil(t, err)
 	err = k.kafkaClient.Initialize()
 	assert.Nil(t, err)

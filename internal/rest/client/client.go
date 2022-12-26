@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/antonio-alexander/go-bludgeon/internal"
@@ -78,7 +78,7 @@ func (c *client) DoRequest(ctx context.Context, uri, method string, data []byte)
 	if err != nil {
 		return nil, err
 	}
-	data, err = ioutil.ReadAll(response.Body)
+	data, err = io.ReadAll(response.Body)
 	defer response.Body.Close()
 	if err != nil {
 		return nil, err
