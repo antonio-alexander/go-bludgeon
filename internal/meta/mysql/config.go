@@ -75,7 +75,7 @@ func (c *Configuration) Default() {
 	c.ParseTime = DefaultParseTime
 }
 
-func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
+func (c *Configuration) FromEnv(envs map[string]string) {
 	if databaseHost := envs[EnvNameDatabaseHost]; databaseHost != "" {
 		c.Hostname = databaseHost
 	}

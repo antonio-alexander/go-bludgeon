@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/internal/config"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"google.golang.org/grpc"
@@ -14,41 +16,71 @@ type grpcClient struct {
 	sync.RWMutex
 	logger.Logger
 	*grpc.ClientConn
-	config      *Configuration
 	initialized bool
+	configured  bool
+	config      *Configuration
 }
 
-func New(parameters ...interface{}) interface {
-	Client
+func New() interface {
+	internal.Configurer
+	internal.Initializer
+	internal.Parameterizer
 	grpc.ClientConnInterface
 } {
-	var config *Configuration
+	return &grpcClient{Logger: logger.NewNullLogger()}
+}
 
-	s := &grpcClient{}
+func (s *grpcClient) SetParameters(parameters ...interface{}) {
+	//use this to set common utilities/parameters
+}
+
+func (s *grpcClient) SetUtilities(parameters ...interface{}) {
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
-		case *Configuration:
-			config = p
 		case logger.Logger:
 			s.Logger = p
 		}
 	}
-	if config != nil {
-		if err := s.Initialize(config); err != nil {
-			panic(err)
-		}
-	}
-	return s
 }
 
-func (s *grpcClient) Initialize(config *Configuration) error {
+func (s *grpcClient) Configure(items ...interface{}) error {
+	s.Lock()
+	defer s.Unlock()
+
+	var c *Configuration
+	var envs map[string]string
+
+	for _, item := range items {
+		switch v := item.(type) {
+		case config.Envs:
+			envs = v
+		case *Configuration:
+			c = v
+		}
+	}
+	if c == nil {
+		c = new(Configuration)
+		c.Default()
+		c.FromEnv(envs)
+	}
+	if err := c.Validate(); err != nil {
+		return err
+	}
+	s.config = c
+	s.configured = true
+	return nil
+}
+
+func (s *grpcClient) Initialize() error {
 	s.Lock()
 	defer s.Unlock()
 
 	if s.initialized {
 		return errors.New("already initialized")
 	}
-	s.config = config
+	if !s.configured {
+		return errors.New("not configured")
+	}
 	clientConn, err := grpc.Dial(fmt.Sprintf("%s:%s", s.config.Address, s.config.Port), s.config.Options...)
 	if err != nil {
 		return err
@@ -68,5 +100,5 @@ func (s *grpcClient) Shutdown() {
 	if err := s.Close(); err != nil {
 		s.Error("error while closing: %s", err)
 	}
-	s.initialized = false
+	s.initialized, s.configured = false, false
 }

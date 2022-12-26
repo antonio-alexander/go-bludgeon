@@ -24,6 +24,7 @@ const (
 	EnvNameAllowedOrigins   string = "BLUDGEON_ALLOWED_ORIGINS"
 	EnvNameAllowedMethods   string = "BLUDGEON_ALLOWED_METHODS"
 	EnvNameCorsDebug        string = "BLUDGEON_CORS_DEBUG"
+	EnvNameCorsDisabled     string = "BLUDGEON_DISABLE_CORS"
 )
 
 const (
@@ -36,7 +37,7 @@ const (
 
 var (
 	DefaultAllowedOrigins = [...]string{"http://localhost:8000"}
-	DefaultAllowedMethods = [...]string{http.MethodPost, http.MethodPut, http.MethodGet, http.MethodDelete}
+	DefaultAllowedMethods = [...]string{http.MethodPost, http.MethodPut, http.MethodGet, http.MethodDelete, http.MethodPatch}
 )
 
 type Configuration struct {
@@ -48,6 +49,7 @@ type Configuration struct {
 	AllowedMethods   []string      `json:"allowed_methods"`
 	AllowCredentials bool          `json:"allow_credentials"`
 	CorsDebug        bool          `json:"cors_debug"`
+	CorsDisabled     bool          `json:"cors_disabled"`
 }
 
 func (c *Configuration) Default() {
@@ -60,7 +62,7 @@ func (c *Configuration) Default() {
 	c.CorsDebug = DefaultCorsDebug
 }
 
-func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
+func (c *Configuration) FromEnv(envs map[string]string) {
 	//Get the address from the environment, then the port
 	// then the timeout
 	if address, ok := envs[EnvNameAddress]; ok {
@@ -92,6 +94,11 @@ func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
 			c.CorsDebug = corsDebug
 		}
 	}
+	if corsDisabledString, ok := envs[EnvNameCorsDisabled]; ok {
+		if corsDisabled, err := strconv.ParseBool(corsDisabledString); err == nil {
+			c.CorsDisabled = corsDisabled
+		}
+	}
 }
 
 func (c *Configuration) Validate() (err error) {
@@ -99,9 +106,6 @@ func (c *Configuration) Validate() (err error) {
 	// check if the port is empty, and then ensure
 	// that the port is an integer, finally
 	// check if the timeout is lte 0
-	if c.Address == "" {
-		return errors.New(ErrAddressEmpty)
-	}
 	if c.Port == "" {
 		return errors.New(ErrPortEmpty)
 	}

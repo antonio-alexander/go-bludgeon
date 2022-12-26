@@ -1,8 +1,9 @@
 package grpcserver
 
-type RegisterFx func()
+import "google.golang.org/grpc"
 
-type Owner interface {
-	Initialize(*Configuration, ...RegisterFx) error
-	Shutdown()
+type RegisterFx func(server grpc.ServiceRegistrar)
+
+type Registerer interface {
+	Register(server grpc.ServiceRegistrar)
 }

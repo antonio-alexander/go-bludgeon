@@ -8,6 +8,11 @@ type Logger interface {
 	Debug(format string, v ...interface{})
 	Trace(format string, v ...interface{})
 }
+type Printer interface {
+	Print(v ...interface{})
+	Printf(format string, v ...interface{})
+	Println(v ...interface{})
+}
 
 type Level int
 
@@ -23,13 +28,13 @@ func (l Level) String() string {
 	default:
 		return ""
 	case Error:
-		return "Error"
+		return "error"
 	case Info:
-		return "Info"
+		return "info"
 	case Debug:
-		return "Debug"
+		return "debug"
 	case Trace:
-		return "Trace"
+		return "trace"
 	}
 }
 

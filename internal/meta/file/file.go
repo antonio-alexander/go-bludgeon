@@ -7,15 +7,13 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/internal/config"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"github.com/gofrs/flock"
 	"github.com/pkg/errors"
 )
-
-type Owner interface {
-	Initialize(config *Configuration) (err error)
-}
 
 type File interface {
 	Write(item interface{}) error
@@ -26,23 +24,17 @@ type file struct {
 	sync.RWMutex
 	*flock.Flock
 	logger.Logger
-	config *Configuration
+	configured bool
+	config     *Configuration
 }
 
-func New(parameters ...interface{}) interface {
+func New() interface {
 	File
-	Owner
+	internal.Configurer
+	internal.Initializer
+	internal.Parameterizer
 } {
-	m := &file{
-		config: new(Configuration),
-	}
-	for _, p := range parameters {
-		switch p := p.(type) {
-		case logger.Logger:
-			m.Logger = p
-		}
-	}
-	return m
+	return &file{Logger: logger.NewNullLogger()}
 }
 
 func (m *file) Lock() {
@@ -83,7 +75,48 @@ func (m *file) RUnlock() {
 	}
 }
 
-//write will serialize and write the current in-memory data to
+func (m *file) SetParameters(parameters ...interface{}) {
+	//use this to set common utilities/parameters
+}
+
+func (m *file) SetUtilities(parameters ...interface{}) {
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case logger.Logger:
+			m.Logger = p
+		}
+	}
+}
+
+func (m *file) Configure(items ...interface{}) error {
+	m.RWMutex.Lock()
+	defer m.RWMutex.Unlock()
+
+	var envs map[string]string
+	var c *Configuration
+
+	for _, item := range items {
+		switch v := item.(type) {
+		case config.Envs:
+			envs = v
+		case *Configuration:
+			c = v
+		}
+	}
+	if c == nil {
+		c = new(Configuration)
+		c.Default()
+		c.FromEnv(envs)
+	}
+	if err := c.Validate(); err != nil {
+		return err
+	}
+	m.config = c
+	m.configured = true
+	return nil
+}
+
+// write will serialize and write the current in-memory data to
 // File
 func (m *file) Write(item interface{}) error {
 	m.Lock()
@@ -108,17 +141,13 @@ func (m *file) Read(item interface{}) error {
 	return nil
 }
 
-//Initialize
-func (m *file) Initialize(config *Configuration) error {
-	m.RLock()
-	defer m.RUnlock()
-	if config == nil {
-		return errors.New("config is nil")
+// Initialize
+func (m *file) Initialize() error {
+	m.RWMutex.Lock()
+	defer m.RWMutex.Unlock()
+	if !m.configured {
+		return errors.New("not configured")
 	}
-	if err := config.Validate(); err != nil {
-		return err
-	}
-	m.config = config
 	if _, err := os.Stat(m.config.File); os.IsNotExist(err) {
 		folder := filepath.Dir(m.config.File)
 		return os.MkdirAll(folder, os.ModePerm)
@@ -130,4 +159,14 @@ func (m *file) Initialize(config *Configuration) error {
 		m.Flock = flock.New(m.config.LockFile)
 	}
 	return nil
+}
+
+func (m *file) Shutdown() {
+	m.RWMutex.Lock()
+	defer m.RWMutex.Unlock()
+
+	if m.Flock != nil {
+		m.Flock.Close()
+	}
+	m.configured = false
 }
