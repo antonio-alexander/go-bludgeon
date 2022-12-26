@@ -1,66 +1,19 @@
-name: employees
+name: employees_pull_request
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-      - develop
     paths:
       - "employees/**"
-      - ".github/workflows/employees.yml"
-  pull_request:
-    paths:
-      - "employees/**"
-      - ".github/workflows/employees.yml"
+      - ".github/workflows/employees_pull_request.yml"
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  environment_push:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    env:
-      GITHUB_SHA: ${{ github.sha }}
-      GITHUB_REF: ${{ github.ref }}
-    steps:
-      - name: Get git source
-        run: |
-          git_source=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
-          git_source=`echo $git_source | sed 's/refs\/tags\///'`
-          git_source=`echo $git_source | sed 's/refs\\///'`
-          echo $git_source
-          echo "git_source=$git_source" >> $GITHUB_ENV
-      - name: Get git SHA
-        run: |
-          git_sha=`echo $GITHUB_SHA`
-          echo $git_sha
-          echo "git_sha=$git_sha" >> $GITHUB_ENV
-      - name: Checkout repository code
-        uses: actions/checkout@v2
-      - name: Get version
-        run: |
-          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/employees/version.json | jq '.Version' | sed 's/"//g'`
-          echo $version_source
-          echo "version_source=$version_source" >> $GITHUB_ENV
-      - name: Generate build artifacts
-        run: |
-          mkdir -p /tmp
-          echo ${{ env.version_source }} >> /tmp/version_source
-          echo ${{ env.git_source }} >> /tmp/git_source
-          echo ${{ env.git_sha }} >> /tmp/git_sha
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: artifacts
-          path: |
-            /tmp/version_source
-            /tmp/git_source
-            /tmp/git_sha
-
-  environment_pull_request:
-    if: github.event_name == 'pull_request'
+  environment:
     runs-on: ubuntu-latest
     env:
       GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
@@ -87,19 +40,19 @@ jobs:
           echo $git_sha
           echo "git_sha=$git_sha" >> $GITHUB_ENV
       - name: Checkout repository code (source)
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Get source version
         run: |
           version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/employees/version.json | jq '.Version' | sed 's/"//g'`
           echo $version_source
           echo "version_source=$version_source" >> $GITHUB_ENV
       - name: Checkout repository code (target)
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.base_ref }}
       - name: Get target version
         run: |
-          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/employees/version.json | jq '.Version' | sed 's/"//g'`
+          version_target=`cat /home/runner/work/go-bludgeon/go-bludgeon/employees/version.json | jq '.Version' | sed 's/"//g'`
           echo $version_target
           echo "version_target=$version_target" >> $GITHUB_ENV
       - name: Generate build artifacts
@@ -111,7 +64,7 @@ jobs:
           echo ${{ env.git_source }} >> /tmp/git_source
           echo ${{ env.git_sha }} >> /tmp/git_sha
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: artifacts
           path: |
@@ -136,44 +89,42 @@ jobs:
           args: --verbose
 
   go_test:
-    needs: [go_lint]
+    needs: [go_lint, version_validate, proto_validate, swagger_validate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: 1.16
       - name: Test employees (exclude client)
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/employees
           go mod download
-          docker compose up -d mysql
+          make dep
           go test -v $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-employees.out | tee /tmp/go-bludgeon-employees.log
+          docker compose logs >> /tmp/go-bludgeon-employees_services.log
+      - name: Docker clean-up
+        if: always()
+        run: |
+          make stop
+          docker image prune -f
+          docker container prune -f
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        if: always()
+        uses: actions/upload-artifact@v3
         with:
           name: artifacts
           path: |
             /tmp/go-bludgeon-employees.log
             /tmp/go-bludgeon-employees.out
+            /tmp/go-bludgeon-employees_services.log
 
   docker_build_images:
-    if: ${{ always() &&
-      (needs.environment_push.result=='success' || needs.environment_pull_request.result=='success') &&
-      needs.go_test.result=='success' && needs.swagger_validate.result=='success' &&
-      needs.proto_validate.result=='success'}}
-    needs:
-      [
-        environment_push,
-        environment_pull_request,
-        go_test,
-        swagger_validate,
-        proto_validate,
-      ]
+    needs: [environment, go_test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -182,7 +133,7 @@ jobs:
       PLATFORM_ARMV7: linux/arm/v7
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: artifacts
           path: /tmp
@@ -193,7 +144,7 @@ jobs:
           git_source=`cat /tmp/git_source`
           echo "git_source=$git_source" >> $GITHUB_ENV
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Build docker employees
         run: |
           cd employees
@@ -205,7 +156,7 @@ jobs:
           docker save -o /tmp/go-bludgeon-employees_amd64-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }}
           docker save -o /tmp/go-bludgeon-employees_armv7-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }}
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: artifacts
           path: |
@@ -218,14 +169,13 @@ jobs:
           docker container prune -f
 
   go_test_client:
-    if: ${{ always() && needs.docker_build_images.result=='success' }}
     needs: [docker_build_images]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: artifacts
           path: /tmp
@@ -238,46 +188,42 @@ jobs:
           docker load -i /tmp/go-bludgeon-employees_amd64-${{ env.version }}.tar.gz
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:latest
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: 1.16
       - name: Test employees client
         run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/employees/client
+          cd /home/runner/work/go-bludgeon/go-bludgeon/employees
           go mod download
-          docker compose up -d
-          go test -v ./... -coverprofile /tmp/go-bludgeon-employees_client.out | tee /tmp/go-bludgeon-employees_client.log
+          make run
+          go test -v ./client/... -coverprofile /tmp/go-bludgeon-employees-client.out | tee /tmp/go-bludgeon-employees-client.log
+          docker compose logs >> /tmp/go-bludgeon-employees-client_services.log
+      - name: Docker clean-up
+        if: always()
+        run: |
+          make stop
+          docker image prune -f
+          docker container prune -f
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: artifacts
           path: |
             /tmp/go-bludgeon-employees_client.log
             /tmp/go-bludgeon-employees_client.out
+            /tmp/go-bludgeon-employees-client_services.log
 
   swagger_validate:
-    if: ${{ always() &&
-      (needs.environment_push.result=='success' || needs.environment_pull_request.result=='success') }}
-    needs: [environment_push, environment_pull_request]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get environment
-        run: |
-          version=`cat /tmp/version_source`
-          echo "version=$version" >> $GITHUB_ENV
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: 1.16
       - name: Validate swagger spec
@@ -306,14 +252,17 @@ jobs:
     needs: [proto_lint]
     runs-on: ubuntu-latest
     steps:
+      - name: Install Protoc
+        run: |
+          PROTOC_ZIP=protoc-3.20.1-linux-x86_64.zip
+          curl -OL --silent https://github.com/protocolbuffers/protobuf/releases/download/v3.20.1/$PROTOC_ZIP
+          sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
+          sudo unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
+          rm -f $PROTOC_ZIP
       - name: Setup go
         uses: actions/setup-go@v3
         with:
           go-version: 1.16
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v1
-        with:
-          version: "3.20.1"
       - name: Install protoc-gen-go
         run: |
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
@@ -321,13 +270,13 @@ jobs:
         run: |
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
       - name: Checkout repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Build protos
         working-directory: /home/runner/work/go-bludgeon/go-bludgeon/employees/data/
         run: |
           protoc -I="./pb" --go_opt=paths=source_relative --go_out="/tmp" --go-grpc_opt=paths=source_relative --go-grpc_out="/tmp" ./pb/employees.proto
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: artifacts
           path: |
@@ -353,15 +302,13 @@ jobs:
           fi
 
   version_validate:
-    if: ${{ always() &&
-      (github.base_ref == 'refs/heads/main' || github.base_ref == 'refs/heads/develop') }}
-    needs: [environment_pull_request]
+    needs: [environment]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: artifacts
           path: /tmp
@@ -378,83 +325,3 @@ jobs:
                echo "versions are the same, versions must be different"
                exit 1
           fi
-
-  git_push_tag:
-    if: ${{ always() &&
-      (github.ref == 'refs/heads/develop' || github.event_name == 'release' || github.ref == 'refs/heads/main') &&
-      (needs.go_test_client.result=='success' && needs.go_lint.result=='success') }}
-    needs: [go_test_client, go_lint]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get environment
-        run: |
-          version=`cat /tmp/version_source`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Check out repository code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: "0"
-      - name: Push/Update version
-        uses: anothrNick/github-tag-action@1.36.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: true
-          CUSTOM_TAG: employees/v${{ env.version }}
-
-  docker_push_images:
-    if: ${{ always() &&
-      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') &&
-      needs.docker_build_images.result=='success' && needs.go_test_client.result=='success' }}
-    needs: [go_test_client, docker_build_images]
-    runs-on: ubuntu-latest
-    permissions:
-      packages: write
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get environment
-        run: |
-          version=`cat /tmp/version_source`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Login to ghcr.io
-        uses: docker/login-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Load Docker Images
-        run: |
-          docker load -i /tmp/go-bludgeon-employees_amd64-${{ env.version }}.tar.gz
-          docker load -i /tmp/go-bludgeon-employees_armv7-${{ env.version }}.tar.gz
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_latest
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }}
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_latest
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }}
-      - name: Push Docker Images
-        run: |
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_latest
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_latest
-      - name: Create/Push Docker manifest
-        run: |
-          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }}
-          docker manifest annotate --arch arm --os linux --variant 7 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_${{ env.version }}
-          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:${{ env.version }} --purge
-          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:amd64_latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_latest
-          docker manifest annotate --arch arm --os linux --variant 7 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:armv7_latest
-          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-employees:latest --purge
-      - name: Docker clean-up
-        run: |
-          docker image prune -f
-          docker container prune -f

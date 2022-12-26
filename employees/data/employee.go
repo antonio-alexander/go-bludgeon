@@ -32,6 +32,10 @@ type Employee struct {
 	Version int `json:"version"`
 }
 
+func (e *Employee) Type() string {
+	return "employee"
+}
+
 // swagger:model EmployeePartial
 //EmployeePartial provides a way to optionally/partially update different fields of an employee
 type EmployeePartial struct {

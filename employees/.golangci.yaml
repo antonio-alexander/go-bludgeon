@@ -3,13 +3,10 @@ linters:
   enable:
     # - gosec
     - bodyclose
-    - deadcode
     - gosimple
     - govet
     - staticcheck
-    - structcheck
     - unused
-    - varcheck
     - whitespace
 
 run:

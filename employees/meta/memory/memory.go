@@ -8,9 +8,8 @@ import (
 
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
 	meta "github.com/antonio-alexander/go-bludgeon/employees/meta"
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-
-	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
 
 	"github.com/pkg/errors"
 )
@@ -23,21 +22,17 @@ type memory struct {
 	employees     map[string]*data.Employee //map to store employees
 }
 
-func New(parameters ...interface{}) interface {
-	internal_meta.Owner
+func New() interface {
 	meta.Employee
 	meta.Serializer
+	internal.Initializer
+	internal.Configurer
+	internal.Parameterizer
 } {
-	m := &memory{
+	return &memory{
 		employees: make(map[string]*data.Employee),
+		Logger:    logger.NewNullLogger(),
 	}
-	for _, p := range parameters {
-		switch p := p.(type) {
-		case logger.Logger:
-			m.Logger = p
-		}
-	}
-	return m
 }
 
 func (m *memory) validateEmployee(e data.EmployeePartial, create bool, ids ...string) error {
@@ -62,6 +57,31 @@ func (m *memory) validateEmployee(e data.EmployeePartial, create bool, ids ...st
 			return meta.ErrEmployeeConflictUpdate
 		}
 	}
+	return nil
+}
+
+func (m *memory) SetParameters(parameters ...interface{}) {
+	//
+}
+
+func (m *memory) SetUtilities(parameters ...interface{}) {
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case logger.Logger:
+			m.Logger = p
+		}
+	}
+}
+
+func (m *memory) Configure(items ...interface{}) error {
+	//KIM: thsi is a dummy place holder to satisfy the
+	// internal.Configurer interface
+	return nil
+}
+
+func (m *memory) Initialize() error {
+	//KIM: thsi is a dummy place holder to satisfy the
+	// internal.Initializer interface
 	return nil
 }
 

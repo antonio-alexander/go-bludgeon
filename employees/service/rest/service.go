@@ -2,11 +2,12 @@ package service
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
 	logic "github.com/antonio-alexander/go-bludgeon/employees/logic"
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 	restserver "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 
@@ -19,29 +20,12 @@ type restServer struct {
 	router restserver.Router
 }
 
-func New(parameters ...interface{}) interface{} {
-	s := &restServer{}
-	for _, parameter := range parameters {
-		switch p := parameter.(type) {
-		case logic.Logic:
-			s.logic = p
-		case restserver.Router:
-			s.router = p
-		case logger.Logger:
-			s.Logger = p
-		}
+func New() interface {
+	internal.Parameterizer
+} {
+	return &restServer{
+		Logger: logger.NewNullLogger(),
 	}
-	switch {
-	case s.logic == nil:
-		panic("logic not set")
-	case s.router == nil:
-		panic("router not set")
-	}
-	if s.Logger == nil {
-		s.Logger = logger.New()
-	}
-	s.buildRoutes()
-	return s
 }
 
 func (s *restServer) endpointEmployeeCreate() func(http.ResponseWriter, *http.Request) {
@@ -52,7 +36,7 @@ func (s *restServer) endpointEmployeeCreate() func(http.ResponseWriter, *http.Re
 		var err error
 
 		ctx := request.Context()
-		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+		if bytes, err = io.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &employeePartial); err == nil {
 				if employee, err = s.logic.EmployeeCreate(ctx, employeePartial); err == nil {
 					bytes, err = json.Marshal(employee)
@@ -73,7 +57,7 @@ func (s *restServer) endpointEmployeeRead() func(http.ResponseWriter, *http.Requ
 
 		ctx := request.Context()
 		id := idFromPath(mux.Vars(request))
-		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+		if bytes, err = io.ReadAll(request.Body); err == nil {
 			if employee, err = s.logic.EmployeeRead(ctx, id); err == nil {
 				bytes, err = json.Marshal(employee)
 			}
@@ -93,7 +77,7 @@ func (s *restServer) endpointEmployeesRead() func(http.ResponseWriter, *http.Req
 
 		ctx := request.Context()
 		search.FromParams(request.URL.Query())
-		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+		if bytes, err = io.ReadAll(request.Body); err == nil {
 			if employees, err = s.logic.EmployeesRead(ctx, search); err == nil {
 				bytes, err = json.Marshal(employees)
 			}
@@ -113,7 +97,7 @@ func (s *restServer) endpointEmployeeUpdate() func(http.ResponseWriter, *http.Re
 
 		ctx := request.Context()
 		id := idFromPath(mux.Vars(request))
-		if bytes, err = ioutil.ReadAll(request.Body); err == nil {
+		if bytes, err = io.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, &employeePartial); err == nil {
 				if employee, err = s.logic.EmployeeUpdate(ctx, id, employeePartial); err == nil {
 					bytes, err = json.Marshal(employee)
@@ -149,5 +133,32 @@ func (s *restServer) buildRoutes() {
 		{Route: data.RouteEmployeesID, Method: http.MethodDelete, HandleFx: s.endpointEmployeeDelete()},
 	} {
 		s.router.HandleFunc(route)
+	}
+}
+
+func (s *restServer) SetParameters(parameters ...interface{}) {
+	for _, parameter := range parameters {
+		switch p := parameter.(type) {
+		case logic.Logic:
+			s.logic = p
+		case restserver.Router:
+			s.router = p
+			s.buildRoutes()
+		}
+	}
+	switch {
+	case s.logic == nil:
+		panic("logic not set")
+	case s.router == nil:
+		panic("router not set")
+	}
+}
+
+func (s *restServer) SetUtilities(parameters ...interface{}) {
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case logger.Logger:
+			s.Logger = p
+		}
 	}
 }

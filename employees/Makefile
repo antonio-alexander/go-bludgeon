@@ -4,7 +4,7 @@
 ## used in CI/CD pipelines.
 ## ----------------------------------------------------------------------
 
-swagger_port = 8082 # defaults
+swagger_port = 9000 # defaults
 
 # REFERENCE: https://stackoverflow.com/questions/16931770/makefile4-missing-separator-stop
 help: ## - Show this help.
@@ -12,7 +12,7 @@ help: ## - Show this help.
 
 check-proto: ## - check protoc/proto-gen-go/protolint
 	 @which protolint || (go install github.com/yoheimuta/protolint/cmd/protolint@v0.38.3)
-	 @which protoc || echo protocv3.20.1 not installed, install https://github.com/protocolbuffers/protobuf/releases/tag/v3.20.1
+	 @which protoc || echo protoc v3.20.1 not installed, install https://github.com/protocolbuffers/protobuf/releases/tag/v3.20.1
 	 @which protoc-gen-go || (go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0)
 	 @which protoc-gen-go-grpc || (go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2)
 
@@ -39,13 +39,13 @@ check-swagger: ## - validate/install swagger (v0.29.0)
 	which swagger || (go install github.com/go-swagger/go-swagger/cmd/swagger@v0.29.0)
 
 swagger: check-swagger ## - generate the swagger.json
-	@swagger generate spec --work-dir=./service/rest/swagger --output ./cmd/service/swagger.json --scan-models
+	@swagger generate spec --work-dir=./internal/swagger --output ./tmp/swagger.json --scan-models
 
 validate-swagger: swagger ## - validate the swagger.json
-	@swagger validate ./cmd/service/swagger.json
+	@swagger validate ./tmp/swagger.json
 
 serve-swagger: swagger ## - serve (web) the swagger.json
-	@swagger serve -F=swagger ./cmd/service/swagger.json -p ${swagger_port} --no-open
+	@swagger serve -F=swagger ./tmp/swagger.json -p ${swagger_port} --no-open
 
 check-godoc: ## - validate/install godoc
 	which godoc || (go install golang.org/x/tools/cmd/godoc@v0.1.10)
@@ -53,25 +53,17 @@ check-godoc: ## - validate/install godoc
 serve-godoc: check-godoc ## - serve (web) the godocs
 	@cd .. && godoc -http :8080
 
-test: ## - test the source
-	@go test -cover --count=1 ./...
-
-test-verbose: ## - test the source with verbose output
-	@go test -cover -v --count=1 ./...
+test: run ## - test the source with verbose output
+	@go test -v -cover -parallel=1 --count=1 ./... -coverprofile ./tmp/go-bludgeon-employees.out | tee ./tmp/go-bludgeon-employees.log
 
 build: ## - build the source (latest)
-	@./build.sh latest
+	@docker compose --profile application build --build-arg GIT_COMMIT=`git rev-parse HEAD` --build-arg GIT_BRANCH=`git rev-parse --abbrev-ref HEAD`
+	@docker image prune -f
 
-dep: ## - run only the dependencies (docker)
-	@docker compose up
-
-dep-detach: ## - run only the dependencies (docker) detached
+dep: ## - run only the dependencies (docker) detached
 	@docker compose up -d
 
-run: ## - run the service and its dependencies (docker)
-	@docker compose --profile application up
-
-run-detach: ## - run the service and its dependencies (docker) detached
+run: ## - run the service and its dependencies (docker) detached
 	@docker compose --profile application up -d
 
 stop:

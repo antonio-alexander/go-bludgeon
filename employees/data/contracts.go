@@ -1,6 +1,8 @@
 package data
 
-//rest routes for employees
+var ServiceName = "bludgeon_employees"
+
+// rest routes for employees
 const (
 	RouteEmployees       string = "/api/v1/employees"
 	RouteEmployeesSearch string = RouteEmployees + "/search"
@@ -10,7 +12,7 @@ const (
 
 const PathID string = "id"
 
-//patameters for employees service
+// patameters for employees service
 const (
 	ParameterIDs            string = "ids"
 	ParameterFirstName      string = "first_name"
@@ -19,4 +21,12 @@ const (
 	ParameterLastNames      string = "last_names"
 	ParameterEmailAddress   string = "email_address"
 	ParameterEmailAddresses string = "email_addresses"
+)
+
+// contracts for changes
+var (
+	ChangeTypeEmployee = "employee"
+	ChangeActionCreate = "create"
+	ChangeActionUpdate = "update"
+	ChangeActionDelete = "delete"
 )

@@ -1,2 +1,6 @@
 meta/file/data/*
 !meta/file/data/.gitkeep
+tmp/*
+!tmp/.gitkeep
+cmd/service/data/*
+!cmd/service/data/.gitkeep

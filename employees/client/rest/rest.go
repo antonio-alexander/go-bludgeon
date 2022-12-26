@@ -3,62 +3,89 @@ package rest
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	restclient "github.com/antonio-alexander/go-bludgeon/internal/rest/client"
+
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/internal/config"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	internal_rest "github.com/antonio-alexander/go-bludgeon/internal/rest/client"
 )
 
 const urif string = "http://%s:%s%s"
 
 type rest struct {
-	restclient.Client
-	logger.Logger
+	internal_logger.Logger
+	restClient interface {
+		internal.Configurer
+		internal.Parameterizer
+		internal_rest.Client
+	}
 	config *Configuration
 }
 
-//New can be used to create a concrete instance of the rest client
+// New can be used to create a concrete instance of the rest client
 // that implements the interfaces of logic.Logic and Owner
-func New(parameters ...interface{}) interface {
+func New() interface {
+	internal.Configurer
+	internal.Parameterizer
 	Client
 } {
-	var config *Configuration
-	//create a rest pointer, and range over the parameters
-	// if configuration is provided, initialize (panic on
-	// error)
-	r := &rest{Client: restclient.New()}
-	for _, parameter := range parameters {
-		switch p := parameter.(type) {
-		case *Configuration:
-			config = p
-		case logger.Logger:
+	return &rest{
+		Logger:     internal_logger.NewNullLogger(),
+		restClient: internal_rest.New(),
+	}
+}
+
+func (r *rest) doRequest(ctx context.Context, uri, method string, data []byte) ([]byte, error) {
+	return r.restClient.DoRequest(ctx, uri, method, data)
+}
+
+func (r *rest) SetParameters(parameters ...interface{}) {
+	r.restClient.SetParameters(parameters...)
+}
+
+func (r *rest) SetUtilities(parameters ...interface{}) {
+	r.restClient.SetUtilities(parameters...)
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case internal_logger.Logger:
 			r.Logger = p
 		}
 	}
-	if config != nil {
-		if err := r.Initialize(config); err != nil {
-			panic(err)
-		}
-	}
-	return r
 }
 
-//Initialize can be used to ready the underlying pointer for use
-func (r *rest) Initialize(config *Configuration) error {
-	if config == nil {
-		return errors.New("config is nil")
+// Initialize can be used to ready the underlying pointer for use
+func (r *rest) Configure(items ...interface{}) error {
+	var configuration *Configuration
+	var envs map[string]string
+
+	for _, item := range items {
+		switch v := item.(type) {
+		case config.Envs:
+			envs = v
+		case *Configuration:
+			configuration = v
+		}
 	}
-	if err := r.Client.Initialize(&config.Configuration); err != nil {
+	if configuration == nil {
+		configuration = new(Configuration)
+		configuration.Default()
+		configuration.FromEnv(envs)
+	}
+	if err := configuration.Validate(); err != nil {
 		return err
 	}
-	r.config = config
+	r.config = configuration
+	if err := r.restClient.Configure(&r.config.Configuration); err != nil {
+		return err
+	}
 	return nil
 }
 
-//EmployeeCreate can be used to create a single Employee
+// EmployeeCreate can be used to create a single Employee
 // the employee email address is required and must be unique
 // at the time of creation
 func (r *rest) EmployeeCreate(ctx context.Context, employeePartial data.EmployeePartial) (*data.Employee, error) {
@@ -67,7 +94,7 @@ func (r *rest) EmployeeCreate(ctx context.Context, employeePartial data.Employee
 	if err != nil {
 		return nil, err
 	}
-	bytes, err = r.DoRequest(ctx, uri, http.MethodPost, bytes)
+	bytes, err = r.doRequest(ctx, uri, http.MethodPost, bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -78,12 +105,12 @@ func (r *rest) EmployeeCreate(ctx context.Context, employeePartial data.Employee
 	return employee, nil
 }
 
-//EmployeeRead can be used to read a single employee given a
+// EmployeeRead can be used to read a single employee given a
 // valid id
 func (r *rest) EmployeeRead(ctx context.Context, id string) (*data.Employee, error) {
 	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
 		fmt.Sprintf(data.RouteEmployeesIDf, id))
-	bytes, err := r.DoRequest(ctx, uri, http.MethodGet, nil)
+	bytes, err := r.doRequest(ctx, uri, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +121,7 @@ func (r *rest) EmployeeRead(ctx context.Context, id string) (*data.Employee, err
 	return employee, nil
 }
 
-//EmployeeUpdate can be used to update the properties of a given employee
+// EmployeeUpdate can be used to update the properties of a given employee
 func (r *rest) EmployeeUpdate(ctx context.Context, id string, employeePartial data.EmployeePartial) (*data.Employee, error) {
 	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
 		fmt.Sprintf(data.RouteEmployeesIDf, id))
@@ -102,7 +129,7 @@ func (r *rest) EmployeeUpdate(ctx context.Context, id string, employeePartial da
 	if err != nil {
 		return nil, err
 	}
-	bytes, err = r.DoRequest(ctx, uri, http.MethodPut, bytes)
+	bytes, err = r.doRequest(ctx, uri, http.MethodPut, bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -113,23 +140,23 @@ func (r *rest) EmployeeUpdate(ctx context.Context, id string, employeePartial da
 	return employee, nil
 }
 
-//EmployeeDelete can be used to delete a single employee given a
+// EmployeeDelete can be used to delete a single employee given a
 // valid id
 func (r *rest) EmployeeDelete(ctx context.Context, id string) error {
 	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
 		fmt.Sprintf(data.RouteEmployeesIDf, id))
-	if _, err := r.DoRequest(ctx, uri, http.MethodDelete, nil); err != nil {
+	if _, err := r.doRequest(ctx, uri, http.MethodDelete, nil); err != nil {
 		return err
 	}
 	return nil
 }
 
-//EmployeesRead can be used to read one or more employees, given a set of
+// EmployeesRead can be used to read one or more employees, given a set of
 // search parameters
 func (r *rest) EmployeesRead(ctx context.Context, search data.EmployeeSearch) ([]*data.Employee, error) {
 	uri := fmt.Sprintf(urif, r.config.Address, r.config.Port,
 		data.RouteEmployeesSearch+search.ToParams())
-	bytes, err := r.DoRequest(ctx, uri, http.MethodGet, nil)
+	bytes, err := r.doRequest(ctx, uri, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}

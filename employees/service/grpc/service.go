@@ -6,7 +6,9 @@ import (
 
 	pb "github.com/antonio-alexander/go-bludgeon/employees/data/pb"
 	logic "github.com/antonio-alexander/go-bludgeon/employees/logic"
-	grpcserver "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
+
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	server "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"google.golang.org/grpc"
@@ -17,49 +19,46 @@ type grpcService struct {
 	sync.WaitGroup
 	logger.Logger
 	pb.UnimplementedEmployeesServer
-	logic  logic.Logic
-	server interface {
-		grpcserver.Owner
-		grpc.ServiceRegistrar
-	}
+	logic logic.Logic
 }
 
-//KIM: we don't need to expose this interface, but we need
+// KIM: we don't need to expose this interface, but we need
 // to implement it for grpc's sake
 var _ pb.EmployeesServer = &grpcService{}
 
-type Owner interface {
-	Register()
+func New() interface {
+	internal.Parameterizer
+	server.Registerer
+} {
+	return &grpcService{
+		Logger: logger.NewNullLogger(),
+	}
 }
 
-func New(parameters ...interface{}) interface {
-	Owner
-} {
-	s := &grpcService{}
+func (s *grpcService) SetParameters(parameters ...interface{}) {
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
-		case interface {
-			grpcserver.Owner
-			grpc.ServiceRegistrar
-		}:
-			s.server = p
 		case logic.Logic:
 			s.logic = p
+		}
+	}
+	switch {
+	case s.logic == nil:
+		panic("logic not set")
+	}
+}
+
+func (s *grpcService) SetUtilities(parameters ...interface{}) {
+	for _, p := range parameters {
+		switch p := p.(type) {
 		case logger.Logger:
 			s.Logger = p
 		}
 	}
-	if s.server == nil {
-		panic("server not set")
-	}
-	if s.Logger == nil {
-		s.Logger = logger.New()
-	}
-	return s
 }
 
-func (s *grpcService) Register() {
-	pb.RegisterEmployeesServer(s.server, s)
+func (s *grpcService) Register(server grpc.ServiceRegistrar) {
+	pb.RegisterEmployeesServer(server, s)
 }
 
 func (s *grpcService) EmployeeCreate(ctx context.Context, request *pb.EmployeeCreateRequest) (*pb.EmployeeCreateResponse, error) {

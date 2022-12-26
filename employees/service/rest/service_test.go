@@ -4,56 +4,57 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
+	"path"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/antonio-alexander/go-bludgeon/employees/data"
 	"github.com/antonio-alexander/go-bludgeon/employees/logic"
 	"github.com/antonio-alexander/go-bludgeon/employees/meta"
+	"github.com/antonio-alexander/go-bludgeon/employees/meta/file"
 	"github.com/antonio-alexander/go-bludgeon/employees/meta/memory"
+	"github.com/antonio-alexander/go-bludgeon/employees/meta/mysql"
 	service "github.com/antonio-alexander/go-bludgeon/employees/service/rest"
 
+	changesclientrest "github.com/antonio-alexander/go-bludgeon/changes/client/rest"
+
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
+	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
+	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
 	internal_server "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	address         string        = "localhost"
-	port            string        = "8081"
-	shutdownTimeout time.Duration = 15 * time.Second
-	letterRunes     []rune        = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-)
+const filename string = "bludgeon_logic.json"
 
-func randomString(n int) string {
-	//REFERENCE: https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
-}
+var (
+	letterRunes         = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	configMetaMysql     = new(internal_mysql.Configuration)
+	configMetaFile      = new(internal_file.Configuration)
+	configLogger        = new(internal_logger.Configuration)
+	configServer        = new(internal_server.Configuration)
+	configChangesClient = new(changesclientrest.Configuration)
+)
 
 type restServerTest struct {
 	server interface {
-		internal_server.Owner
+		internal.Initializer
+		internal.Configurer
 		internal_server.Router
 	}
 	meta interface {
-		internal_meta.Owner
-		meta.Serializer
-		meta.Employee
+		internal.Initializer
+		internal.Configurer
 	}
-	logic interface {
-		logic.Logic
+	changesClient interface {
+		internal.Initializer
+		internal.Configurer
 	}
 	client *http.Client
 }
@@ -65,35 +66,73 @@ func init() {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	if _, ok := envs["BLUDGEON_REST_ADDRESS"]; ok {
-		address = envs["BLUDGEON_REST_ADDRESS"]
-	}
-	if _, ok := envs["BLUDGEON_REST_PORT"]; ok {
-		port = envs["BLUDGEON_REST_PORT"]
-	}
-	if _, ok := envs["BLUDGEON_REST_SHUTDOWN_TIMEOUT"]; ok {
-		if i, err := strconv.Atoi(envs["BLUDGEON_REST_SHUTDOWN_TIMEOUT"]); err != nil {
-			shutdownTimeout = time.Duration(i) * time.Second
-		}
-	}
+	configLogger.Default()
+	configLogger.FromEnv(envs)
+	configMetaFile.Default()
+	configMetaFile.FromEnv(envs)
+	configMetaFile.File = path.Join("../../tmp", filename)
+	os.Remove(configMetaFile.File)
+	configMetaMysql.Default()
+	configMetaMysql.FromEnv(envs)
+	configChangesClient.Default()
+	configChangesClient.FromEnv(envs)
+	configServer.Default()
+	configServer.FromEnv(envs)
+	configServer.Address = "localhost"
+	configServer.Port = "8081"
 }
 
-func new() *restServerTest {
-	logger := internal_logger.New("bludgeon_rest_server_test")
-	server := internal_server.New(logger)
-	employeeMeta := memory.New()
-	employeeLogic := logic.New(logger, employeeMeta)
-	service.New(logger, server, employeeLogic)
+func randomString(n int) string {
+	//REFERENCE: https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
+
+func newRestServerTest(metaType string) *restServerTest {
+	var employeeMeta interface {
+		meta.Employee
+		internal.Initializer
+		internal.Configurer
+		internal.Parameterizer
+	}
+
+	logger := internal_logger.New()
+	logger.Configure(&internal_logger.Configuration{
+		Prefix: "bludgeon_rest_server_test",
+		Level:  internal_logger.Trace,
+	})
+	switch metaType {
+	default:
+		employeeMeta = memory.New()
+	case "mysql":
+		employeeMeta = mysql.New()
+	case "file":
+		employeeMeta = file.New()
+	}
+	employeeMeta.SetUtilities(logger)
+	changesClient := changesclientrest.New()
+	changesClient.SetUtilities(logger)
+	employeeLogic := logic.New()
+	employeeLogic.SetParameters(employeeMeta, changesClient)
+	employeeLogic.SetUtilities(logger)
+	server := internal_server.New()
+	server.SetUtilities(logger)
+	service := service.New()
+	service.SetUtilities(logger)
+	service.SetParameters(server, employeeLogic)
 	return &restServerTest{
-		server: server,
-		meta:   employeeMeta,
-		logic:  employeeLogic,
-		client: &http.Client{},
+		server:        server,
+		meta:          employeeMeta,
+		changesClient: changesClient,
+		client:        &http.Client{},
 	}
 }
 
 func (r *restServerTest) doRequest(route, method string, data []byte) ([]byte, int, error) {
-	uri := fmt.Sprintf("http://%s:%s%s", address, port, route)
+	uri := fmt.Sprintf("http://%s:%s%s", configServer.Address, configServer.Port, route)
 	request, err := http.NewRequest(method, uri, bytes.NewBuffer(data))
 	if err != nil {
 		return nil, -1, err
@@ -102,23 +141,36 @@ func (r *restServerTest) doRequest(route, method string, data []byte) ([]byte, i
 	if err != nil {
 		return nil, -1, err
 	}
-	bytes, err := ioutil.ReadAll(response.Body)
+	bytes, err := io.ReadAll(response.Body)
 	defer response.Body.Close()
 	return bytes, response.StatusCode, err
 }
 
-func (r *restServerTest) initialize(t *testing.T) {
-	err := r.server.Start(&internal_server.Configuration{
-		Address:         address,
-		Port:            port,
-		ShutdownTimeout: shutdownTimeout,
-	})
+func (r *restServerTest) initialize(t *testing.T, metaType string) {
+	switch metaType {
+	case "mysql":
+		err := r.meta.Configure(configMetaMysql)
+		assert.Nil(t, err)
+	case "file":
+		err := r.meta.Configure(configMetaFile)
+		assert.Nil(t, err)
+	}
+	err := r.meta.Initialize()
+	assert.Nil(t, err)
+	err = r.changesClient.Configure(configChangesClient)
+	assert.Nil(t, err)
+	err = r.changesClient.Initialize()
+	assert.Nil(t, err)
+	err = r.server.Configure(configServer)
+	assert.Nil(t, err)
+	err = r.server.Initialize()
 	assert.Nil(t, err)
 }
 
 func (r *restServerTest) shutdown(t *testing.T) {
+	r.server.Shutdown()
+	r.changesClient.Shutdown()
 	r.meta.Shutdown()
-	r.server.Stop()
 }
 
 func (r *restServerTest) TestEmployeeOperations(t *testing.T) {
@@ -137,6 +189,11 @@ func (r *restServerTest) TestEmployeeOperations(t *testing.T) {
 	employeeCreated := &data.Employee{}
 	err = json.Unmarshal(bytes, employeeCreated)
 	assert.Nil(t, err)
+	employeeId := employeeCreated.ID
+	defer func() {
+		r.doRequest(fmt.Sprintf(data.RouteEmployeesIDf, employeeId), http.MethodDelete, nil)
+	}()
+
 	//read created employee
 	bytes, statusCode, err = r.doRequest(fmt.Sprintf(data.RouteEmployeesIDf, employeeCreated.ID), http.MethodGet, bytes)
 	assert.Nil(t, err)
@@ -146,7 +203,8 @@ func (r *restServerTest) TestEmployeeOperations(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, employeeCreated, employeeRead)
 	//read all employees
-	bytes, statusCode, err = r.doRequest(data.RouteEmployeesSearch, http.MethodGet, nil)
+	search := &data.EmployeeSearch{IDs: []string{employeeId}}
+	bytes, statusCode, err = r.doRequest(data.RouteEmployeesSearch+search.ToParams(), http.MethodGet, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	employees := []data.Employee{}
@@ -189,9 +247,23 @@ func (r *restServerTest) TestEmployeeOperations(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, statusCode)
 }
 
-func TestEmployeesRestService(t *testing.T) {
-	r := new()
-	r.initialize(t)
+func testEmployeesRestService(t *testing.T, metaType string) {
+	r := newRestServerTest(metaType)
+
+	r.initialize(t, metaType)
+	defer r.shutdown(t)
+
 	t.Run("Test Employee Operations", r.TestEmployeeOperations)
-	r.shutdown(t)
+}
+
+func TestEmployeesRestServiceMemory(t *testing.T) {
+	testEmployeesRestService(t, "memory")
+}
+
+func TestEmployeesRestServiceFile(t *testing.T) {
+	testEmployeesRestService(t, "file")
+}
+
+func TestEmployeesRestServiceMysql(t *testing.T) {
+	testEmployeesRestService(t, "mysql")
 }
