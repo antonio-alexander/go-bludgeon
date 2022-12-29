@@ -13,13 +13,9 @@ services:
       context: ./
       dockerfile: ./cmd/godocs/Dockerfile
       args:
-        - BRANCH=develop
-        - REPO=https://github.com/antonio-alexander/go-bludgeon.git
-        - PLATFORM=linux/amd64
-        - GO_ARCH=amd64
-        # - PLATFORM=linux/arm/v7
-        # - GO_ARCH=arm
-        # - GO_ARM=7
+        GIT_BRANCH: ${GIT_BRANCH:-main}
+        PLATFORM: ${PLATFORM:-linux/amd64}
+        GO_ARCH: ${GO_ARCH:-amd64}
     volumes:
       - ./tmp/godoc:/tmp
 
@@ -34,13 +30,9 @@ services:
       context: ./
       dockerfile: ./cmd/swagger/Dockerfile
       args:
-        - BRANCH=develop
-        - REPO=https://github.com/antonio-alexander/go-bludgeon.git
-        - PLATFORM=linux/amd64
-        - GO_ARCH=amd64
-        # - PLATFORM=linux/arm/v7
-        # - GO_ARCH=arm
-        # - GO_ARM=7
+        GIT_BRANCH: ${GIT_BRANCH:-main}
+        PLATFORM: ${PLATFORM:-linux/amd64}
+        GO_ARCH: ${GO_ARCH:-amd64}
     volumes:
       - ./tmp/swagger:/tmp
 
@@ -50,8 +42,12 @@ services:
     image: ghcr.io/antonio-alexander/go-bludgeon-nginx:latest
     restart: "always"
     depends_on:
-      - employees
-      - timers
+      employees:
+        condition: service_started
+      timers:
+        condition: service_started
+      changes:
+        condition: service_started
     build:
       context: ./
       dockerfile: ./cmd/nginx/Dockerfile
@@ -66,52 +62,136 @@ services:
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: bludgeon
-      MYSQL_DATABASE: bludgeon
-      MYSQL_USER: bludgeon
-      MYSQL_PASSWORD: bludgeon
-      BLUDGEON_MICROSERVICE: false
+      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD:-bludgeon}
+      MYSQL_DATABASE: ${DATABASE_NAME:-bludgeon}
+      MYSQL_USER: ${DATABASE_USER:-bludgeon}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:-bludgeon}
+      BLUDGEON_MICROSERVICE: ${BLUDGEON_MICROSERVICE:-false}
+
+  zookeeper:
+    hostname: zookeeper
+    container_name: zookeeper
+    image: wurstmeister/zookeeper:3.4.6
+    restart: always
+    ports:
+      - "2181:2181"
+
+  kafka:
+    hostname: kafka
+    container_name: kafka
+    image: wurstmeister/kafka:2.13-2.8.1
+    restart: always
+    depends_on:
+      zookeeper:
+        condition: service_started
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9093 --list"
+      start_period: 0s
+      interval: 30s
+      timeout: 2m
+      retries: 10
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:9093,OUTSIDE://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_LISTENERS: INSIDE://0.0.0.0:9093,OUTSIDE://0.0.0.0:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
 
   employees:
     container_name: "employees"
     hostname: "employees"
     image: ghcr.io/antonio-alexander/go-bludgeon-employees:latest
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     restart: "always"
     ports:
       - "9000:8080"
+      - "9001:8080"
     environment:
-      BLUDGEON_SERVICE_TYPE: "rest"
-      BLUDGEON_META_TYPE: "mysql"
-      BLUDGEON_REST_ADDRESS: ""
-      BLUDGEON_REST_PORT: "8080"
-      BLUDGEON_META__FILE: "data/bludgeon.json"
-      BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal,http://localhost:8082"
-      BLUDGEON_CORS_DEBUG: "true"
-      DATABASE_HOST: "mysql"
-      DATABASE_PORT: "3306"
-      DATABASE_NAME: "bludgeon"
-      DATABASE_USER: "bludgeon"
-      DATABASE_PASSWORD: "bludgeon"
+      BLUDGEON_LOG_PREFIX: "employees"
+      BLUDGEON_LOG_LEVEL: ${BLUDGEON_LOG_LEVEL:-trace}
+      BLUDGEON_META_TYPE: ${BLUDGEON_META_TYPE:-mysql}
+      BLUDGEON_META_FILE: ${BLUDGEON_META_FILE:-./data/bludgeon.json}
+      BLUDGEON_REST_ENABLED: ${BLUDGEON_REST_ENABLED:-true}
+      BLUDGEON_REST_ADDRESS: ${BLUDGEON_REST_ADDRESS}
+      BLUDGEON_REST_PORT: ${BLUDGEON_REST_PORT:-8080}
+      BLUDGEON_ALLOWED_ORIGINS: ${BLUDGEON_ALLOWED_ORIGINS:-*}
+      BLUDGEON_CORS_DEBUG: ${BLUDGEON_CORS_DEBUG}
+      BLUDGEON_GRPC_ENABLED: ${BLUDGEON_GRPC_ENABLED:-true}
+      BLUDGEON_GRPC_ADDRESS: ${BLUDGEON_GRPC_ADDRESS}
+      BLUDGEON_GRPC_PORT: ${BLUDGEON_GRPC_PORT:-8081}
+      DATABASE_HOST: ${DATABASE_HOST:-localhost}
+      DATABASE_PORT: ${DATABASE_PORT:-3306}
+      DATABASE_NAME: ${DATABASE_NAME:-bludgeon}
+      DATABASE_USER: ${DATABASE_USER:-bludgeon}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-bludgeon}
 
   timers:
     container_name: "timers"
     hostname: "timers"
     image: ghcr.io/antonio-alexander/go-bludgeon-timers:latest
     restart: "always"
+    depends_on:
+      mysql:
+        condition: service_healthy
     ports:
       - "9010:8080"
+      - "9011:8081"
     environment:
-      BLUDGEON_SERVICE_TYPE: "rest"
-      BLUDGEON_META_TYPE: "mysql"
-      BLUDGEON_REST_ADDRESS: ""
-      BLUDGEON_REST_PORT: "8080"
-      BLUDGEON_META__FILE: "data/bludgeon.json"
-      BLUDGEON_ALLOWED_ORIGINS: "http://host.docker.internal,http://localhost:8082"
-      BLUDGEON_CORS_DEBUG: "true"
-      DATABASE_HOST: "mysql"
-      DATABASE_PORT: "3306"
-      DATABASE_NAME: "bludgeon"
-      DATABASE_USER: "bludgeon"
-      DATABASE_PASSWORD: "bludgeon"
+      BLUDGEON_LOG_PREFIX: "timers"
+      BLUDGEON_LOG_LEVEL: ${BLUDGEON_LOG_LEVEL:-trace}
+      BLUDGEON_META_TYPE: ${BLUDGEON_META_TYPE:-mysql}
+      DATABASE_HOST: ${DATABASE_HOST:-localhost}
+      DATABASE_PORT: ${DATABASE_PORT:-3306}
+      DATABASE_NAME: ${DATABASE_NAME:-bludgeon}
+      DATABASE_USER: ${DATABASE_USER:-bludgeon}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-bludgeon}
+      BLUDGEON_META_FILE: ${BLUDGEON_META_FILE:-./data/bludgeon.json}
+      BLUDGEON_REST_ENABLED: ${BLUDGEON_REST_ENABLED:-true}
+      BLUDGEON_REST_ADDRESS: ${BLUDGEON_REST_ADDRESS}
+      BLUDGEON_REST_PORT: ${BLUDGEON_REST_PORT:-8080}
+      BLUDGEON_ALLOWED_ORIGINS: ${BLUDGEON_ALLOWED_ORIGINS:-*}
+      BLUDGEON_CORS_DEBUG: ${BLUDGEON_CORS_DEBUG}
+      BLUDGEON_GRPC_ENABLED: ${BLUDGEON_GRPC_ENABLED:-true}
+      BLUDGEON_GRPC_ADDRESS: ${BLUDGEON_GRPC_ADDRESS}
+      BLUDGEON_GRPC_PORT: ${BLUDGEON_GRPC_PORT:-8081}
+
+  changes:
+    container_name: "changes"
+    hostname: "changes"
+    image: ghcr.io/antonio-alexander/go-bludgeon-changes:latest
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: "always"
+    ports:
+      - "9020:8080"
+      - "9021:8081"
+    environment:
+      BLUDGEON_LOG_PREFIX: "changes"
+      BLUDGEON_LOG_LEVEL: ${BLUDGEON_LOG_LEVEL:-trace}
+      BLUDGEON_META_TYPE: ${BLUDGEON_META_TYPE:-mysql}
+      BLUDGEON_META_FILE: ${BLUDGEON_META_FILE:-./data/bludgeon.json}
+      BLUDGEON_REST_ENABLED: ${BLUDGEON_REST_ENABLED:-true}
+      BLUDGEON_REST_ADDRESS: ${BLUDGEON_REST_ADDRESS}
+      BLUDGEON_REST_PORT: ${BLUDGEON_REST_PORT:-8080}
+      BLUDGEON_ALLOWED_ORIGINS: ${BLUDGEON_ALLOWED_ORIGINS:-*}
+      BLUDGEON_CORS_DEBUG: ${BLUDGEON_CORS_DEBUG}
+      BLUDGEON_GRPC_ENABLED: ${BLUDGEON_GRPC_ENABLED:-true}
+      BLUDGEON_GRPC_ADDRESS: ${BLUDGEON_GRPC_ADDRESS}
+      BLUDGEON_GRPC_PORT: ${BLUDGEON_GRPC_PORT:-8081}
+      DATABASE_HOST: ${DATABASE_HOST:-localhost}
+      DATABASE_PORT: ${DATABASE_PORT:-3306}
+      DATABASE_NAME: ${DATABASE_NAME:-bludgeon}
+      DATABASE_USER: ${DATABASE_USER:-bludgeon}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-bludgeon}
+      BLUDGEON_KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9093}
+      BLUDGEON_KAFKA_GROUP_ID: ${KAFKA_CHANGES_GROUP_ID:-changes}
+      BLUDGEON_KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-true}
+      BLUDGEON_KAFKA_ENABLE_LOG: ${KAFKA_ENABLE_LOG:-true}
