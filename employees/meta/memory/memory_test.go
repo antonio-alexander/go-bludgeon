@@ -5,13 +5,17 @@ import (
 
 	metamemory "github.com/antonio-alexander/go-bludgeon/employees/meta/memory"
 	tests "github.com/antonio-alexander/go-bludgeon/employees/meta/tests"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 )
 
 func TestMetaMemory(t *testing.T) {
-	m := metamemory.New(
-		logger.New(),
-	)
-	t.Run("Employee CRUD", tests.TestEmployeeCRUD(m))
-	m.Shutdown()
+	meta, logger := metamemory.New(), internal_logger.New()
+	logger.Configure(&internal_logger.Configuration{
+		Prefix: "employee_memory_test",
+		Level:  internal_logger.Trace,
+	})
+	meta.SetUtilities(logger)
+	defer meta.Shutdown()
+
+	t.Run("Employee CRUD", tests.TestEmployeeCRUD(meta))
 }

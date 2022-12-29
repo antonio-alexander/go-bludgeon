@@ -6,13 +6,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-const LogAlias string = "Logic"
+const (
+	LogAlias                 string = "Logic"
+	PanicEmployeeMetaNotSet  string = "employee meta not set"
+	PanicChangesclientNotSet string = "changes client not set"
+)
 
-const PanicEmployeeMetaNotSet string = "employee meta not set"
+var (
+	ErrEmployeeIDNotProvided = errors.New("employee id not provided")
+)
 
-var ErrEmployeeIDNotProvided = errors.New("employee id not provided")
-
-//Logic is an interface that provides functionality to interact with
+// Logic is an interface that provides functionality to interact with
 // Employee objects
 type Logic interface {
 	meta.Employee

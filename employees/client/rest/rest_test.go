@@ -10,16 +10,18 @@ import (
 	"testing"
 	"time"
 
-	restclient "github.com/antonio-alexander/go-bludgeon/employees/client/rest"
+	client "github.com/antonio-alexander/go-bludgeon/employees/client/rest"
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	config      *restclient.Configuration
-	letterRunes []rune = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	configRestClient = new(client.Configuration)
+	letterRunes      = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 )
 
 func randomString(n int) string {
@@ -32,33 +34,39 @@ func randomString(n int) string {
 }
 
 func init() {
-	pwd, _ := os.Getwd()
 	envs := make(map[string]string)
 	for _, env := range os.Environ() {
 		if s := strings.Split(env, "="); len(s) > 1 {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	config = new(restclient.Configuration)
-	config.Default()
-	config.FromEnv(pwd, envs)
+	configRestClient.Default()
+	configRestClient.FromEnv(envs)
 	rand.Seed(time.Now().UnixNano())
 }
 
 type restClientTest struct {
-	client restclient.Client
+	client interface {
+		client.Client
+		internal.Configurer
+	}
 }
 
 func newRestclientTest() *restClientTest {
-	logger := logger.New("bludgeon_rest_server_test")
-	client := restclient.New(logger)
+	logger := internal_logger.New()
+	logger.Configure(&internal_logger.Configuration{
+		Prefix: "bludgeon_rest_server_test",
+		Level:  internal_logger.Trace,
+	})
+	client := client.New()
+	client.SetUtilities(logger)
 	return &restClientTest{
 		client: client,
 	}
 }
 
 func (r *restClientTest) Initialize(t *testing.T) {
-	err := r.client.Initialize(config)
+	err := r.client.Configure(configRestClient)
 	assert.Nil(t, err)
 }
 
@@ -130,5 +138,6 @@ func (r *restClientTest) TestEmployeeOperations(t *testing.T) {
 func TestEmployeesRestClient(t *testing.T) {
 	r := newRestclientTest()
 	r.Initialize(t)
+
 	t.Run("Test Employee Operations", r.TestEmployeeOperations)
 }

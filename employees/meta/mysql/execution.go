@@ -6,9 +6,10 @@ import (
 	"fmt"
 
 	"github.com/antonio-alexander/go-bludgeon/employees/data"
+	"github.com/antonio-alexander/go-bludgeon/employees/meta"
 )
 
-//rowsAffected can be used to return a pre-determined error via errorString in the event
+// rowsAffected can be used to return a pre-determined error via errorString in the event
 // no rows are affected; this function assumes that in the event no error is returned and
 // rows were supposed to be affected, an error will be returned
 func rowsAffected(result sql.Result, errIfNoRowsAffected error) error {
@@ -20,6 +21,32 @@ func rowsAffected(result sql.Result, errIfNoRowsAffected error) error {
 		return errIfNoRowsAffected
 	}
 	return nil
+}
+
+func employeeScan(scanFx func(...interface{}) error) (*data.Employee, error) {
+	var firstName, lastName sql.NullString
+	var lastUpdated sql.NullFloat64
+
+	employee := new(data.Employee)
+	if err := scanFx(
+		&employee.ID,
+		&firstName,
+		&lastName,
+		&employee.EmailAddress,
+		&employee.Version,
+		&lastUpdated,
+		&employee.LastUpdatedBy,
+	); err != nil {
+		switch {
+		default:
+			return nil, err
+		case err == sql.ErrNoRows:
+			return nil, meta.ErrEmployeeNotFound
+		}
+	}
+	employee.FirstName, employee.LastName = firstName.String, lastName.String
+	employee.LastUpdated = int64(lastUpdated.Float64 * 1000)
+	return employee, nil
 }
 
 func employeeRead(ctx context.Context, db interface {
@@ -38,19 +65,9 @@ func employeeRead(ctx context.Context, db interface {
 		version, last_updated, last_updated_by FROM %s WHERE %s;`,
 		tableEmployeesV1, condition)
 	row := db.QueryRowContext(ctx, query, id)
-	employee := &data.Employee{}
-	firstName, lastName := sql.NullString{}, sql.NullString{}
-	if err := row.Scan(
-		&employee.ID,
-		&firstName,
-		&lastName,
-		&employee.EmailAddress,
-		&employee.Version,
-		&employee.LastUpdated,
-		&employee.LastUpdatedBy,
-	); err != nil {
+	employee, err := employeeScan(row.Scan)
+	if err != nil {
 		return nil, err
 	}
-	employee.FirstName, employee.LastName = firstName.String, lastName.String
 	return employee, nil
 }
