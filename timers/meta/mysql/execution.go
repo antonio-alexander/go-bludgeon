@@ -13,7 +13,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-//rowsAffected can be used to return a pre-determined error via errorString in the event
+const secondToNanoSecond float64 = 1000000000
+
+// rowsAffected can be used to return a pre-determined error via errorString in the event
 // no rows are affected; this function assumes that in the event no error is returned and
 // rows were supposed to be affected, an error will be returned
 func rowsAffected(result sql.Result, customErr error) error {
@@ -25,6 +27,68 @@ func rowsAffected(result sql.Result, customErr error) error {
 		return customErr
 	}
 	return nil
+}
+
+func timerScan(scanFx func(...interface{}) error) (*data.Timer, error) {
+	var employeeID, activeTimeSliceID sql.NullString
+
+	var start, finish, elapsedTime, lastUpdated sql.NullFloat64
+
+	timer := &data.Timer{}
+	if err := scanFx(
+		&timer.ID,
+		&start,
+		&finish,
+		&elapsedTime,
+		&timer.Comment,
+		&timer.Archived,
+		&timer.Completed,
+		&employeeID,
+		&activeTimeSliceID,
+		&timer.Version,
+		&lastUpdated,
+		&timer.LastUpdatedBy,
+	); err != nil {
+		switch {
+		default:
+			return nil, err
+		case err == sql.ErrNoRows:
+			return nil, meta.ErrTimerNotFound
+		}
+	}
+	timer.EmployeeID, timer.ActiveTimeSliceID = employeeID.String, activeTimeSliceID.String
+	timer.Start, timer.Finish = int64(start.Float64*secondToNanoSecond), int64(finish.Float64*secondToNanoSecond)
+	timer.ElapsedTime = int64(elapsedTime.Float64 * secondToNanoSecond)
+	timer.LastUpdated = int64(lastUpdated.Float64 * secondToNanoSecond)
+	return timer, nil
+}
+
+func timeSliceScan(scanFx func(...interface{}) error) (*data.TimeSlice, error) {
+	var start, finish, elapsedTime, lastUpdated sql.NullFloat64
+
+	timeSlice := &data.TimeSlice{}
+	if err := scanFx(
+		&timeSlice.ID,
+		&start,
+		&finish,
+		&timeSlice.Completed,
+		&elapsedTime,
+		&timeSlice.TimerID,
+		&timeSlice.Version,
+		&lastUpdated,
+		&timeSlice.LastUpdatedBy,
+	); err != nil {
+		switch {
+		default:
+			return nil, err
+		case err == sql.ErrNoRows:
+			return nil, meta.ErrTimeSliceNotFound
+		}
+	}
+	timeSlice.Start, timeSlice.Finish = int64(start.Float64*1000), int64(finish.Float64*1000)
+	timeSlice.ElapsedTime = int64(elapsedTime.Float64 * 1000)
+	timeSlice.LastUpdated = int64(lastUpdated.Float64 * 1000)
+	return timeSlice, nil
 }
 
 func timeSliceCreate(ctx context.Context, db interface {
@@ -66,11 +130,7 @@ func timeSliceCreate(ctx context.Context, db interface {
 	if err != nil {
 		return nil, err
 	}
-	timeSlice, err := timeSliceRead(ctx, db, activeSliceID)
-	if err != nil {
-		return nil, err
-	}
-	return timeSlice, nil
+	return timeSliceRead(ctx, db, activeSliceID)
 }
 
 func timeSliceUpdate(ctx context.Context, db interface {
@@ -110,11 +170,7 @@ func timeSliceUpdate(ctx context.Context, db interface {
 	if err != nil {
 		return nil, err
 	}
-	timeSlice, err := timeSliceRead(ctx, db, id)
-	if err != nil {
-		return nil, err
-	}
-	return timeSlice, nil
+	return timeSliceRead(ctx, db, id)
 }
 
 func timeSliceRead(ctx context.Context, db interface {
@@ -124,6 +180,7 @@ func timeSliceRead(ctx context.Context, db interface {
 	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }, id interface{}) (*data.TimeSlice, error) {
 	var value string
+
 	switch id.(type) {
 	case string:
 		value = "?"
@@ -134,25 +191,7 @@ func timeSliceRead(ctx context.Context, db interface {
 		version, last_updated, last_updated_by FROM %s WHERE time_slice_id = %s`,
 		tableTimeSlicesV1, value)
 	row := db.QueryRowContext(ctx, query, id)
-	timeSlice := &data.TimeSlice{}
-	start, finish := sql.NullInt64{}, sql.NullInt64{}
-	elapsed_time := sql.NullInt64{}
-	if err := row.Scan(
-		&timeSlice.ID,
-		&start,
-		&finish,
-		&timeSlice.Completed,
-		&elapsed_time,
-		&timeSlice.TimerID,
-		&timeSlice.Version,
-		&timeSlice.LastUpdated,
-		&timeSlice.LastUpdatedBy,
-	); err != nil {
-		return nil, err
-	}
-	timeSlice.Start, timeSlice.Finish = start.Int64, finish.Int64
-	timeSlice.ElapsedTime = elapsed_time.Int64
-	return timeSlice, nil
+	return timeSliceScan(row.Scan)
 }
 
 func timerRead(ctx context.Context, db interface {
@@ -173,30 +212,7 @@ func timerRead(ctx context.Context, db interface {
 		employee_id, active_time_slice_id, version, last_updated, last_updated_by FROM %s WHERE %s;`,
 		tableTimersV1, condition)
 	row := db.QueryRowContext(ctx, query, id)
-	timer := &data.Timer{}
-	employeeID, activeTimeSliceID := sql.NullString{}, sql.NullString{}
-	start, finish := sql.NullInt64{}, sql.NullInt64{}
-	elapsed_time := sql.NullInt64{}
-	if err := row.Scan(
-		&timer.ID,
-		&start,
-		&finish,
-		&elapsed_time,
-		&timer.Comment,
-		&timer.Archived,
-		&timer.Completed,
-		&employeeID,
-		&activeTimeSliceID,
-		&timer.Version,
-		&timer.LastUpdated,
-		&timer.LastUpdatedBy,
-	); err != nil {
-		return nil, err
-	}
-	timer.EmployeeID, timer.ActiveTimeSliceID = employeeID.String, activeTimeSliceID.String
-	timer.Start, timer.Finish = start.Int64, finish.Int64
-	timer.ElapsedTime = elapsed_time.Int64
-	return timer, nil
+	return timerScan(row.Scan)
 }
 
 func timerUpdate(ctx context.Context, db interface {
@@ -240,11 +256,7 @@ func timerUpdate(ctx context.Context, db interface {
 	if err := rowsAffected(result, meta.ErrTimerNotFound); err != nil {
 		return nil, err
 	}
-	timer, err := timerRead(ctx, db, id)
-	if err != nil {
-		return nil, err
-	}
-	return timer, nil
+	return timerRead(ctx, db, id)
 }
 
 func timerStop(ctx context.Context, db interface {
@@ -266,8 +278,5 @@ func timerStop(ctx context.Context, db interface {
 	}); err != nil {
 		return nil, err
 	}
-	if timer, err = timerRead(ctx, db, id); err != nil {
-		return nil, err
-	}
-	return timer, nil
+	return timerRead(ctx, db, id)
 }

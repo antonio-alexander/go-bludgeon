@@ -30,10 +30,8 @@ type TimersClient interface {
 	TimerDelete(ctx context.Context, in *TimerDeleteRequest, opts ...grpc.CallOption) (*TimerDeleteResponse, error)
 	// timers_read
 	TimersRead(ctx context.Context, in *TimersReadRequest, opts ...grpc.CallOption) (*TimersReadResponse, error)
-	// timer_update_comment
-	TimerUpdateComment(ctx context.Context, in *TimerUpdateCommentRequest, opts ...grpc.CallOption) (*TimerUpdateCommentResponse, error)
-	// timer_archive
-	TimerArchive(ctx context.Context, in *TimerArchiveRequest, opts ...grpc.CallOption) (*TimerArchiveResponse, error)
+	// timer_update
+	TimerUpdate(ctx context.Context, in *TimerUpdateRequest, opts ...grpc.CallOption) (*TimerUpdateResponse, error)
 	// timer_start
 	TimerStart(ctx context.Context, in *TimerStartRequest, opts ...grpc.CallOption) (*TimerStartResponse, error)
 	// timer_stop
@@ -86,18 +84,9 @@ func (c *timersClient) TimersRead(ctx context.Context, in *TimersReadRequest, op
 	return out, nil
 }
 
-func (c *timersClient) TimerUpdateComment(ctx context.Context, in *TimerUpdateCommentRequest, opts ...grpc.CallOption) (*TimerUpdateCommentResponse, error) {
-	out := new(TimerUpdateCommentResponse)
-	err := c.cc.Invoke(ctx, "/go_bludgeon_timers.Timers/timer_update_comment", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *timersClient) TimerArchive(ctx context.Context, in *TimerArchiveRequest, opts ...grpc.CallOption) (*TimerArchiveResponse, error) {
-	out := new(TimerArchiveResponse)
-	err := c.cc.Invoke(ctx, "/go_bludgeon_timers.Timers/timer_archive", in, out, opts...)
+func (c *timersClient) TimerUpdate(ctx context.Context, in *TimerUpdateRequest, opts ...grpc.CallOption) (*TimerUpdateResponse, error) {
+	out := new(TimerUpdateResponse)
+	err := c.cc.Invoke(ctx, "/go_bludgeon_timers.Timers/timer_update", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -143,10 +132,8 @@ type TimersServer interface {
 	TimerDelete(context.Context, *TimerDeleteRequest) (*TimerDeleteResponse, error)
 	// timers_read
 	TimersRead(context.Context, *TimersReadRequest) (*TimersReadResponse, error)
-	// timer_update_comment
-	TimerUpdateComment(context.Context, *TimerUpdateCommentRequest) (*TimerUpdateCommentResponse, error)
-	// timer_archive
-	TimerArchive(context.Context, *TimerArchiveRequest) (*TimerArchiveResponse, error)
+	// timer_update
+	TimerUpdate(context.Context, *TimerUpdateRequest) (*TimerUpdateResponse, error)
 	// timer_start
 	TimerStart(context.Context, *TimerStartRequest) (*TimerStartResponse, error)
 	// timer_stop
@@ -172,11 +159,8 @@ func (UnimplementedTimersServer) TimerDelete(context.Context, *TimerDeleteReques
 func (UnimplementedTimersServer) TimersRead(context.Context, *TimersReadRequest) (*TimersReadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TimersRead not implemented")
 }
-func (UnimplementedTimersServer) TimerUpdateComment(context.Context, *TimerUpdateCommentRequest) (*TimerUpdateCommentResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method TimerUpdateComment not implemented")
-}
-func (UnimplementedTimersServer) TimerArchive(context.Context, *TimerArchiveRequest) (*TimerArchiveResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method TimerArchive not implemented")
+func (UnimplementedTimersServer) TimerUpdate(context.Context, *TimerUpdateRequest) (*TimerUpdateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TimerUpdate not implemented")
 }
 func (UnimplementedTimersServer) TimerStart(context.Context, *TimerStartRequest) (*TimerStartResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TimerStart not implemented")
@@ -272,38 +256,20 @@ func _Timers_TimersRead_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Timers_TimerUpdateComment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TimerUpdateCommentRequest)
+func _Timers_TimerUpdate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TimerUpdateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TimersServer).TimerUpdateComment(ctx, in)
+		return srv.(TimersServer).TimerUpdate(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/go_bludgeon_timers.Timers/timer_update_comment",
+		FullMethod: "/go_bludgeon_timers.Timers/timer_update",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TimersServer).TimerUpdateComment(ctx, req.(*TimerUpdateCommentRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Timers_TimerArchive_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TimerArchiveRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TimersServer).TimerArchive(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/go_bludgeon_timers.Timers/timer_archive",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TimersServer).TimerArchive(ctx, req.(*TimerArchiveRequest))
+		return srv.(TimersServer).TimerUpdate(ctx, req.(*TimerUpdateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -386,12 +352,8 @@ var Timers_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Timers_TimersRead_Handler,
 		},
 		{
-			MethodName: "timer_update_comment",
-			Handler:    _Timers_TimerUpdateComment_Handler,
-		},
-		{
-			MethodName: "timer_archive",
-			Handler:    _Timers_TimerArchive_Handler,
+			MethodName: "timer_update",
+			Handler:    _Timers_TimerUpdate_Handler,
 		},
 		{
 			MethodName: "timer_start",

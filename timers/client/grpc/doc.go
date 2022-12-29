@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-	Package client provides an implementation of a rest client to interact with
-	the timers service.
+Package client provides an implementation of a rest client to interact with
+the timers service.
 */
-package client
+package grpc

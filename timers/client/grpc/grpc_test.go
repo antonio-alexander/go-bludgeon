@@ -1,4 +1,4 @@
-package client_test
+package grpc_test
 
 import (
 	"context"
@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
-	client "github.com/antonio-alexander/go-bludgeon/timers/client/grpc"
+	client "github.com/antonio-alexander/go-bludgeon/timers/client"
+	grpcclient "github.com/antonio-alexander/go-bludgeon/timers/client/grpc"
 	data "github.com/antonio-alexander/go-bludgeon/timers/data"
 
-	internal_grpc "github.com/antonio-alexander/go-bludgeon/internal/grpc/client"
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"github.com/stretchr/testify/assert"
@@ -18,40 +19,53 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var config *internal_grpc.Configuration
+var config = new(grpcclient.Configuration)
 
 func init() {
-	pwd, _ := os.Getwd()
 	envs := make(map[string]string)
 	for _, env := range os.Environ() {
 		if s := strings.Split(env, "="); len(s) > 1 {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	config = new(internal_grpc.Configuration)
 	config.Default()
-	config.FromEnv(pwd, envs)
+	config.FromEnv(envs)
 	config.Options = []grpc.DialOption{
-		grpc.WithTransportCredentials(
-			insecure.NewCredentials(),
-		),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 }
 
 type grpcClientTest struct {
-	client client.Client
+	client interface {
+		client.Client
+		internal.Parameterizer
+		internal.Configurer
+		internal.Initializer
+	}
 }
 
 func newGrpcClientTest() *grpcClientTest {
-	logger := internal_logger.New("bludgeon_rest_server_test")
-	client := client.New(logger)
+	logger := internal_logger.New()
+	logger.Configure(&internal_logger.Configuration{
+		Prefix: "bludgeon_rest_client_test",
+		Level:  internal_logger.Trace,
+	})
+	client := grpcclient.New()
+	client.SetUtilities(logger)
 	return &grpcClientTest{
 		client: client,
 	}
 }
 
-func (r *grpcClientTest) Initialize() error {
-	return r.client.Initialize(config)
+func (r *grpcClientTest) Initialize(t *testing.T) {
+	err := r.client.Configure(config)
+	assert.Nil(t, err)
+	err = r.client.Initialize()
+	assert.Nil(t, err)
+}
+
+func (r *grpcClientTest) Shutdown(t *testing.T) {
+	r.client.Shutdown()
 }
 
 func (r *grpcClientTest) TestTimers(t *testing.T) {
@@ -79,7 +93,7 @@ func (r *grpcClientTest) TestTimers(t *testing.T) {
 	//read the timer
 	timerRead, err = r.client.TimerRead(ctx, timerID)
 	assert.Nil(t, err)
-	assert.GreaterOrEqual(t, int64(time.Second), timerRead.ElapsedTime)
+	assert.GreaterOrEqual(t, timerRead.ElapsedTime, int64(time.Second))
 	//stop the timer
 	timerStopped, err := r.client.TimerStop(ctx, timerID)
 	assert.Nil(t, err)
@@ -95,7 +109,7 @@ func (r *grpcClientTest) TestTimers(t *testing.T) {
 	assert.Equal(t, timerStopped, timerRead)
 	//submit the timer
 	tNow := time.Now()
-	timerSubmitted, err := r.client.TimerSubmit(ctx, timerID, &tNow)
+	timerSubmitted, err := r.client.TimerSubmit(ctx, timerID, tNow.UnixNano())
 	assert.Nil(t, err)
 	//read the timer
 	timerRead, err = r.client.TimerRead(ctx, timerID)
@@ -108,7 +122,8 @@ func (r *grpcClientTest) TestTimers(t *testing.T) {
 
 func TestTimersGrpcClient(t *testing.T) {
 	r := newGrpcClientTest()
-	err := r.Initialize()
-	assert.Nil(t, err)
+	r.Initialize(t)
+	defer r.Shutdown(t)
+
 	t.Run("Test Timer Operations", r.TestTimers)
 }

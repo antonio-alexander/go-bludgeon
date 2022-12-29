@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	data "github.com/antonio-alexander/go-bludgeon/timers/data"
-	meta "github.com/antonio-alexander/go-bludgeon/timers/meta"
+	"github.com/antonio-alexander/go-bludgeon/timers/data"
+	"github.com/antonio-alexander/go-bludgeon/timers/meta"
 
-	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
+	"github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"github.com/pkg/errors"
 )
@@ -24,25 +24,19 @@ type memory struct {
 	timeSlices    map[string]*data.TimeSlice //active time slices indexed by timer id
 }
 
-type Memory interface {
+func New() interface {
 	meta.Timer
 	meta.TimeSlice
 	meta.Serializer
-	internal_meta.Owner
-}
-
-func New(parameters ...interface{}) Memory {
-	m := &memory{
+	internal.Parameterizer
+	internal.Initializer
+	internal.Configurer
+} {
+	return &memory{
 		timers:     make(map[string]*data.Timer),
 		timeSlices: make(map[string]*data.TimeSlice),
+		Logger:     logger.NewNullLogger(),
 	}
-	for _, p := range parameters {
-		switch p := p.(type) {
-		case logger.Logger:
-			m.Logger = p
-		}
-	}
-	return m
 }
 
 func (m *memory) validateTimeSlice(p data.TimeSlicePartial, ids ...string) error {
@@ -225,6 +219,27 @@ func (m *memory) timeSlicesRead(search data.TimeSliceSearch) ([]*data.TimeSlice,
 		}
 	}
 	return timeSlices, nil
+}
+
+func (m *memory) SetParameters(parameters ...interface{}) {
+	//
+}
+
+func (m *memory) SetUtilities(parameters ...interface{}) {
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case logger.Logger:
+			m.Logger = p
+		}
+	}
+}
+
+func (m *memory) Configure(...interface{}) error {
+	return nil
+}
+
+func (m *memory) Initialize() error {
+	return nil
 }
 
 func (m *memory) Shutdown() {
@@ -451,7 +466,7 @@ func (m *memory) TimerStop(ctx context.Context, id string) (*data.Timer, error) 
 	return m.timerStop(id)
 }
 
-//TimerSubmit can be used to stop a timer and set completed to true
+// TimerSubmit can be used to stop a timer and set completed to true
 func (m *memory) TimerSubmit(ctx context.Context, id string, finishTime int64) (*data.Timer, error) {
 	m.Lock()
 	defer m.Unlock()

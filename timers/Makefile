@@ -39,13 +39,13 @@ check-swagger: ## - validate/install swagger (v0.29.0)
 	which swagger || (go install github.com/go-swagger/go-swagger/cmd/swagger@v0.29.0)
 
 swagger: check-swagger ## - generate the swagger.json
-	@swagger generate spec --work-dir=./service/rest/swagger --output ./cmd/service/swagger.json --scan-models
+	@swagger generate spec --work-dir=./internal/swagger --output ./tmp/swagger.json --scan-models
 
 validate-swagger: swagger ## - validate the swagger.json
-	@swagger validate ./cmd/service/swagger.json
+	@swagger validate ./tmp/swagger.json
 
 serve-swagger: swagger ## - serve (web) the swagger.json
-	@swagger serve -F=swagger ./cmd/service/swagger.json -p ${swagger_port} --no-open
+	@swagger serve -F=swagger ./tmp/swagger.json -p ${swagger_port} --no-open
 
 check-godoc: ## - validate/install godoc
 	which godoc || (go install golang.org/x/tools/cmd/godoc@v0.1.10)
@@ -53,26 +53,24 @@ check-godoc: ## - validate/install godoc
 serve-godoc: check-godoc ## - serve (web) the godocs
 	@cd .. && godoc -http :8080
 
-test: ## - test the source
-	@go test -cover --count=1 ./...
-
-test-verbose: ## - test the source with verbose output
-	@go test -cover -v --count=1 ./...
+test: run ## - test the source with verbose output
+	@go test -v -cover -parallel=1 --count=1 ./... -coverprofile ./tmp/go-bludgeon-timers.out | tee ./tmp/go-bludgeon-timers.log
 
 build: ## - build the source (latest)
-	@./build.sh latest
+	@docker compose --profile application build --build-arg GIT_COMMIT=`git rev-parse HEAD` --build-arg GIT_BRANCH=`git rev-parse --abbrev-ref HEAD`
+	@docker image prune -f
+
+pull:
+	@docker compose pull
+	@docker image prune -f
 
 dep: ## - run only the dependencies (docker)
-	@docker compose up
-
-dep-detach: ## - run only the dependencies (docker) detached
-	@docker compose up -d
+	@docker compose up -d --wait
 
 run: ## - run the service and its dependencies (docker)
-	@docker compose --profile application up
-
-run-detach: ## - run the service and its dependencies (docker) detached
-	@docker compose --profile application up -d
+	@docker container rm -f timers
+	@docker image prune -f
+	@docker compose --profile application up -d --wait
 
 stop:
 	@docker compose --profile application down
