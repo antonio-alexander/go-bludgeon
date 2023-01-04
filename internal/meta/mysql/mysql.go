@@ -15,10 +15,10 @@ import (
 	_ "github.com/go-sql-driver/mysql" //import for driver support
 )
 
-//common constants
+// common constants
 const (
 	DatabaseIsolation = sql.LevelSerializable
-	LogAlias          = "MySQL"
+	LogAlias          = "[mysql_client]"
 )
 
 type DB struct {

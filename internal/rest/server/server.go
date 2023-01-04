@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/antonio-alexander/go-bludgeon/internal"
 	"github.com/antonio-alexander/go-bludgeon/internal/config"
@@ -33,7 +34,6 @@ func New() interface {
 	internal.Configurer
 	internal.Initializer
 	internal.Parameterizer
-	Router
 	context.Context
 } {
 	router := mux.NewRouter()
@@ -47,11 +47,22 @@ func New() interface {
 	}
 }
 
-func (s *server) launchServer() {
+func (s *server) handleFunc(config HandleFuncConfig) {
+	switch config.Method {
+	default:
+		s.Router.HandleFunc(config.Route, config.HandleFx).Methods(config.Method)
+	case "":
+		s.Router.HandleFunc(config.Route, config.HandleFx)
+	}
+}
+
+func (s *server) launchServer() error {
 	started := make(chan struct{})
+	chErr := make(chan error, 1)
 	s.Add(1)
 	go func() {
 		defer s.WaitGroup.Done()
+		defer close(chErr)
 
 		if !s.config.CorsDisabled {
 			s.Server.Handler = cors.New(cors.Options{
@@ -77,31 +88,41 @@ func (s *server) launchServer() {
 		}
 		close(started)
 		if err := s.Server.ListenAndServe(); err != nil {
+			//KIM: here we're accounting for a situation where the server closes unexexpectedly
+			// but quickly (within a second of starting); this allows us to respond to errors such as
+			// the port being already used
 			if err != http.ErrServerClosed {
 				s.Error(logAlias+"%s %s", err)
 			}
+			chErr <- err
 		}
-		//REVIEW: Do we need to account for a situation where the rest server kills itself
-		// unexepctedly?
 	}()
 	<-started
+	select {
+	case err := <-chErr:
+		return err
+	case <-time.After(time.Second):
+	}
+	return nil
 }
 
 func (s *server) Done() <-chan struct{} {
 	return s.Context.Done()
 }
 
-func (s *server) HandleFunc(config HandleFuncConfig) {
-	switch config.Method {
-	default:
-		s.Router.HandleFunc(config.Route, config.HandleFx).Methods(config.Method)
-	case "":
-		s.Router.HandleFunc(config.Route, config.HandleFx)
-	}
-}
-
 func (s *server) SetParameters(parameters ...interface{}) {
+	var routes []HandleFuncConfig
+
 	//use this to set common utilities/parameters
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case RouteBuilder:
+			routes = append(routes, p.BuildRoutes()...)
+		}
+	}
+	for _, route := range routes {
+		s.handleFunc(route)
+	}
 }
 
 func (s *server) SetUtilities(parameters ...interface{}) {
@@ -127,7 +148,6 @@ func (s *server) Configure(items ...interface{}) error {
 	}
 	if c == nil {
 		c = new(Configuration)
-		c.Default()
 		c.FromEnv(envs)
 	}
 	if err := c.Validate(); err != nil {
@@ -149,7 +169,9 @@ func (s *server) Initialize() (err error) {
 	}
 	s.Context, s.cancel = context.WithCancel(context.Background())
 	s.Server.Addr = fmt.Sprintf("%s:%s", s.config.Address, s.config.Port)
-	s.launchServer()
+	if err := s.launchServer(); err != nil {
+		return err
+	}
 	s.initialized = true
 	s.Info(logAlias+"listening on %s:%s", s.config.Address, s.config.Port)
 	return
