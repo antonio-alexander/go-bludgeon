@@ -24,7 +24,7 @@ import (
 // swagger:response ChangePatchResponseOK
 type ChangePatchResponseOK struct {
 	// in:body
-	Body data.ResponseChange
+	Body data.Change
 }
 
 // This is the general response when a non-specific error occurs
@@ -38,5 +38,5 @@ type ChangePatchResponseError struct {
 type ChangePatchParams struct {
 	// This allows you to partially set values for certain properties of an Change.
 	// in: body
-	Body data.RequestChange
+	Body data.ChangePartial
 }

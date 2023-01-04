@@ -20,6 +20,7 @@ type Client interface {
 
 type Handler interface {
 	HandlerCreate(handlerFx HandlerFx) (handlerId string, err error)
+	HandlerConnected(handlerId string) (bool, error)
 	HandlerDelete(handlerId string) (err error)
 }
 

@@ -4,22 +4,6 @@ import (
 	"encoding/json"
 )
 
-type RequestChange struct {
-	ChangePartial ChangePartial `json:"change_partial"`
-}
-
-func (r *RequestChange) Type() MessageType {
-	return MessageTypeRequestChange
-}
-
-func (r *RequestChange) MarshalBinary() ([]byte, error) {
-	return json.Marshal(r)
-}
-
-func (r *RequestChange) UnmarshalBinary(bytes []byte) error {
-	return json.Unmarshal(bytes, r)
-}
-
 type RequestAcknowledge struct {
 	ChangeIds []string `json:"change_ids"`
 }

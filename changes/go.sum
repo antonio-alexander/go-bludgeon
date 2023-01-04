@@ -43,8 +43,8 @@ github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRF
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk541a8SKzHPHnH3zbiI+7dagKZ0cgpgrD7Fyho=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
-github.com/antonio-alexander/go-bludgeon/internal v1.3.1-0.20221226221028-0c462b186628 h1:lvGoRrKeZAtQ3zC/TeQE4bey2ks1ilqYB4vp4Bo8LwQ=
-github.com/antonio-alexander/go-bludgeon/internal v1.3.1-0.20221226221028-0c462b186628/go.mod h1:LUtsZmZetGueW33m13erasT2xz3L7BdnZedvLCN0NZ8=
+github.com/antonio-alexander/go-bludgeon/internal v1.4.0 h1:21JCMEm+VSDrDGjDojp4NXc5N5EyUFm4o07jtCAqRTE=
+github.com/antonio-alexander/go-bludgeon/internal v1.4.0/go.mod h1:LUtsZmZetGueW33m13erasT2xz3L7BdnZedvLCN0NZ8=
 github.com/antonio-alexander/go-queue v1.1.1 h1:qAe3AtxwZ2UMLjS7bQ+gdTSBnyXLbmXu2rQibSgqxFA=
 github.com/antonio-alexander/go-queue v1.1.1/go.mod h1:T1+MheS1/xNIsqC9JRhUcQAoRHz3buNWuDQ+D54g8lI=
 github.com/antonio-alexander/go-queue/finite v1.1.2 h1:fOqnH96D6uxzMroGghQpCV2FHPOegGhwbXCAxFB7faA=

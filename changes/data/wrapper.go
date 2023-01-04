@@ -13,10 +13,8 @@ const (
 	MessageTypeEmpty               MessageType = "empty"
 	MessageTypeChange              MessageType = "change"
 	MessageTypeChangeDigest        MessageType = "change_digest"
-	MessageTypeRequestChange       MessageType = "request_change"
 	MessageTypeRequestRegister     MessageType = "request_register"
 	MessageTypeRequestAcknowledge  MessageType = "request_acknowledge"
-	MessageTypeResponseChange      MessageType = "response_change"
 	MessageTypeResponseRegister    MessageType = "response_register"
 	MessageTypeResponseAcknowledge MessageType = "response_acknowledge"
 )
@@ -72,18 +70,6 @@ func FromWrapper(wrapper *Wrapper) (interface{}, error) {
 			return nil, err
 		}
 		return changeDigest, nil
-	case MessageTypeRequestChange:
-		request := &RequestChange{}
-		if err := request.UnmarshalBinary(wrapper.Bytes); err != nil {
-			return nil, err
-		}
-		return request, nil
-	case MessageTypeResponseChange:
-		response := &ResponseChange{}
-		if err := response.UnmarshalBinary(wrapper.Bytes); err != nil {
-			return nil, err
-		}
-		return response, nil
 	case MessageTypeRequestAcknowledge:
 		request := &RequestAcknowledge{}
 		if err := request.UnmarshalBinary(wrapper.Bytes); err != nil {

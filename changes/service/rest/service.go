@@ -12,10 +12,9 @@ import (
 	meta "github.com/antonio-alexander/go-bludgeon/changes/meta"
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
 
-	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
-	internal_websocket "github.com/antonio-alexander/go-bludgeon/internal/websocket/server"
+	rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
+	websocket "github.com/antonio-alexander/go-bludgeon/internal/websocket/server"
 
 	"github.com/pkg/errors"
 )
@@ -23,13 +22,13 @@ import (
 type restServer struct {
 	sync.WaitGroup
 	logger.Logger
-	ctx    context.Context
-	logic  logic.Logic
-	router internal_rest.Router
+	ctx   context.Context
+	logic logic.Logic
 }
 
 func New() interface {
 	internal.Parameterizer
+	rest.RouteBuilder
 } {
 	return &restServer{
 		Logger: logger.NewNullLogger(),
@@ -38,26 +37,38 @@ func New() interface {
 }
 
 func (s *restServer) handleResponse(writer http.ResponseWriter, err error, item interface{}) error {
+	var canSendBody bool
+
 	if err != nil {
-		switch {
-		default:
-			writer.WriteHeader(http.StatusInternalServerError)
-		case errors.Is(err, meta.ErrChangeNotFound):
-			writer.WriteHeader(http.StatusNotFound)
-		case errors.Is(err, meta.ErrChangeNotWritten):
-			writer.WriteHeader(http.StatusNotModified)
-		case errors.Is(err, meta.ErrChangeConflictWrite):
-			writer.WriteHeader(http.StatusConflict)
-		}
 		//REVIEW: I don't like to throw away/shadow this error, but it's not
-		bytes, jsonErr := json.Marshal(&internal_errors.Error{Error: err.Error()})
+		bytes, jsonErr := json.Marshal(err)
 		if jsonErr != nil {
 			s.Error(logAlias+"json error on handle response: %s", jsonErr)
 		}
-		_, err = writer.Write(bytes)
-		return err
+		switch {
+		default:
+			canSendBody = true
+			writer.WriteHeader(http.StatusInternalServerError)
+		case errors.Is(err, meta.ErrChangeNotWritten):
+			writer.WriteHeader(http.StatusNotModified)
+		case errors.Is(err, meta.ErrChangeNotFound):
+			canSendBody = true
+			writer.WriteHeader(http.StatusNotFound)
+		case errors.Is(err, meta.ErrChangeConflictWrite):
+			canSendBody = true
+			writer.WriteHeader(http.StatusConflict)
+		}
+		if canSendBody {
+			_, err = writer.Write(bytes)
+			return err
+		}
+		return nil
 	}
-	if item != nil {
+	switch {
+	default:
+		writer.WriteHeader(http.StatusNoContent)
+		return nil
+	case item != nil:
 		bytes, err := json.Marshal(item)
 		if err != nil {
 			s.Error(logAlias+"json error on handle response: %s", err)
@@ -66,27 +77,23 @@ func (s *restServer) handleResponse(writer http.ResponseWriter, err error, item 
 		_, err = writer.Write(bytes)
 		return err
 	}
-	writer.WriteHeader(http.StatusNoContent)
-	_, err = writer.Write([]byte{})
-	return err
 }
 
 func (s *restServer) endpointChangeUpsert() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
+		var changePartial data.ChangePartial
 		var change *data.Change
 		var bytes []byte
 		var err error
 
-		changeRequest, changeResponse := &data.RequestChange{}, &data.ResponseChange{}
 		if bytes, err = io.ReadAll(request.Body); err == nil {
-			if err = json.Unmarshal(bytes, &changeRequest); err == nil {
-				if change, err = s.logic.ChangeUpsert(request.Context(), changeRequest.ChangePartial); err == nil {
-					changeResponse.Change = *change
+			if err = json.Unmarshal(bytes, &changePartial); err == nil {
+				if change, err = s.logic.ChangeUpsert(request.Context(), changePartial); err == nil {
 					s.Debug(logAlias+"upserted change: %s", change.Id)
 				}
 			}
 		}
-		if err = s.handleResponse(writer, err, changeResponse); err != nil {
+		if err = s.handleResponse(writer, err, change); err != nil {
 			s.Error(logAlias+"upserted changes: %s", err)
 			return
 		}
@@ -98,13 +105,12 @@ func (s *restServer) endpointChangeRead() func(http.ResponseWriter, *http.Reques
 		var change *data.Change
 		var err error
 
-		changeResponse := &data.ResponseChange{}
-		if changeId, _ := valueFromPath(data.PathChangeId, internal_rest.Vars(request)); err == nil {
+		if changeId, _ := valueFromPath(data.PathChangeId, rest.Vars(request)); err == nil {
 			if change, err = s.logic.ChangeRead(request.Context(), changeId); err == nil {
-				changeResponse.Change = *change
+				s.Debug("read change: %d", changeId)
 			}
 		}
-		if err = s.handleResponse(writer, err, changeResponse); err != nil {
+		if err = s.handleResponse(writer, err, change); err != nil {
 			s.Error(logAlias+"change read:  %s", err)
 		}
 	}
@@ -116,9 +122,7 @@ func (s *restServer) endpointChangesRead() func(http.ResponseWriter, *http.Reque
 
 		search.FromParams(request.URL.Query())
 		changes, err := s.logic.ChangesRead(request.Context(), search)
-		if err = s.handleResponse(writer, err, &data.ChangeDigest{
-			Changes: changes,
-		}); err != nil {
+		if err = s.handleResponse(writer, err, &data.ChangeDigest{Changes: changes}); err != nil {
 			s.Error(logAlias+"changes read: %s", err)
 		}
 	}
@@ -126,7 +130,7 @@ func (s *restServer) endpointChangesRead() func(http.ResponseWriter, *http.Reque
 
 func (s *restServer) endpointChangeDelete() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		changeId, _ := valueFromPath(data.PathChangeId, internal_rest.Vars(request))
+		changeId, _ := valueFromPath(data.PathChangeId, rest.Vars(request))
 		err := s.logic.ChangesDelete(request.Context(), changeId)
 		if err = s.handleResponse(writer, err, nil); err != nil {
 			s.Error(logAlias+"change delete: %s", err)
@@ -138,23 +142,28 @@ func (s *restServer) endpointChangeDelete() func(http.ResponseWriter, *http.Requ
 
 func (s *restServer) endpointRegistrationUpsert() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		registrationId, _ := valueFromPath(data.PathRegistrationId, internal_rest.Vars(request))
-		err := s.logic.RegistrationUpsert(request.Context(), registrationId)
+		var requestRegister data.RequestRegister
+		var bytes []byte
+		var err error
+
+		if bytes, err = io.ReadAll(request.Body); err == nil {
+			if err = json.Unmarshal(bytes, &requestRegister); err == nil {
+				err = s.logic.RegistrationUpsert(request.Context(), requestRegister.RegistrationId)
+			}
+		}
 		if err = s.handleResponse(writer, err, nil); err != nil {
 			s.Error(logAlias+"registration upsert -  %s", err)
 			return
 		}
-		s.Debug(logAlias+"upserted registration: %s", registrationId)
+		s.Debug(logAlias+"upserted registration: %s", requestRegister.RegistrationId)
 	}
 }
 
 func (s *restServer) endpointRegistrationChangesRead() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		registrationId, _ := valueFromPath(data.PathRegistrationId, internal_rest.Vars(request))
+		registrationId, _ := valueFromPath(data.PathRegistrationId, rest.Vars(request))
 		changes, err := s.logic.RegistrationChangesRead(request.Context(), registrationId)
-		if err = s.handleResponse(writer, err, &data.ChangeDigest{
-			Changes: changes,
-		}); err != nil {
+		if err = s.handleResponse(writer, err, &data.ChangeDigest{Changes: changes}); err != nil {
 			s.Error(logAlias+"registration changes read: %s", err)
 		}
 	}
@@ -165,7 +174,7 @@ func (s *restServer) endpointRegistrationChangeAcknowledge() func(http.ResponseW
 		var bytes []byte
 		var err error
 
-		registrationId, _ := valueFromPath(data.PathRegistrationId, internal_rest.Vars(request))
+		registrationId, _ := valueFromPath(data.PathRegistrationId, rest.Vars(request))
 		acknowledgeRequest := &data.RequestAcknowledge{}
 		if bytes, err = io.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, acknowledgeRequest); err == nil {
@@ -184,7 +193,7 @@ func (s *restServer) endpointRegistrationChangeAcknowledge() func(http.ResponseW
 
 func (s *restServer) endpointRegistrationDelete() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		registrationId, _ := valueFromPath(data.PathRegistrationId, internal_rest.Vars(request))
+		registrationId, _ := valueFromPath(data.PathRegistrationId, rest.Vars(request))
 		err := s.logic.RegistrationDelete(request.Context(), registrationId)
 		if err = s.handleResponse(writer, err, nil); err != nil {
 			s.Error(logAlias+"registration delete -  %s", err)
@@ -196,7 +205,7 @@ func (s *restServer) endpointRegistrationDelete() func(http.ResponseWriter, *htt
 
 func (s *restServer) endpointWebsocket() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		ws := internal_websocket.New(writer, request, s.Logger)
+		ws := websocket.New(writer, request, s.Logger)
 		if ws == nil {
 			err := errors.New("unable to create websocket")
 			if err := s.handleResponse(writer, err, nil); err != nil {
@@ -226,8 +235,8 @@ func (s *restServer) endpointWebsocket() func(http.ResponseWriter, *http.Request
 	}
 }
 
-func (s *restServer) buildRoutes() {
-	for _, route := range []internal_rest.HandleFuncConfig{
+func (s *restServer) BuildRoutes() []rest.HandleFuncConfig {
+	return []rest.HandleFuncConfig{
 		{Route: data.RouteChangesWebsocket, HandleFx: s.endpointWebsocket()},
 		{Route: data.RouteChanges, Method: data.MethodChangeUpsert, HandleFx: s.endpointChangeUpsert()},
 		{Route: data.RouteChangesSearch, Method: data.MethodChangeRead, HandleFx: s.endpointChangesRead()},
@@ -237,8 +246,6 @@ func (s *restServer) buildRoutes() {
 		{Route: data.RouteChangesRegistration, Method: data.MethodRegistrationUpsert, HandleFx: s.endpointRegistrationUpsert()},
 		{Route: data.RouteChangesRegistrationParamChanges, Method: data.MethodChangeRead, HandleFx: s.endpointRegistrationChangesRead()},
 		{Route: data.RouteChangesRegistrationParam, Method: data.MethodRegistrationDelete, HandleFx: s.endpointRegistrationDelete()},
-	} {
-		s.router.HandleFunc(route)
 	}
 }
 
@@ -254,26 +261,15 @@ func (s *restServer) SetUtilities(parameters ...interface{}) {
 func (s *restServer) SetParameters(parameters ...interface{}) {
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
-		case interface {
-			internal_rest.Router
-			context.Context
-		}:
-			s.ctx = p
-			s.router = p
-			s.buildRoutes()
 		case logic.Logic:
 			s.logic = p
 		case context.Context:
 			s.ctx = p
-		case internal_rest.Router:
-			s.router = p
 		}
 	}
 	switch {
 	case s.logic == nil:
 		panic("logic not set")
-	case s.router == nil:
-		panic("router not set")
 	case s.ctx == nil:
 		panic("context not set")
 	}

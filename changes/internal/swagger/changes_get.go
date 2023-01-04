@@ -24,7 +24,7 @@ import (
 // swagger:response ChangeGetResponseOk
 type ChangeGetResponseOk struct {
 	// in:body
-	Body data.ResponseChange
+	Body data.Change
 }
 
 // This respons is provided when a change is not found

@@ -10,8 +10,8 @@ import (
 
 	client "github.com/antonio-alexander/go-bludgeon/changes/client"
 	data "github.com/antonio-alexander/go-bludgeon/changes/data"
-	"github.com/antonio-alexander/go-bludgeon/internal"
 
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 	internal_websocketclient "github.com/antonio-alexander/go-bludgeon/internal/websocket/client"
 )
@@ -72,7 +72,7 @@ func (h *handler) launchConnect() {
 				h.config.Rest.Address, h.config.Rest.Port)
 			response, err := h.client.Connect(h.ctx, uri, http.Header{})
 			if err != nil {
-				h.Error(logAlias+"error while connecting to websocket", err)
+				h.Error(logAlias+"error while connecting to websocket: %s", err)
 				return false
 			}
 			defer response.Body.Close()

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -29,72 +29,59 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	address         string        = "localhost"
-	port            string        = "8082"
-	shutdownTimeout time.Duration = 15 * time.Second
-)
+var configServer = new(internal_server.Configuration)
 
 type restServerTest struct {
 	server interface {
 		internal.Initializer
 		internal.Configurer
-		internal_server.Router
 	}
 	meta interface {
-		meta.Change
-		meta.Registration
-		meta.RegistrationChange
-		meta.Serializer
-		internal.Shutdowner
+		internal.Initializer
+		internal.Configurer
 	}
 	logic interface {
-		logic.Logic
 		internal.Initializer
 	}
 	client *http.Client
 }
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
 	envs := make(map[string]string)
 	for _, e := range os.Environ() {
 		if s := strings.Split(e, "="); len(s) > 1 {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	if _, ok := envs["BLUDGEON_REST_ADDRESS"]; ok {
-		address = envs["BLUDGEON_REST_ADDRESS"]
-	}
-	if _, ok := envs["BLUDGEON_REST_PORT"]; ok {
-		port = envs["BLUDGEON_REST_PORT"]
-	}
-	if _, ok := envs["BLUDGEON_REST_SHUTDOWN_TIMEOUT"]; ok {
-		if i, err := strconv.Atoi(envs["BLUDGEON_REST_SHUTDOWN_TIMEOUT"]); err != nil {
-			shutdownTimeout = time.Duration(i) * time.Second
-		}
-	}
+	configServer.FromEnv(envs)
+	configServer.Address = "localhost"
+	configServer.Port = "9000"
+	configServer.AllowedMethods = []string{http.MethodDelete, http.MethodPatch, http.MethodPost, http.MethodPut, http.MethodGet}
+	configServer.ShutdownTimeout = 15 * time.Second
 }
 
-func new() *restServerTest {
+func newRestServerTest() *restServerTest {
 	logger := internal_logger.New()
 	logger.Configure(&internal_logger.Configuration{
 		Level:  internal_logger.Trace,
 		Prefix: "bludgeon_rest_server_test",
 	})
+	changesMeta := memory.New()
+	changesMeta.SetUtilities(logger)
+	changesLogic := logic.New()
+	changesLogic.SetUtilities(logger)
+	changesLogic.SetParameters(changesMeta)
+	changesService := service.New()
+	changesService.SetUtilities(logger)
 	server := internal_server.New()
 	server.SetUtilities(logger)
-	employeeMeta := memory.New()
-	employeeMeta.SetUtilities(logger)
-	employeeLogic := logic.New()
-	employeeLogic.SetUtilities(logger)
-	employeeLogic.SetParameters(employeeMeta)
-	service := service.New()
-	service.SetUtilities(logger)
-	service.SetParameters(server, employeeLogic)
+	changesService.SetParameters(changesLogic, server)
+	server.SetParameters(changesService)
 	return &restServerTest{
 		server: server,
-		meta:   employeeMeta,
-		logic:  employeeLogic,
+		meta:   changesMeta,
+		logic:  changesLogic,
 		client: &http.Client{},
 	}
 }
@@ -104,7 +91,7 @@ func (l *restServerTest) generateId() string {
 }
 
 func (r *restServerTest) doRequest(route, method string, data []byte) ([]byte, int, error) {
-	uri := fmt.Sprintf("http://%s:%s%s", address, port, route)
+	uri := fmt.Sprintf("http://%s:%s"+route, configServer.Address, configServer.Port)
 	request, err := http.NewRequest(method, uri, bytes.NewBuffer(data))
 	if err != nil {
 		return nil, -1, err
@@ -137,13 +124,13 @@ func (r *restServerTest) pongHandler(t *testing.T) func(pong string) error {
 }
 
 func (r *restServerTest) initialize(t *testing.T) {
-	err := r.logic.Initialize()
+	err := r.meta.Initialize()
 	assert.Nil(t, err)
-	err = r.server.Configure(&internal_server.Configuration{
-		Address:         address,
-		Port:            port,
-		ShutdownTimeout: shutdownTimeout,
-	})
+	err = r.meta.Configure()
+	assert.Nil(t, err)
+	err = r.logic.Initialize()
+	assert.Nil(t, err)
+	err = r.server.Configure(configServer)
 	assert.Nil(t, err)
 	err = r.server.Initialize()
 	assert.Nil(t, err)
@@ -153,6 +140,8 @@ func (r *restServerTest) initialize(t *testing.T) {
 }
 
 func (r *restServerTest) shutdown(t *testing.T) {
+	//REVIEW: why do we need to sleep?
+	time.Sleep(2 * time.Second)
 	r.server.Shutdown()
 	r.logic.Shutdown()
 	r.meta.Shutdown()
@@ -164,13 +153,11 @@ func (r *restServerTest) testChangeOperations(t *testing.T) {
 	dataType, dataService := "employee", "employees"
 
 	//create change
-	bytes, err := json.Marshal(&data.RequestChange{
-		ChangePartial: data.ChangePartial{
-			DataId:          &dataId,
-			DataVersion:     &version,
-			DataType:        &dataType,
-			DataServiceName: &dataService,
-		},
+	bytes, err := json.Marshal(&data.ChangePartial{
+		DataId:          &dataId,
+		DataVersion:     &version,
+		DataType:        &dataType,
+		DataServiceName: &dataService,
 	})
 	assert.Nil(t, err)
 	uri := data.RouteChanges
@@ -178,10 +165,10 @@ func (r *restServerTest) testChangeOperations(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
-	changeResponse := &data.ResponseChange{}
-	err = json.Unmarshal(bytes, changeResponse)
+	changeUpserted := &data.Change{}
+	err = json.Unmarshal(bytes, changeUpserted)
 	assert.Nil(t, err)
-	changeId := changeResponse.Change.Id
+	changeId := changeUpserted.Id
 
 	//read change
 	uri = fmt.Sprintf(data.RouteChangesParamf, changeId)
@@ -189,14 +176,14 @@ func (r *restServerTest) testChangeOperations(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
-	changeResponse = &data.ResponseChange{}
-	err = json.Unmarshal(bytes, changeResponse)
+	changeRead := &data.Change{}
+	err = json.Unmarshal(bytes, changeRead)
 	assert.Nil(t, err)
-	assert.Equal(t, changeId, changeResponse.Change.Id)
-	assert.Equal(t, dataId, changeResponse.Change.DataId)
-	assert.Equal(t, version, changeResponse.Change.DataVersion)
-	assert.Equal(t, dataType, changeResponse.Change.DataType)
-	assert.Equal(t, dataService, changeResponse.Change.DataServiceName)
+	assert.Equal(t, changeId, changeRead.Id)
+	assert.Equal(t, dataId, changeRead.DataId)
+	assert.Equal(t, version, changeRead.DataVersion)
+	assert.Equal(t, dataType, changeRead.DataType)
+	assert.Equal(t, dataService, changeRead.DataServiceName)
 
 	//delete change
 	uri = fmt.Sprintf(data.RouteChangesParamf, changeId)
@@ -215,7 +202,7 @@ func (r *restServerTest) testChangeOperations(t *testing.T) {
 	err = json.Unmarshal(bytes, internalErr)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, internalErr.Error)
-	assert.Equal(t, meta.ErrChangeNotFound.Error(), internalErr.Error)
+	assert.Equal(t, meta.ErrChangeNotFound.Error(), internalErr.Error())
 
 	//TODO: add test to acknowledge change
 }
@@ -228,7 +215,7 @@ func (r *restServerTest) testChangeStreaming(t *testing.T) {
 	dataType, dataService := "employee", "employees"
 
 	//connect to web socket
-	websocketUri := fmt.Sprintf("ws://%s:%s"+data.RouteChangesWebsocket, address, port)
+	websocketUri := fmt.Sprintf("ws://%s:%s"+data.RouteChangesWebsocket, configServer.Address, configServer.Port)
 	ws, response, err := websocket.DefaultDialer.Dial(websocketUri, nil)
 	defer response.Body.Close()
 	if err == websocket.ErrBadHandshake {
@@ -248,13 +235,11 @@ func (r *restServerTest) testChangeStreaming(t *testing.T) {
 		defer wg.Done()
 
 		<-start
-		bytes, err := json.Marshal(&data.RequestChange{
-			ChangePartial: data.ChangePartial{
-				DataId:          &dataId,
-				DataVersion:     &version,
-				DataType:        &dataType,
-				DataServiceName: &dataService,
-			},
+		bytes, err := json.Marshal(&data.ChangePartial{
+			DataId:          &dataId,
+			DataVersion:     &version,
+			DataType:        &dataType,
+			DataServiceName: &dataService,
 		})
 		assert.Nil(t, err)
 		bytes, statusCode, err := r.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
@@ -307,285 +292,310 @@ func (r *restServerTest) testChangeStreaming(t *testing.T) {
 }
 
 func (r *restServerTest) testChangeRegistration(t *testing.T) {
-	// 	var changes []*data.Change
-	// 	ctx := context.TODO()
+	var changes []*data.Change
 
-	// 	//upsert change (neither registration should see this change)
-	// 	dataId := r.generateId()
-	// 	dataVersion, dataType := rand.Intn(1000), r.generateId()
-	// 	dataServiceName, whenChanged := r.generateId(), time.Now().UnixNano()
-	// 	changedBy, dataAction := "test_change_crud", r.generateId()
-	// 	bytes, err := json.Marshal(&data.RequestChange{
-	// 		ChangePartial: data.ChangePartial{
-	// 			DataId:          &dataId,
-	// 			DataVersion:     &dataVersion,
-	// 			DataType:        &dataType,
-	// 			DataServiceName: &dataServiceName,
-	// 			DataAction:      &dataAction,
-	// 			WhenChanged:     &whenChanged,
-	// 			ChangedBy:       &changedBy,
-	// 		},
-	// 	})
-	// 	assert.Nil(t, err)
-	// 	assert.NotEmpty(t, bytes)
-	// 	uri := fmt.Sprintf("http://%s:%s"+data.RouteChanges, address, port)
-	// 	bytes, statusCode, err := r.doRequest(uri, data.MethodChangeUpsert, bytes)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	changeCreated := &data.Change{}
-	// 	err = json.Unmarshal(bytes, changeCreated)
-	// 	assert.Nil(t, err)
-	// 	assert.NotNil(t, changeCreated)
-	// 	defer func(changeId string) {
-	// 		uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesParamf, address, port, changeId)
-	// 		r.doRequest(uri, data.MethodChangeDelete, bytes)
-	// 	}(changeCreated.Id)
-	// 	changes = append(changes, changeCreated)
+	//upsert change (neither registration should see this change)
+	dataId := r.generateId()
+	dataVersion, dataType := rand.Intn(1000), r.generateId()
+	dataServiceName, whenChanged := r.generateId(), time.Now().UnixNano()
+	changedBy, dataAction := "test_change_crud", r.generateId()
+	bytes, err := json.Marshal(&data.ChangePartial{
+		DataId:          &dataId,
+		DataVersion:     &dataVersion,
+		DataType:        &dataType,
+		DataServiceName: &dataServiceName,
+		DataAction:      &dataAction,
+		WhenChanged:     &whenChanged,
+		ChangedBy:       &changedBy,
+	})
+	assert.Nil(t, err)
+	assert.NotEmpty(t, bytes)
+	bytes, statusCode, err := r.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeCreated := &data.Change{}
+	err = json.Unmarshal(bytes, changeCreated)
+	assert.Nil(t, err)
+	assert.NotNil(t, changeCreated)
+	defer func(changeId string) {
+		route := fmt.Sprintf(data.RouteChangesParamf, changeId)
+		r.doRequest(route, data.MethodChangeDelete, bytes)
+	}(changeCreated.Id)
+	changes = append(changes, changeCreated)
 
-	// 	//create registration (1)
-	// 	registrationId1 := r.generateId()
-	// 	bytes, err = json.Marshal(&data.RequestRegister{
-	// 		RegistrationId: registrationId1,
-	// 	})
-	// 	assert.Nil(t, err)
-	// 	assert.NotEmpty(t, bytes)
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistration, address, port)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodRegistrationUpsert, bytes)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	registrationResponse := &data.ResponseRegister{}
-	// 	err = json.Unmarshal(bytes, registrationResponse)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, registrationId1, registrationResponse.RegistrationId)
-	// 	defer func(registrationId string) {
-	// 		uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamf, address, port, registrationId)
-	// 		r.doRequest(uri, data.MethodRegistrationDelete, bytes)
-	// 	}(registrationResponse.RegistrationId)
+	//create registration (1)
+	registrationId1 := r.generateId()
+	bytes, err = json.Marshal(&data.RequestRegister{
+		RegistrationId: registrationId1,
+	})
+	assert.Nil(t, err)
+	assert.NotEmpty(t, bytes)
+	bytes, statusCode, err = r.doRequest(data.RouteChangesRegistration, data.MethodRegistrationUpsert, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNoContent, statusCode)
+	assert.Empty(t, bytes)
+	defer func(registrationId string) {
+		route := fmt.Sprintf(data.RouteChangesRegistrationParamf, registrationId)
+		r.doRequest(route, data.MethodRegistrationDelete, bytes)
+	}(registrationId1)
 
-	// 	//validate that registration (1) doesn't include any changes
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamChangesf,
-	// 		address, port, registrationId1)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeRead, nil)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	changeDigest := &data.ChangeDigest{}
-	// 	err = json.Unmarshal(bytes, changeDigest)
-	// 	assert.Nil(t, err)
-	// 	assert.Len(t, changeDigest.Changes, 0)
+	//validate that registration (1) doesn't include any changes
+	route := fmt.Sprintf(data.RouteChangesRegistrationParamChangesf, registrationId1)
+	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeDigest := &data.ChangeDigest{}
+	err = json.Unmarshal(bytes, changeDigest)
+	assert.Nil(t, err)
+	assert.Len(t, changeDigest.Changes, 0)
 
-	// 	//upsert change (to be seen by registration (1))
-	// 	dataId = r.generateId()
-	// 	dataVersion, dataType = rand.Intn(1000), r.generateId()
-	// 	dataServiceName, whenChanged = r.generateId(), time.Now().UnixNano()
-	// 	dataAction, changedBy = r.generateId(), "test_change_crud"
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChanges, address, port)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeUpsert, bytes)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	changeCreated = &data.Change{}
-	// 	err = json.Unmarshal(bytes, changeCreated)
-	// 	assert.Nil(t, err)
-	// 	assert.NotNil(t, changeCreated)
-	// 	defer func(changeId string) {
-	// 		uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesParamf, address, port, changeId)
-	// 		r.doRequest(uri, data.MethodChangeDelete, bytes)
-	// 	}(changeCreated.Id)
-	// 	changes = append(changes, changeCreated)
+	//upsert change (to be seen by registration (1))
+	dataId = r.generateId()
+	dataVersion, dataType = rand.Intn(1000), r.generateId()
+	dataServiceName, whenChanged = r.generateId(), time.Now().UnixNano()
+	dataAction, changedBy = r.generateId(), "test_change_crud"
+	bytes, err = json.Marshal(&data.ChangePartial{
+		WhenChanged:     &whenChanged,
+		ChangedBy:       &changedBy,
+		DataId:          &dataId,
+		DataServiceName: &dataServiceName,
+		DataType:        &dataType,
+		DataAction:      &dataAction,
+		DataVersion:     &dataVersion,
+	})
+	assert.Nil(t, err)
+	assert.NotEmpty(t, bytes)
+	bytes, statusCode, err = r.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeCreated = &data.Change{}
+	err = json.Unmarshal(bytes, changeCreated)
+	assert.Nil(t, err)
+	assert.NotNil(t, changeCreated)
+	defer func(changeId string) {
+		route := fmt.Sprintf(data.RouteChangesParamf, changeId)
+		r.doRequest(route, data.MethodChangeDelete, bytes)
+	}(changeCreated.Id)
+	changes = append(changes, changeCreated)
 
-	// 	//validate that registration (1) sees the second change, but not the first
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamChangesf,
-	// 		address, port, registrationId1)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeRead, nil)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	changeDigest = &data.ChangeDigest{}
-	// 	err = json.Unmarshal(bytes, changeDigest)
-	// 	assert.Nil(t, err)
-	// 	assert.Len(t, changeDigest.Changes, 1)
-	// 	assert.Contains(t, changeDigest.Changes, changes[1])
-	// 	assert.NotContains(t, changeDigest.Changes, changes[0])
+	//validate that registration (1) sees the second change, but not the first
+	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf, registrationId1)
+	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeDigest = &data.ChangeDigest{}
+	err = json.Unmarshal(bytes, changeDigest)
+	assert.Nil(t, err)
+	assert.Len(t, changeDigest.Changes, 1)
+	assert.Contains(t, changeDigest.Changes, changes[1])
+	assert.NotContains(t, changeDigest.Changes, changes[0])
 
-	// 	//create registration
-	// 	registrationId2 := r.generateId()
-	// 	bytes, err = json.Marshal(&data.RequestRegister{
-	// 		RegistrationId: registrationId1,
-	// 	})
-	// 	assert.Nil(t, err)
-	// 	assert.NotEmpty(t, bytes)
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistration, address, port)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodRegistrationUpsert, bytes)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	registrationResponse = &data.ResponseRegister{}
-	// 	err = json.Unmarshal(bytes, registrationResponse)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, registrationId2, registrationResponse.RegistrationId)
-	// 	defer func(registrationId string) {
-	// 		uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamf, address, port, registrationId)
-	// 		r.doRequest(uri, data.MethodRegistrationDelete, bytes)
-	// 	}(registrationResponse.RegistrationId)
+	//create registration
+	registrationId2 := r.generateId()
+	bytes, err = json.Marshal(&data.RequestRegister{
+		RegistrationId: registrationId2,
+	})
+	assert.Nil(t, err)
+	assert.NotEmpty(t, bytes)
+	bytes, statusCode, err = r.doRequest(data.RouteChangesRegistration, data.MethodRegistrationUpsert, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNoContent, statusCode)
+	assert.Empty(t, bytes)
+	defer func(registrationId string) {
+		route := fmt.Sprintf(data.RouteChangesRegistrationParamf, registrationId)
+		r.doRequest(route, data.MethodRegistrationDelete, bytes)
+	}(registrationId2)
 
-	// 	//upsert change (to be seen by registration (1) and (2))
-	// 	dataId = r.generateId()
-	// 	dataVersion, dataType = rand.Intn(1000), r.generateId()
-	// 	dataServiceName, whenChanged = r.generateId(), time.Now().UnixNano()
-	// 	dataAction, changedBy = r.generateId(), "test_change_crud"
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChanges, address, port)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeUpsert, bytes)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	changeCreated = &data.Change{}
-	// 	err = json.Unmarshal(bytes, changeCreated)
-	// 	assert.Nil(t, err)
-	// 	assert.NotNil(t, changeCreated)
-	// 	defer func(changeId string) {
-	// 		uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesParamf, address, port, changeId)
-	// 		r.doRequest(uri, data.MethodChangeDelete, bytes)
-	// 	}(changeCreated.Id)
-	// 	changes = append(changes, changeCreated)
+	//upsert change (to be seen by registration (1) and (2))
+	dataId = r.generateId()
+	dataVersion, dataType = rand.Intn(1000), r.generateId()
+	dataServiceName, whenChanged = r.generateId(), time.Now().UnixNano()
+	dataAction, changedBy = r.generateId(), "test_change_crud"
+	bytes, err = json.Marshal(&data.ChangePartial{
+		WhenChanged:     &whenChanged,
+		ChangedBy:       &changedBy,
+		DataId:          &dataId,
+		DataServiceName: &dataServiceName,
+		DataType:        &dataType,
+		DataAction:      &dataAction,
+		DataVersion:     &dataVersion,
+	})
+	assert.Nil(t, err)
+	assert.NotEmpty(t, bytes)
+	bytes, statusCode, err = r.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeCreated = &data.Change{}
+	err = json.Unmarshal(bytes, changeCreated)
+	assert.Nil(t, err)
+	assert.NotNil(t, changeCreated)
+	defer func(changeId string) {
+		route := fmt.Sprintf(data.RouteChangesParamf, changeId)
+		r.doRequest(route, data.MethodChangeDelete, bytes)
+	}(changeCreated.Id)
+	changes = append(changes, changeCreated)
 
-	// 	//validate that registration (2) sees the third change, but not the first or second
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamChangesf,
-	// 		address, port, registrationId2)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeRead, nil)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	changeDigest = &data.ChangeDigest{}
-	// 	err = json.Unmarshal(bytes, changeDigest)
-	// 	assert.Nil(t, err)
-	// 	assert.Len(t, changeDigest.Changes, 1)
-	// 	assert.Contains(t, changeDigest.Changes, changes[2])
-	// 	assert.NotContains(t, changeDigest.Changes, changes[0])
-	// 	assert.NotContains(t, changeDigest.Changes, changes[1])
+	//validate that registration (2) sees the third change, but not the first or second
+	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf, registrationId2)
+	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeDigest = &data.ChangeDigest{}
+	err = json.Unmarshal(bytes, changeDigest)
+	assert.Nil(t, err)
+	assert.Len(t, changeDigest.Changes, 1)
+	assert.Contains(t, changeDigest.Changes, changes[2])
+	assert.NotContains(t, changeDigest.Changes, changes[0])
+	assert.NotContains(t, changeDigest.Changes, changes[1])
 
-	// 	//acknowledge the initial change for both services and confirm that there's no change
-	// 	bytes, err = json.Marshal(&data.RequestAcknowledge{
-	// 		ChangeIds: []string{changes[0].Id},
-	// 	})
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationServiceIdAcknowledgef,
-	// 		address, port, registrationId1)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodRegistrationChangeAcknowledge, bytes)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	acknowledgeResponse := &data.ResponseAcknowledge{}
-	// 	err = json.Unmarshal(bytes, acknowledgeResponse)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, registrationId1, acknowledgeResponse.RegistrationId)
-	// 	assert.Contains(t, acknowledgeResponse.ChangeIds, changes[0].Id)
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamChangesf,
-	// 		address, port, registrationId1)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeRead, nil)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	changeDigest = &data.ChangeDigest{}
-	// 	err = json.Unmarshal(bytes, changeDigest)
-	// 	assert.Nil(t, err)
-	// 	assert.Len(t, changeDigest.Changes, 2)
-	// 	bytes, err = json.Marshal(&data.RequestAcknowledge{
-	// 		ChangeIds: []string{changes[0].Id},
-	// 	})
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationServiceIdAcknowledgef,
-	// 		address, port, registrationId2)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodRegistrationChangeAcknowledge, bytes)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	acknowledgeResponse = &data.ResponseAcknowledge{}
-	// 	err = json.Unmarshal(bytes, acknowledgeResponse)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, registrationId1, acknowledgeResponse.RegistrationId)
-	// 	assert.Contains(t, acknowledgeResponse.ChangeIds, changes[0].Id)
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamChangesf,
-	// 		address, port, registrationId2)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeRead, nil)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	changeDigest = &data.ChangeDigest{}
-	// 	err = json.Unmarshal(bytes, changeDigest)
-	// 	assert.Nil(t, err)
-	// 	assert.Len(t, changeDigest.Changes, 1)
+	//acknowledge the initial change for registration 1
+	bytes, err = json.Marshal(&data.RequestAcknowledge{
+		ChangeIds: []string{changes[0].Id},
+	})
+	assert.Nil(t, err)
+	assert.NotEmpty(t, bytes)
+	route = fmt.Sprintf(data.RouteChangesRegistrationServiceIdAcknowledgef, registrationId1)
+	bytes, statusCode, err = r.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNoContent, statusCode)
+	assert.Empty(t, bytes)
+	//get changes for registration 1
+	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf, registrationId1)
+	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeDigest = &data.ChangeDigest{}
+	err = json.Unmarshal(bytes, changeDigest)
+	assert.Nil(t, err)
+	assert.Len(t, changeDigest.Changes, 2)
+	//acknowledge the initial change for registration 1
+	bytes, err = json.Marshal(&data.RequestAcknowledge{
+		ChangeIds: []string{changes[0].Id},
+	})
+	assert.Nil(t, err)
+	assert.NotEmpty(t, bytes)
+	//get changes for registration 2
+	route = fmt.Sprintf(data.RouteChangesRegistrationServiceIdAcknowledgef, registrationId2)
+	bytes, statusCode, err = r.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNoContent, statusCode)
+	assert.Empty(t, bytes)
+	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf, registrationId2)
+	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeDigest = &data.ChangeDigest{}
+	err = json.Unmarshal(bytes, changeDigest)
+	assert.Nil(t, err)
+	assert.Len(t, changeDigest.Changes, 1)
 
-	// 	//validate that initial change has been removed
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesParamf,
-	// 		address, port, changes[0].Id)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeRead, nil)
-	// 	assert.Nil(t, err)
-	// 	//REVIEW: this should validate a 404 (but its probably a 500)
-	// 	assert.NotEqual(t, http.StatusOK, statusCode)
+	//validate that initial change has been removed
+	//KIM: this change is removed because of the acknowledgement(s) earlier
+	route = fmt.Sprintf(data.RouteChangesParamf, changes[0].Id)
+	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNotFound, statusCode)
 
-	// 	//acknowledge the second change for both registrations and confirm actual changes
-	// 	bytes, err = json.Marshal(&data.RequestAcknowledge{
-	// 		ChangeIds: []string{changes[1].Id},
-	// 	})
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationServiceIdAcknowledgef,
-	// 		address, port, registrationId1)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodRegistrationChangeAcknowledge, bytes)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	acknowledgeResponse = &data.ResponseAcknowledge{}
-	// 	err = json.Unmarshal(bytes, acknowledgeResponse)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, registrationId1, acknowledgeResponse.RegistrationId)
-	// 	assert.Contains(t, acknowledgeResponse.ChangeIds, changes[0].Id)
-	// 	//
-	// 	uri = fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamChangesf,
-	// 		address, port, registrationId1)
-	// 	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeRead, nil)
-	// 	assert.Nil(t, err)
-	// 	assert.Equal(t, http.StatusOK, statusCode)
-	// 	assert.Empty(t, bytes)
-	// 	changeDigest = &data.ChangeDigest{}
-	// 	err = json.Unmarshal(bytes, changeDigest)
-	// 	assert.Nil(t, err)
-	// 	assert.Len(t, changeDigest.Changes, 1)
-	// 	assert.Contains(t, changeDigest.Changes, changes[2])
-	// 	//
-	// 	err = l.RegistrationChangeAcknowledge(ctx, registrationId2, changes[1].Id)
-	// 	assert.Nil(t, err)
-	// 	changesRead, err = l.RegistrationChangesRead(ctx, registrationId2)
-	// 	assert.Nil(t, err)
-	// 	assert.Len(t, changesRead, 1)
-	// 	assert.Contains(t, changesRead, changes[2])
+	//acknowledge the second change for both registrations and confirm actual changes
+	bytes, err = json.Marshal(&data.RequestAcknowledge{
+		ChangeIds: []string{changes[1].Id},
+	})
+	assert.NotEmpty(t, bytes)
+	assert.Nil(t, err)
+	route = fmt.Sprintf(data.RouteChangesRegistrationServiceIdAcknowledgef,
+		registrationId1)
+	bytes, statusCode, err = r.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNoContent, statusCode)
+	assert.Empty(t, bytes)
+	//read changes for registration 1
+	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf,
+		registrationId1)
+	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeDigest = &data.ChangeDigest{}
+	err = json.Unmarshal(bytes, changeDigest)
+	assert.Nil(t, err)
+	assert.Len(t, changeDigest.Changes, 1)
+	assert.Contains(t, changeDigest.Changes, changes[2])
 
-	// 	//validate that second change has been removed
-	// 	change, err = l.ChangeRead(ctx, changes[1].Id)
-	// 	assert.NotNil(t, err)
-	// 	assert.Nil(t, change)
+	//acknowledge the second change for registration 2
+	bytes, err = json.Marshal(&data.RequestAcknowledge{
+		ChangeIds: []string{changes[1].Id},
+	})
+	assert.NotEmpty(t, bytes)
+	assert.Nil(t, err)
+	route = fmt.Sprintf(data.RouteChangesRegistrationServiceIdAcknowledgef,
+		registrationId2)
+	bytes, statusCode, err = r.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNoContent, statusCode)
+	assert.Empty(t, bytes)
+	// read the changes for registration 2
+	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf,
+		registrationId2)
+	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeDigest = &data.ChangeDigest{}
+	err = json.Unmarshal(bytes, changeDigest)
+	assert.Nil(t, err)
+	assert.Len(t, changeDigest.Changes, 1)
+	assert.Contains(t, changeDigest.Changes, changes[2])
 
-	// 	//delete the initial registration, then re-create it and ensure that there are no changes
-	// 	err = l.RegistrationDelete(ctx, registrationId1)
-	// 	assert.Nil(t, err)
-	// 	err = l.RegistrationUpsert(ctx, registrationId1)
-	// 	assert.Nil(t, err)
-	// 	changesRead, err = l.RegistrationChangesRead(ctx, registrationId1)
-	// 	assert.Nil(t, err)
-	// 	assert.Len(t, changesRead, 0)
+	//validate that second change has been removed
+	route = fmt.Sprintf(data.RouteChangesParamf, changes[1].Id)
+	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNotFound, statusCode)
+
+	//delete the initial registration,
+	route = fmt.Sprintf(data.RouteChangesRegistrationParamf, registrationId1)
+	bytes, statusCode, err = r.doRequest(route, data.MethodRegistrationDelete, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNoContent, statusCode)
+	assert.Empty(t, bytes)
+	// re-create the registration
+	bytes, err = json.Marshal(&data.RequestRegister{
+		RegistrationId: registrationId1,
+	})
+	assert.Nil(t, err)
+	assert.NotEmpty(t, bytes)
+	bytes, statusCode, err = r.doRequest(data.RouteChangesRegistration, data.MethodRegistrationUpsert, bytes)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNoContent, statusCode)
+	assert.Empty(t, bytes)
+	// read the registration changes
+	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf,
+		registrationId1)
+	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.NotEmpty(t, bytes)
+	changeDigest = &data.ChangeDigest{}
+	err = json.Unmarshal(bytes, changeDigest)
+	assert.Nil(t, err)
+	assert.Empty(t, changeDigest.Changes)
 }
 
 func TestChangesRestService(t *testing.T) {
-	r := new()
+	r := newRestServerTest()
 
-	//initialize
 	r.initialize(t)
-	defer func() {
-		r.shutdown(t)
-	}()
+	defer r.shutdown(t)
 
-	//execute tests
 	t.Run("Change Operations", r.testChangeOperations)
 	t.Run("Change Streaming", r.testChangeStreaming)
 	t.Run("Change Registration", r.testChangeRegistration)
-	time.Sleep(2 * time.Second)
 }
