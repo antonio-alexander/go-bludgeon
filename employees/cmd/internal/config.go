@@ -10,24 +10,27 @@ import (
 )
 
 const (
-	EnvNameMetaType            string = "BLUDGEON_META_TYPE"
-	EnvNameServiceRestEnabled  string = "BLUDGEON_REST_ENABLED"
-	EnvNameServiceGrpcEnabled  string = "BLUDGEON_GRPC_ENABLED"
-	EnvNameServiceKafkaEnabled string = "BLUDGEON_KAFKA_ENABLED"
+	EnvNameMetaType                  = "BLUDGEON_META_TYPE"
+	EnvNameServiceRestEnabled        = "BLUDGEON_REST_ENABLED"
+	EnvNameServiceGrpcEnabled        = "BLUDGEON_GRPC_ENABLED"
+	EnvNameClientChangesRestEnabled  = "BLUDGEON_CHANGES_CLIENT_REST_ENABLED"
+	EnvNameClientChangesKafkaEnabled = "BLUDGEON_CHANGES_CLIENT_KAFKA_ENABLED"
 )
 
 const (
-	DefaultRestEnabled  bool      = false
-	DefaultGrpcEnabled  bool      = true
-	DefaultKafkaEnabled bool      = true
-	DefaultMetaType     meta.Type = meta.TypeMemory
+	DefaultMetaType                  = meta.TypeMySQL
+	DefaultServiceRestEnabled        = true
+	DefaultServiceGrpcEnabled        = true
+	DefaultClientChangesRestEnabled  = true
+	DefaultClientChangesKafkaEnabled = false
 )
 
 type Configuration struct {
-	MetaType     meta.Type `json:"type"`
-	GrpcEnabled  bool      `json:"grpc_enabled"`
-	RestEnabled  bool      `json:"rest_enabled"`
-	KafkaEnabled bool      `json:"kafka_enabled"`
+	MetaType                  meta.Type `json:"type"`
+	ServiceRestEnabled        bool      `json:"service_rest_enabled"`
+	ServiceGrpcEnabled        bool      `json:"service_grpc_enabled"`
+	ClientChangesRestEnabled  bool      `json:"client_changes_rest_enabled"`
+	ClientChangesKafkaEnabled bool      `json:"client_changes_kafka_enabled"`
 }
 
 func (c *Configuration) Read(configFile string) error {
@@ -48,8 +51,10 @@ func (c *Configuration) Write(configFile string) error {
 
 func (c *Configuration) Default(pwd string) {
 	c.MetaType = DefaultMetaType
-	c.RestEnabled = DefaultRestEnabled
-	c.KafkaEnabled = DefaultKafkaEnabled
+	c.ServiceRestEnabled = DefaultServiceRestEnabled
+	c.ServiceGrpcEnabled = DefaultServiceGrpcEnabled
+	c.ClientChangesRestEnabled = DefaultClientChangesRestEnabled
+	c.ClientChangesKafkaEnabled = DefaultClientChangesKafkaEnabled
 }
 
 func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
@@ -57,13 +62,23 @@ func (c *Configuration) FromEnv(pwd string, envs map[string]string) {
 		c.MetaType = meta.AtoType(s)
 	}
 	if s, ok := envs[EnvNameServiceRestEnabled]; ok {
-		if restEnabled, err := strconv.ParseBool(s); err == nil {
-			c.RestEnabled = restEnabled
+		if serviceRestEnabled, err := strconv.ParseBool(s); err == nil {
+			c.ServiceRestEnabled = serviceRestEnabled
 		}
 	}
-	if s, ok := envs[EnvNameServiceKafkaEnabled]; ok {
-		if kafkaEnabled, err := strconv.ParseBool(s); err == nil {
-			c.KafkaEnabled = kafkaEnabled
+	if s, ok := envs[EnvNameServiceGrpcEnabled]; ok {
+		if serviceGrpcEnabled, err := strconv.ParseBool(s); err == nil {
+			c.ServiceGrpcEnabled = serviceGrpcEnabled
+		}
+	}
+	if s, ok := envs[EnvNameClientChangesRestEnabled]; ok {
+		if clientChangesRestEnabled, err := strconv.ParseBool(s); err == nil {
+			c.ClientChangesRestEnabled = clientChangesRestEnabled
+		}
+	}
+	if s, ok := envs[EnvNameClientChangesKafkaEnabled]; ok {
+		if clientChangesKafkaEnabled, err := strconv.ParseBool(s); err == nil {
+			c.ClientChangesKafkaEnabled = clientChangesKafkaEnabled
 		}
 	}
 }

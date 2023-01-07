@@ -7,7 +7,7 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/internal/errors"
 )
 
-//these constants are used to generate employee specific errors
+// these constants are used to generate employee specific errors
 const (
 	EmployeeNotFound       string = "employee not found"
 	EmployeeNotUpdated     string = "employee not updated"
@@ -16,22 +16,22 @@ const (
 	EmployeeConflictUpdate string = "cannot update employee; email address in use"
 )
 
-//these are error variables used within the employee meta
+// these are error variables used within the employee meta
 var (
-	ErrEmployeeNotFound       = errors.NewNotFound(EmployeeNotFound)
-	ErrEmployeeNotUpdated     = errors.NewNotupdated(EmployeeNotUpdated)
-	ErrEmployeeNotCreated     = errors.NewNotCreated(EmployeeNotCreated)
-	ErrEmployeeConflictCreate = errors.NewConflict(EmployeeConflictCreate)
-	ErrEmployeeConflictUpdate = errors.NewConflict(EmployeeConflictUpdate)
+	ErrEmployeeNotFound       = errors.NewNotFound(errors.New(EmployeeNotFound))
+	ErrEmployeeNotUpdated     = errors.NewNotUpdated(errors.New(EmployeeNotUpdated))
+	ErrEmployeeNotCreated     = errors.NewNotCreated(errors.New(EmployeeNotCreated))
+	ErrEmployeeConflictCreate = errors.NewConflict(errors.New(EmployeeConflictCreate))
+	ErrEmployeeConflictUpdate = errors.NewConflict(errors.New(EmployeeConflictUpdate))
 )
 
-//SerializedData provides a struct that describes the representation
+// SerializedData provides a struct that describes the representation
 // of the data when serialized
 type SerializedData struct {
 	Employees map[string]data.Employee `json:"employees"`
 }
 
-//Serializer is an interface that can be used to convert the contents of
+// Serializer is an interface that can be used to convert the contents of
 // meta into a scalar type
 type Serializer interface {
 	//Serialize can be used to convert all available metadata
@@ -43,7 +43,7 @@ type Serializer interface {
 	Deserialize(data *SerializedData) error
 }
 
-//Employee is an interface that groups functions to interact with one or more
+// Employee is an interface that groups functions to interact with one or more
 // employees
 type Employee interface {
 	//EmployeeCreate can be used to create a single Employee

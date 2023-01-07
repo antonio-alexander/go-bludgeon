@@ -8,9 +8,11 @@ import (
 	metafile "github.com/antonio-alexander/go-bludgeon/employees/meta/file"
 	metamemory "github.com/antonio-alexander/go-bludgeon/employees/meta/memory"
 	metamysql "github.com/antonio-alexander/go-bludgeon/employees/meta/mysql"
-	servicegrpc "github.com/antonio-alexander/go-bludgeon/employees/service/rest"
+	servicegrpc "github.com/antonio-alexander/go-bludgeon/employees/service/grpc"
 	servicerest "github.com/antonio-alexander/go-bludgeon/employees/service/rest"
 
+	changesclient "github.com/antonio-alexander/go-bludgeon/changes/client"
+	changesclientkafka "github.com/antonio-alexander/go-bludgeon/changes/client/kafka"
 	changesclientrest "github.com/antonio-alexander/go-bludgeon/changes/client/rest"
 
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
@@ -43,6 +45,18 @@ func parameterize(config *Configuration) (interface {
 		internal.Parameterizer
 		meta.Employee
 	}
+	var changesClient interface {
+		changesclient.Client
+		internal.Initializer
+		internal.Configurer
+		internal.Parameterizer
+	}
+	var changesHandler interface {
+		changesclient.Handler
+		internal.Initializer
+		internal.Configurer
+		internal.Parameterizer
+	}
 	var parameters []interface{}
 
 	logger := internal_logger.New()
@@ -55,26 +69,39 @@ func parameterize(config *Configuration) (interface {
 		employeesMeta = metamysql.New()
 	}
 	employeesMeta.SetUtilities(logger)
-	changesClient := changesclientrest.New()
+	switch {
+	default:
+		c := changesclientrest.New()
+		changesClient, changesHandler = c, c
+	case config.ClientChangesKafkaEnabled:
+		switch {
+		default:
+			changesClient = changesclientrest.New()
+		}
+		changesHandler = changesclientkafka.New()
+	}
 	changesClient.SetUtilities(logger)
+	changesHandler.SetUtilities(logger)
 	employeesLogic := logic.New()
 	employeesLogic.SetUtilities(logger)
-	employeesLogic.SetParameters(employeesMeta, changesClient)
-	parameters = append(parameters, employeesMeta, employeesLogic, changesClient)
-	if config.RestEnabled {
-		restServer := internal_server_rest.New()
-		restServer.SetUtilities(logger)
+	employeesLogic.SetParameters(employeesMeta, changesClient, changesHandler)
+	parameters = append(parameters, employeesMeta, employeesLogic, changesClient, changesHandler)
+	if config.ServiceRestEnabled {
 		employeesRestService := servicerest.New()
 		employeesRestService.SetUtilities(logger)
-		employeesRestService.SetParameters(employeesLogic, restServer)
+		employeesRestService.SetParameters(employeesLogic)
+		restServer := internal_server_rest.New()
+		restServer.SetUtilities(logger)
+		restServer.SetParameters(employeesRestService)
 		parameters = append(parameters, restServer, employeesRestService)
 	}
-	if config.GrpcEnabled {
-		grpcServer := internal_server_grpc.New()
-		grpcServer.SetUtilities(logger)
+	if config.ServiceGrpcEnabled {
 		employeesGrpcService := servicegrpc.New()
 		employeesGrpcService.SetUtilities(logger)
-		employeesGrpcService.SetParameters(employeesLogic, employeesGrpcService)
+		employeesGrpcService.SetParameters(employeesLogic)
+		grpcServer := internal_server_grpc.New()
+		grpcServer.SetUtilities(logger)
+		grpcServer.SetParameters(employeesGrpcService)
 		parameters = append(parameters, grpcServer, employeesGrpcService)
 	}
 	return logger, parameters

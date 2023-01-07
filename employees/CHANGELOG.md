@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2023-01-07
+
+- updated rest client to use latest internal (for rest)
+- normalized types for rest/grpc client so they're inter-changeable
+- fixed service configuration to expose grpc (config issue)
+
 ## [1.3.0] - 2022-12-26
 
 - integrated changes client

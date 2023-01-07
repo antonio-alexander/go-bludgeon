@@ -14,6 +14,8 @@ import (
 
 func handleResponse(writer http.ResponseWriter, err error, bytes []byte) error {
 	if err != nil {
+		var e internal_errors.Error
+
 		switch {
 		default:
 			writer.WriteHeader(http.StatusInternalServerError)
@@ -24,7 +26,13 @@ func handleResponse(writer http.ResponseWriter, err error, bytes []byte) error {
 		case errors.Is(err, meta.ErrEmployeeConflictCreate) || errors.Is(err, meta.ErrEmployeeConflictUpdate):
 			writer.WriteHeader(http.StatusConflict)
 		}
-		bytes, err = json.Marshal(&internal_errors.Error{Error: err.Error()})
+		switch v := err.(type) {
+		default:
+			e = internal_errors.New(err.Error())
+		case internal_errors.Error:
+			e = v
+		}
+		bytes, err = json.Marshal(e)
 		if err != nil {
 			return err
 		}

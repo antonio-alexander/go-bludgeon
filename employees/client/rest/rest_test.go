@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	employeesclient "github.com/antonio-alexander/go-bludgeon/employees/client"
 	client "github.com/antonio-alexander/go-bludgeon/employees/client/rest"
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
 
@@ -47,8 +48,9 @@ func init() {
 
 type restClientTest struct {
 	client interface {
-		client.Client
+		employeesclient.Client
 		internal.Configurer
+		internal.Initializer
 	}
 }
 
@@ -68,6 +70,12 @@ func newRestclientTest() *restClientTest {
 func (r *restClientTest) Initialize(t *testing.T) {
 	err := r.client.Configure(configRestClient)
 	assert.Nil(t, err)
+	err = r.client.Initialize()
+	assert.Nil(t, err)
+}
+
+func (r *restClientTest) Shutdown(t *testing.T) {
+	r.client.Shutdown()
 }
 
 func (r *restClientTest) TestEmployeeOperations(t *testing.T) {
@@ -137,7 +145,9 @@ func (r *restClientTest) TestEmployeeOperations(t *testing.T) {
 
 func TestEmployeesRestClient(t *testing.T) {
 	r := newRestclientTest()
+
 	r.Initialize(t)
+	defer r.Shutdown(t)
 
 	t.Run("Test Employee Operations", r.TestEmployeeOperations)
 }

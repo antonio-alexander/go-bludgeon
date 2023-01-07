@@ -35,6 +35,15 @@ func New() interface {
 	}
 }
 
+func (s *grpcService) SetUtilities(parameters ...interface{}) {
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case logger.Logger:
+			s.Logger = p
+		}
+	}
+}
+
 func (s *grpcService) SetParameters(parameters ...interface{}) {
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
@@ -48,21 +57,12 @@ func (s *grpcService) SetParameters(parameters ...interface{}) {
 	}
 }
 
-func (s *grpcService) SetUtilities(parameters ...interface{}) {
-	for _, p := range parameters {
-		switch p := p.(type) {
-		case logger.Logger:
-			s.Logger = p
-		}
-	}
-}
-
 func (s *grpcService) Register(server grpc.ServiceRegistrar) {
 	pb.RegisterEmployeesServer(server, s)
 }
 
 func (s *grpcService) EmployeeCreate(ctx context.Context, request *pb.EmployeeCreateRequest) (*pb.EmployeeCreateResponse, error) {
-	employee, err := s.logic.EmployeeCreate(ctx, *pb.ToEmployeePartial(request.EmployeePartial))
+	employee, err := s.logic.EmployeeCreate(ctx, *pb.ToEmployeePartial(request.GetEmployeePartial()))
 	return &pb.EmployeeCreateResponse{
 		Employee: pb.FromEmployee(employee),
 	}, err

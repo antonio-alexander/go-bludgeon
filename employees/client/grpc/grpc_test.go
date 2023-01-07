@@ -10,8 +10,11 @@ import (
 	"testing"
 	"time"
 
-	client "github.com/antonio-alexander/go-bludgeon/employees/client/rest"
+	employeesclient "github.com/antonio-alexander/go-bludgeon/employees/client"
+	client "github.com/antonio-alexander/go-bludgeon/employees/client/grpc"
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
@@ -34,6 +37,7 @@ func randomString(n int) string {
 }
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
 	envs := make(map[string]string)
 	for _, env := range os.Environ() {
 		if s := strings.Split(env, "="); len(s) > 1 {
@@ -42,35 +46,42 @@ func init() {
 	}
 	configGrpcClient.Default()
 	configGrpcClient.FromEnv(envs)
-	rand.Seed(time.Now().UnixNano())
+	configGrpcClient.Options = append(configGrpcClient.Options, grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
 
-type restClientTest struct {
+type grpcClientTest struct {
 	client interface {
 		internal.Configurer
-		client.Client
+		internal.Initializer
+		employeesclient.Client
 	}
 }
 
-func newRestClientTest() *restClientTest {
+func newGrpcClientTest() *grpcClientTest {
 	logger := internal_logger.New()
-	logger.Configure(internal_logger.Configuration{
+	logger.Configure(&internal_logger.Configuration{
 		Prefix: "bludgeon_rest_server_test",
 		Level:  internal_logger.Trace,
 	})
 	client := client.New()
 	client.SetUtilities(logger)
-	return &restClientTest{
+	return &grpcClientTest{
 		client: client,
 	}
 }
 
-func (r *restClientTest) Initialize(t *testing.T) {
+func (r *grpcClientTest) Initialize(t *testing.T) {
 	err := r.client.Configure(configGrpcClient)
+	assert.Nil(t, err)
+	err = r.client.Initialize()
 	assert.Nil(t, err)
 }
 
-func (r *restClientTest) testEmployeeOperations(t *testing.T) {
+func (r *grpcClientTest) Shutdown(t *testing.T) {
+	r.client.Shutdown()
+}
+
+func (r *grpcClientTest) TestEmployeeOperations(t *testing.T) {
 	ctx := context.TODO()
 	firstName, lastName := randomString(25), randomString(25)
 	emailAddress := fmt.Sprintf("%s@foobar.duck", randomString(25))
@@ -135,9 +146,11 @@ func (r *restClientTest) testEmployeeOperations(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
-func TestEmployeesRestClient(t *testing.T) {
-	r := newRestClientTest()
+func TestEmployeesGrpcClient(t *testing.T) {
+	r := newGrpcClientTest()
 
 	r.Initialize(t)
-	t.Run("Test Employee Operations", r.testEmployeeOperations)
+	defer r.Shutdown(t)
+
+	t.Run("Test Employee Operations", r.TestEmployeeOperations)
 }

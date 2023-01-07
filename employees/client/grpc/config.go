@@ -10,7 +10,7 @@ import (
 
 // environmental variables
 const (
-	EnvNameRestAddress string = "BLUDGEON_EMPLOYEES_GRPC_ADDRESS"
+	EnvNameGrpcAddress string = "BLUDGEON_EMPLOYEES_GRPC_ADDRESS"
 	EnvNameRestPort    string = "BLUDGEON_EMPLOYEES_GRPC_PORT"
 )
 
@@ -32,7 +32,7 @@ func (r *Configuration) Default() {
 func (r *Configuration) FromEnv(envs map[string]string) {
 	//Get the address from the environment, then the port
 	// then the timeout
-	if address, ok := envs[EnvNameRestAddress]; ok {
+	if address, ok := envs[EnvNameGrpcAddress]; ok {
 		r.Address = address
 	}
 	if port, ok := envs[EnvNameRestPort]; ok {
