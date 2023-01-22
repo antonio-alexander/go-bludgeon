@@ -1,7 +1,6 @@
 package restserver
 
 import (
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -35,11 +34,6 @@ const (
 	DefaultCorsDebug        bool          = false
 )
 
-var (
-	DefaultAllowedOrigins = [...]string{"http://localhost:8000"}
-	DefaultAllowedMethods = [...]string{http.MethodPost, http.MethodPut, http.MethodGet, http.MethodDelete, http.MethodPatch}
-)
-
 type Configuration struct {
 	Address          string        `json:"address"`
 	Port             string        `json:"port"`
@@ -50,16 +44,6 @@ type Configuration struct {
 	AllowCredentials bool          `json:"allow_credentials"`
 	CorsDebug        bool          `json:"cors_debug"`
 	CorsDisabled     bool          `json:"cors_disabled"`
-}
-
-func (c *Configuration) Default() {
-	c.Address = DefaultAddress
-	c.Port = DefaultPort
-	c.ShutdownTimeout = DefaultShutdownTimeout
-	c.AllowCredentials = DefaultAllowCredentials
-	c.AllowedOrigins = DefaultAllowedOrigins[:]
-	c.AllowedMethods = DefaultAllowedMethods[:]
-	c.CorsDebug = DefaultCorsDebug
 }
 
 func (c *Configuration) FromEnv(envs map[string]string) {

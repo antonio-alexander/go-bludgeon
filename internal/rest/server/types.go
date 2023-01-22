@@ -10,8 +10,8 @@ const (
 	ErrNotStarted string = "not started"
 )
 
-type Router interface {
-	HandleFunc(HandleFuncConfig)
+type RouteBuilder interface {
+	BuildRoutes() []HandleFuncConfig
 }
 
 type HandleFuncConfig struct {

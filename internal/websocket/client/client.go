@@ -147,6 +147,9 @@ func (c *client) Read(item interface{}) error {
 }
 
 func (c *client) Close() {
+	if !c.connected {
+		return
+	}
 	if err := c.Conn.Close(); err != nil {
 		c.Error("error while closing connection: %s", err)
 	}

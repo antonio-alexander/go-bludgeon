@@ -3,15 +3,12 @@ package restclient
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/antonio-alexander/go-bludgeon/internal"
 	"github.com/antonio-alexander/go-bludgeon/internal/config"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
-
-	"github.com/pkg/errors"
 )
 
 type client struct {
@@ -69,29 +66,19 @@ func (c *client) Configure(items ...interface{}) error {
 	return nil
 }
 
-func (c *client) DoRequest(ctx context.Context, uri, method string, data []byte) ([]byte, error) {
+func (c *client) DoRequest(ctx context.Context, uri, method string, data []byte) ([]byte, int, error) {
 	request, err := http.NewRequestWithContext(ctx, method, uri, bytes.NewBuffer(data))
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 	response, err := c.Do(request)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 	data, err = io.ReadAll(response.Body)
 	defer response.Body.Close()
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
-	switch response.StatusCode {
-	default:
-		if len(data) > 0 {
-			return nil, errors.New(string(data))
-		}
-		return nil, fmt.Errorf("failure: %d", response.StatusCode)
-	case http.StatusOK:
-		return data, nil
-	case http.StatusNoContent:
-		return nil, nil
-	}
+	return data, response.StatusCode, nil
 }
