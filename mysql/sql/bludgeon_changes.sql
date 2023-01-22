@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS registration_changes (
     registration_id VARCHAR(36) NOT NULL,
     change_id VARCHAR(36) NOT NULL,
     FOREIGN KEY (registration_id)
-        REFERENCES registrations(id),
+        REFERENCES registrations(id)
+        ON DELETE CASCADE,
     FOREIGN KEY (change_id)
         REFERENCES changes(id),
     PRIMARY KEY(registration_id, change_id)

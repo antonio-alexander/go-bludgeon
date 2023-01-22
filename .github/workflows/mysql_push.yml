@@ -4,22 +4,16 @@ on:
   push:
     branches:
       - main
-      - develop
     paths:
       - "mysql/**"
-      - ".github/workflows/mysql.yml"
-  pull_request:
-    paths:
-      - "mysql/**"
-      - ".github/workflows/mysql.yml"
+      - ".github/workflows/mysql_push.yml"
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  environment_push:
-    if: github.event_name == 'push'
+  environment:
     runs-on: ubuntu-latest
     env:
       GITHUB_SHA: ${{ github.sha }}
@@ -59,100 +53,8 @@ jobs:
             /tmp/git_source
             /tmp/git_sha
 
-  environment_pull_request:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    env:
-      GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
-      GITHUB_HEAD_REF: ${{ github.head_ref }}
-      GITHUB_BASE_REF: ${{ github.base_ref }}
-    steps:
-      - name: Get git target
-        run: |
-          git_target=`echo $GITHUB_BASE_REF | sed 's/refs\/heads\///'`
-          git_target=`echo $git_target | sed 's/refs\/tags\///'`
-          git_target=`echo $git_target| sed 's/refs\\///'`
-          echo $git_target
-          echo "git_target=$git_target" >> $GITHUB_ENV
-      - name: Get git source
-        run: |
-          git_source=`echo $GITHUB_HEAD_REF | sed 's/refs\/heads\///'`
-          git_source=`echo $git_source | sed 's/refs\/tags\///'`
-          git_source=`echo $git_source | sed 's/refs\\///'`
-          echo $git_source
-          echo "git_source=$git_source" >> $GITHUB_ENV
-      - name: Get git SHA
-        run: |
-          git_sha=`echo $GITHUB_SHA`
-          echo $git_sha
-          echo "git_sha=$git_sha" >> $GITHUB_ENV
-      - name: Checkout repository code (source)
-        uses: actions/checkout@v3
-      - name: Get source version
-        run: |
-          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/mysql/version.json  | jq '.Version' | sed 's/"//g'`
-          echo $version_source
-          echo "version_source=$version_source" >> $GITHUB_ENV
-      - name: Checkout repository code (target)
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.base_ref }}
-      - name: Get target version
-        run: |
-          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/mysql/version.json  | jq '.Version' | sed 's/"//g'`
-          echo $version_target
-          echo "version_target=$version_target" >> $GITHUB_ENV
-      - name: Generate build artifacts
-        run: |
-          mkdir -p /tmp
-          echo ${{ env.version_source }} >> /tmp/version_source
-          echo ${{ env.version_target }} >> /tmp/version_target
-          echo ${{ env.git_target }} >> /tmp/git_target
-          echo ${{ env.git_source }} >> /tmp/git_source
-          echo ${{ env.git_sha }} >> /tmp/git_sha
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: artifacts
-          path: |
-            /tmp/version_source
-            /tmp/version_target
-            /tmp/git_target
-            /tmp/git_source
-            /tmp/git_sha
-
-  version_validate:
-    if: ${{ always() &&
-      (needs.environment_push.result=='success' || needs.environment_pull_request.result=='success') &&
-      github.base_ref == 'refs/heads/main' }}
-    needs: [environment_push, environment_pull_request]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get environment
-        run: |
-          version_source=`cat /tmp/version_source`
-          echo "version_source=$version_source" >> $GITHUB_ENV
-          version_target=`cat /tmp/version_target`
-          echo "version_target=$version_target" >> $GITHUB_ENV
-      - name: Compare versions
-        run: |
-          echo "Comparing version \"${{ env.version_source }}\" to target version \"${{ env.version_target }}\""
-          if [ "${{ env.version_source }}" = "${{ env.version_target }}" ]; then
-               echo "versions are the same, versions must be different"
-               exit 1
-          fi
-
   docker_build_images:
-    if: ${{ always() &&
-      (needs.environment_push.result=='success' || needs.environment_pull_request.result=='success') }}
-    needs: [environment_push, environment_pull_request]
+    needs: [environment]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -199,8 +101,6 @@ jobs:
           docker container prune -f
 
   docker_push_images:
-    if: ${{ always() && needs.docker_build_images.result=='success' &&
-      (github.event_name == 'release' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
     needs: [docker_build_images]
     runs-on: ubuntu-latest
     permissions:
@@ -249,8 +149,6 @@ jobs:
           docker container prune -f
 
   git_push_tag:
-    if: ${{ always() && needs.docker_build_images.result=='success' &&
-      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.event_name == 'release' ) }}
     needs: [docker_build_images]
     runs-on: ubuntu-latest
     permissions:
