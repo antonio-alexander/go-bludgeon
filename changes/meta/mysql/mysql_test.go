@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var config *internal_mysql.Configuration
+var config = new(internal_mysql.Configuration)
 
 func init() {
 	envs := make(map[string]string)
@@ -23,7 +23,6 @@ func init() {
 			envs[s[0]] = strings.Join(s[1:], ",")
 		}
 	}
-	config = new(internal_mysql.Configuration)
 	config.Default()
 	config.FromEnv(envs)
 	config.ParseTime = false

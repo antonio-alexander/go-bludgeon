@@ -32,11 +32,12 @@
                 "BLUDGEON_ALLOWED_ORIGINS": "*",
                 // "BLUDGEON_ALLOWED_ORIGINS": "http://localhost:8082",
                 "BLUDGEON_CORS_DEBUG": "true",
-                "BLUDGEON_KAFKA_ENABLED": "false",
+                "BLUDGEON_KAFKA_ENABLED": "true",
                 "BLUDGEON_KAFKA_BROKERS": "localhost:9092",
                 "BLUDGEON_KAFKA_GROUP_ID": "changes",
                 "BLUDGEON_KAFKA_CONSUMER_GROUP": "true",
                 "BLUDGEON_KAFKA_ENABLE_LOG": "true",
+                "BLUDGEON_REST_SHUTDOWN_TIMEOUT": "15"
             },
         }
     ]

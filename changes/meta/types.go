@@ -2,12 +2,14 @@ package meta
 
 import (
 	"context"
+	"errors"
 
-	"github.com/antonio-alexander/go-bludgeon/changes/data"
-	"github.com/antonio-alexander/go-bludgeon/internal/errors"
+	data "github.com/antonio-alexander/go-bludgeon/changes/data"
+
+	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
 )
 
-//these constants are used to generate change specific errors
+// these constants are used to generate change specific errors
 const (
 	ChangeNotFound               string = "change not found"
 	ChangeNotWritten             string = "change not written; data id not provided"
@@ -18,18 +20,18 @@ const (
 	RegistrationChangeNotWritten string = "registration change not written; change id not provided"
 )
 
-//these are error variables used within the change meta
+// these are error variables used within the change meta
 var (
-	ErrChangeNotFound               = errors.NewNotFound(ChangeNotFound)
-	ErrChangeNotWritten             = errors.NewNotupdated(ChangeNotWritten)
-	ErrChangeConflictWrite          = errors.NewConflict(ChangeConflictWrite)
-	ErrchangeNotDeletedConflict     = errors.NewConflict(ChangeNotDeletedConflict)
-	ErrRegistrationNotFound         = errors.NewNotFound(RegistrationNotFound)
-	ErrRegistrationNotWritten       = errors.NewNotFound(RegistrationNotWritten)
-	ErrRegistrationChangeNotWritten = errors.NewNotFound(RegistrationChangeNotWritten)
+	ErrChangeNotFound               = internal_errors.NewNotFound(errors.New(ChangeNotFound))
+	ErrChangeNotWritten             = internal_errors.NewNotUpdated(errors.New(ChangeNotWritten))
+	ErrChangeConflictWrite          = internal_errors.NewConflict(errors.New(ChangeConflictWrite))
+	ErrchangeNotDeletedConflict     = internal_errors.NewConflict(errors.New(ChangeNotDeletedConflict))
+	ErrRegistrationNotFound         = internal_errors.NewNotFound(errors.New(RegistrationNotFound))
+	ErrRegistrationNotWritten       = internal_errors.NewNotFound(errors.New(RegistrationNotWritten))
+	ErrRegistrationChangeNotWritten = internal_errors.NewNotFound(errors.New(RegistrationChangeNotWritten))
 )
 
-//SerializedData provides a struct that describes the representation
+// SerializedData provides a struct that describes the representation
 // of the data when serialized
 type SerializedData struct {
 	Changes             map[string]data.Change         `json:"changes"`
@@ -37,7 +39,7 @@ type SerializedData struct {
 	RegistrationChanges map[string]map[string]struct{} `json:"registration_changes"`
 }
 
-//Serializer is an interface that can be used to convert the contents of
+// Serializer is an interface that can be used to convert the contents of
 // meta into a scalar type
 type Serializer interface {
 	//Serialize can be used to convert all available metadata
@@ -49,7 +51,7 @@ type Serializer interface {
 	Deserialize(data *SerializedData) error
 }
 
-//Change is an interface that groups functions to interact with one or more
+// Change is an interface that groups functions to interact with one or more
 // changes
 type Change interface {
 	ChangeCreate(ctx context.Context, change data.ChangePartial) (*data.Change, error)

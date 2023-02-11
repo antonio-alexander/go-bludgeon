@@ -81,8 +81,8 @@ func (k *kafkaClient) subscribeFx(topic string, bytes []byte) {
 	switch v := item.(type) {
 	default:
 		k.Trace(logAlias+"received unsupported type: %T", v)
-	case *data.ResponseChange:
-		k.handleFx(&v.Change)
+	case *data.Change:
+		k.handleFx(v)
 	case *data.ChangeDigest:
 		k.handleFx(v.Changes...)
 	}
@@ -178,7 +178,7 @@ func (k *kafkaClient) HandlerCreate(handlerFx client.HandlerFx) (string, error) 
 }
 
 func (k *kafkaClient) HandlerConnected(handlerId string) (bool, error) {
-	return false, nil
+	return k.subscribeId != "", nil
 }
 
 func (k *kafkaClient) HandlerDelete(handlerId string) error {

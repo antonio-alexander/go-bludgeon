@@ -60,11 +60,12 @@ func parameterize(config *Configuration) (interface {
 	changesLogic.SetParameters(changesMeta)
 	parameters = append(parameters, changesMeta, changesLogic)
 	if config.RestEnabled {
-		restServer := serverrest.New()
-		restServer.SetUtilities(logger)
 		changesRestService := servicerest.New()
 		changesRestService.SetUtilities(logger)
-		changesRestService.SetParameters(changesLogic, restServer)
+		changesRestService.SetParameters(changesLogic)
+		restServer := serverrest.New()
+		restServer.SetUtilities(logger)
+		restServer.SetParameters(changesRestService)
 		parameters = append(parameters, changesMeta, restServer, changesRestService)
 	}
 	if config.KafkaEnabled {

@@ -183,7 +183,7 @@ func TestEmployeesRestClient(t *testing.T) {
 	r := newRestclientTest()
 
 	r.Initialize(t)
-	defer func() { r.Shutdown(t) }()
+	defer r.Shutdown(t)
 
 	t.Run("Test Change Operations", r.TestChangeOperations)
 	t.Run("Test Change Streaming", r.TestChangeStreaming)

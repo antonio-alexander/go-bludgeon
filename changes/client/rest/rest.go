@@ -3,18 +3,21 @@ package restclient
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 
 	client "github.com/antonio-alexander/go-bludgeon/changes/client"
 	data "github.com/antonio-alexander/go-bludgeon/changes/data"
+
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	config "github.com/antonio-alexander/go-bludgeon/internal/config"
+	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_restclient "github.com/antonio-alexander/go-bludgeon/internal/rest/client"
+	restclient "github.com/antonio-alexander/go-bludgeon/internal/rest/client"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 )
 
 type restClient struct {
@@ -22,7 +25,7 @@ type restClient struct {
 	sync.WaitGroup
 	logger.Logger
 	client interface {
-		internal_restclient.Client
+		restclient.Client
 		internal.Configurer
 		internal.Parameterizer
 	}
@@ -43,12 +46,29 @@ func New() interface {
 	internal.Configurer
 	internal.Parameterizer
 } {
-	r := &restClient{
-		client:   internal_restclient.New(),
+	return &restClient{
+		client:   restclient.New(),
 		handlers: make(map[string]*handler),
 		Logger:   logger.NewNullLogger(),
 	}
-	return r
+}
+
+func (r *restClient) doRequest(ctx context.Context, uri string, method string, data []byte) ([]byte, error) {
+	bytes, statusCode, err := r.client.DoRequest(ctx, uri, method, data)
+	if err != nil {
+		return nil, err
+	}
+	switch statusCode {
+	default:
+		err := new(internal_errors.Error)
+		if err := json.Unmarshal(bytes, err); err != nil {
+			r.Error("error while unmarshalling error: %s", err)
+			return nil, errors.Errorf("failed status code: %d", statusCode)
+		}
+		return nil, err
+	case http.StatusOK, http.StatusNoContent, http.StatusNotModified:
+		return bytes, nil
+	}
 }
 
 func (r *restClient) SetUtilities(parameters ...interface{}) {
@@ -66,7 +86,7 @@ func (r *restClient) SetParameters(parameters ...interface{}) {
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
 		case interface {
-			internal_restclient.Client
+			restclient.Client
 			internal.Configurer
 			internal.Parameterizer
 		}:
@@ -135,38 +155,38 @@ func (r *restClient) Shutdown() {
 }
 
 func (r *restClient) ChangeUpsert(ctx context.Context, changePartial data.ChangePartial) (*data.Change, error) {
-	bytes, err := json.Marshal(&data.RequestChange{ChangePartial: changePartial})
+	bytes, err := json.Marshal(&changePartial)
 	if err != nil {
 		return nil, err
 	}
 	uri := fmt.Sprintf("http://%s:%s"+data.RouteChanges, r.config.Rest.Address, r.config.Rest.Port)
-	bytes, err = r.client.DoRequest(ctx, uri, data.MethodChangeUpsert, bytes)
+	bytes, err = r.doRequest(ctx, uri, data.MethodChangeUpsert, bytes)
 	if err != nil {
 		return nil, err
 	}
-	response := &data.ResponseChange{}
-	if err = json.Unmarshal(bytes, response); err != nil {
+	change := &data.Change{}
+	if err = json.Unmarshal(bytes, change); err != nil {
 		return nil, err
 	}
-	return &response.Change, nil
+	return change, nil
 }
 
 func (r *restClient) ChangeRead(ctx context.Context, changeId string) (*data.Change, error) {
 	uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesParamf, r.config.Rest.Address, r.config.Rest.Port, changeId)
-	bytes, err := r.client.DoRequest(ctx, uri, data.MethodChangeRead, nil)
+	bytes, err := r.doRequest(ctx, uri, data.MethodChangeRead, nil)
 	if err != nil {
 		return nil, err
 	}
-	response := &data.ResponseChange{}
-	if err = json.Unmarshal(bytes, response); err != nil {
+	change := &data.Change{}
+	if err = json.Unmarshal(bytes, change); err != nil {
 		return nil, err
 	}
-	return &response.Change, nil
+	return change, nil
 }
 
 func (r *restClient) ChangesRead(ctx context.Context, search data.ChangeSearch) ([]*data.Change, error) {
 	uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesSearch+search.ToParams(), r.config.Rest.Address, r.config.Rest.Port)
-	bytes, err := r.client.DoRequest(ctx, uri, data.MethodChangeRead, nil)
+	bytes, err := r.doRequest(ctx, uri, data.MethodChangeRead, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -179,16 +199,20 @@ func (r *restClient) ChangesRead(ctx context.Context, search data.ChangeSearch) 
 
 func (r *restClient) ChangeDelete(ctx context.Context, changeId string) error {
 	uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesParamf, r.config.Rest.Address, r.config.Rest.Port, changeId)
-	if _, err := r.client.DoRequest(ctx, uri, data.MethodChangeDelete, nil); err != nil {
+	if _, err := r.doRequest(ctx, uri, data.MethodChangeDelete, nil); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (r *restClient) RegistrationUpsert(ctx context.Context, registrationId string) error {
-	uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamf,
-		r.config.Rest.Address, r.config.Rest.Port, registrationId)
-	if _, err := r.client.DoRequest(ctx, uri, data.MethodRegistrationUpsert, nil); err != nil {
+	bytes, err := json.Marshal(&data.RequestRegister{RegistrationId: registrationId})
+	if err != nil {
+		return err
+	}
+	uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistration,
+		r.config.Rest.Address, r.config.Rest.Port)
+	if _, err := r.doRequest(ctx, uri, data.MethodRegistrationUpsert, bytes); err != nil {
 		return err
 	}
 	return nil
@@ -197,7 +221,7 @@ func (r *restClient) RegistrationUpsert(ctx context.Context, registrationId stri
 func (r *restClient) RegistrationChangesRead(ctx context.Context, registrationId string) ([]*data.Change, error) {
 	uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamChangesf,
 		r.config.Rest.Address, r.config.Rest.Port, registrationId)
-	bytes, err := r.client.DoRequest(ctx, uri, data.MethodChangeRead, nil)
+	bytes, err := r.doRequest(ctx, uri, data.MethodChangeRead, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +239,7 @@ func (r *restClient) RegistrationChangeAcknowledge(ctx context.Context, registra
 	}
 	uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationServiceIdAcknowledgef,
 		r.config.Rest.Address, r.config.Rest.Port, registrationId)
-	if _, err = r.client.DoRequest(ctx, uri, data.MethodRegistrationChangeAcknowledge, bytes); err != nil {
+	if _, err = r.doRequest(ctx, uri, data.MethodRegistrationChangeAcknowledge, bytes); err != nil {
 		return err
 	}
 	return nil
@@ -224,7 +248,7 @@ func (r *restClient) RegistrationChangeAcknowledge(ctx context.Context, registra
 func (r *restClient) RegistrationDelete(ctx context.Context, registrationId string) error {
 	uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesRegistrationParamf,
 		r.config.Rest.Address, r.config.Rest.Port, registrationId)
-	if _, err := r.client.DoRequest(ctx, uri, data.MethodRegistrationDelete, nil); err != nil {
+	if _, err := r.doRequest(ctx, uri, data.MethodRegistrationDelete, nil); err != nil {
 		return err
 	}
 	return nil
