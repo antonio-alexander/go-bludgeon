@@ -11,6 +11,7 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/antonio-alexander/go-bludgeon/employees/data"
 	"github.com/antonio-alexander/go-bludgeon/employees/logic"
@@ -40,13 +41,13 @@ var (
 	configLogger        = new(internal_logger.Configuration)
 	configServer        = new(internal_server.Configuration)
 	configChangesClient = new(changesclientrest.Configuration)
+	configLogic         = new(logic.Configuration)
 )
 
-type restServerTest struct {
+type restServiceTest struct {
 	server interface {
 		internal.Initializer
 		internal.Configurer
-		internal_server.Router
 	}
 	meta interface {
 		internal.Initializer
@@ -60,6 +61,7 @@ type restServerTest struct {
 }
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
 	envs := make(map[string]string)
 	for _, e := range os.Environ() {
 		if s := strings.Split(e, "="); len(s) > 1 {
@@ -74,12 +76,14 @@ func init() {
 	os.Remove(configMetaFile.File)
 	configMetaMysql.Default()
 	configMetaMysql.FromEnv(envs)
+	configLogic.Default()
+	configLogic.FromEnv(envs)
 	configChangesClient.Default()
 	configChangesClient.FromEnv(envs)
-	configServer.Default()
 	configServer.FromEnv(envs)
 	configServer.Address = "localhost"
 	configServer.Port = "8081"
+	configServer.ShutdownTimeout = 10 * time.Second
 }
 
 func randomString(n int) string {
@@ -91,7 +95,7 @@ func randomString(n int) string {
 	return string(b)
 }
 
-func newRestServerTest(metaType string) *restServerTest {
+func newRestServiceTest(metaType string) *restServiceTest {
 	var employeeMeta interface {
 		meta.Employee
 		internal.Initializer
@@ -118,12 +122,14 @@ func newRestServerTest(metaType string) *restServerTest {
 	employeeLogic := logic.New()
 	employeeLogic.SetParameters(employeeMeta, changesClient)
 	employeeLogic.SetUtilities(logger)
+	employeeLogic.Configure(configLogic)
+	employeeService := service.New()
+	employeeService.SetUtilities(logger)
+	employeeService.SetParameters(employeeLogic)
 	server := internal_server.New()
 	server.SetUtilities(logger)
-	service := service.New()
-	service.SetUtilities(logger)
-	service.SetParameters(server, employeeLogic)
-	return &restServerTest{
+	server.SetParameters(employeeService)
+	return &restServiceTest{
 		server:        server,
 		meta:          employeeMeta,
 		changesClient: changesClient,
@@ -131,7 +137,7 @@ func newRestServerTest(metaType string) *restServerTest {
 	}
 }
 
-func (r *restServerTest) doRequest(route, method string, data []byte) ([]byte, int, error) {
+func (r *restServiceTest) doRequest(route, method string, data []byte) ([]byte, int, error) {
 	uri := fmt.Sprintf("http://%s:%s%s", configServer.Address, configServer.Port, route)
 	request, err := http.NewRequest(method, uri, bytes.NewBuffer(data))
 	if err != nil {
@@ -146,7 +152,7 @@ func (r *restServerTest) doRequest(route, method string, data []byte) ([]byte, i
 	return bytes, response.StatusCode, err
 }
 
-func (r *restServerTest) initialize(t *testing.T, metaType string) {
+func (r *restServiceTest) initialize(t *testing.T, metaType string) {
 	switch metaType {
 	case "mysql":
 		err := r.meta.Configure(configMetaMysql)
@@ -167,13 +173,13 @@ func (r *restServerTest) initialize(t *testing.T, metaType string) {
 	assert.Nil(t, err)
 }
 
-func (r *restServerTest) shutdown(t *testing.T) {
+func (r *restServiceTest) shutdown(t *testing.T) {
 	r.server.Shutdown()
 	r.changesClient.Shutdown()
 	r.meta.Shutdown()
 }
 
-func (r *restServerTest) TestEmployeeOperations(t *testing.T) {
+func (r *restServiceTest) TestEmployeeOperations(t *testing.T) {
 	//create employee
 	firstName, lastName := randomString(25), randomString(25)
 	emailAddress := fmt.Sprintf("%s@foobar.duck", randomString(25))
@@ -248,7 +254,7 @@ func (r *restServerTest) TestEmployeeOperations(t *testing.T) {
 }
 
 func testEmployeesRestService(t *testing.T, metaType string) {
-	r := newRestServerTest(metaType)
+	r := newRestServiceTest(metaType)
 
 	r.initialize(t, metaType)
 	defer r.shutdown(t)

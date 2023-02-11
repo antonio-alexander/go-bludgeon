@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	client "github.com/antonio-alexander/go-bludgeon/employees/client"
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
 	pb "github.com/antonio-alexander/go-bludgeon/employees/data/pb"
 
@@ -14,10 +15,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-type client struct {
+type grpcClient struct {
 	logger.Logger
 	pb.EmployeesClient
-	grpcClient interface {
+	client interface {
 		internal.Configurer
 		internal.Initializer
 		internal.Parameterizer
@@ -28,31 +29,32 @@ type client struct {
 // New can be used to create a concrete instance of the client client
 // that implements the interfaces of logic.Logic and Owner
 func New() interface {
-	Client
+	client.Client
 	internal.Initializer
 	internal.Configurer
+	internal.Parameterizer
 } {
-	return &client{
-		Logger:     logger.NewNullLogger(),
-		grpcClient: grpcclient.New(),
+	return &grpcClient{
+		Logger: logger.NewNullLogger(),
+		client: grpcclient.New(),
 	}
 }
 
-func (c *client) SetParameters(parameters ...interface{}) {
-	c.grpcClient.SetParameters(parameters...)
+func (g *grpcClient) SetParameters(parameters ...interface{}) {
+	g.client.SetParameters(parameters...)
 }
 
-func (c *client) SetUtilities(parameters ...interface{}) {
-	c.grpcClient.SetUtilities(parameters...)
+func (g *grpcClient) SetUtilities(parameters ...interface{}) {
+	g.client.SetUtilities(parameters...)
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
 		case logger.Logger:
-			c.Logger = p
+			g.Logger = p
 		}
 	}
 }
 
-func (c *client) Configure(items ...interface{}) error {
+func (g *grpcClient) Configure(items ...interface{}) error {
 	var configuration *Configuration
 	var envs map[string]string
 
@@ -64,7 +66,7 @@ func (c *client) Configure(items ...interface{}) error {
 			configuration = v
 		}
 	}
-	if c == nil {
+	if g == nil {
 		configuration = new(Configuration)
 		configuration.Default()
 		configuration.FromEnv(envs)
@@ -72,57 +74,62 @@ func (c *client) Configure(items ...interface{}) error {
 	if err := configuration.Validate(); err != nil {
 		return err
 	}
-	if err := c.grpcClient.Configure(&configuration.Configuration); err != nil {
+	if err := g.client.Configure(&configuration.Configuration); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Initialize can be used to ready the underlying pointer for use
-func (c *client) Initialize() error {
-	if err := c.grpcClient.Initialize(); err != nil {
+func (g *grpcClient) Initialize() error {
+	if err := g.client.Initialize(); err != nil {
 		return err
 	}
-	c.EmployeesClient = pb.NewEmployeesClient(c.grpcClient)
+	g.EmployeesClient = pb.NewEmployeesClient(g.client)
 	return nil
 }
 
-func (c *client) Shutdown() {
-	c.grpcClient.Shutdown()
+func (g *grpcClient) Shutdown() {
+	g.client.Shutdown()
 }
 
 // EmployeeCreate can be used to create a single Employee
 // the employee email address is required and must be unique
 // at the time of creation
-func (c *client) EmployeeCreate(ctx context.Context, employeePartial data.EmployeePartial) (*data.Employee, error) {
-	response, err := c.EmployeesClient.EmployeeCreate(ctx, &pb.EmployeeCreateRequest{})
+func (g *grpcClient) EmployeeCreate(ctx context.Context, employeePartial data.EmployeePartial) (*data.Employee, error) {
+	response, err := g.EmployeesClient.EmployeeCreate(ctx, &pb.EmployeeCreateRequest{
+		EmployeePartial: pb.FromEmployeePartial(&employeePartial),
+	})
 	return pb.ToEmployee(response.GetEmployee()), err
 }
 
 // EmployeeRead can be used to read a single employee given a
 // valid id
-func (c *client) EmployeeRead(ctx context.Context, id string) (*data.Employee, error) {
-	response, err := c.EmployeesClient.EmployeeRead(ctx, &pb.EmployeeReadRequest{Id: id})
+func (g *grpcClient) EmployeeRead(ctx context.Context, id string) (*data.Employee, error) {
+	response, err := g.EmployeesClient.EmployeeRead(ctx, &pb.EmployeeReadRequest{Id: id})
 	return pb.ToEmployee(response.GetEmployee()), err
 }
 
 // EmployeeUpdate can be used to update the properties of a given employee
-func (c *client) EmployeeUpdate(ctx context.Context, id string, employeePartial data.EmployeePartial) (*data.Employee, error) {
-	response, err := c.EmployeesClient.EmployeeUpdate(ctx, &pb.EmployeeUpdateRequest{})
+func (g *grpcClient) EmployeeUpdate(ctx context.Context, id string, employeePartial data.EmployeePartial) (*data.Employee, error) {
+	response, err := g.EmployeesClient.EmployeeUpdate(ctx, &pb.EmployeeUpdateRequest{
+		Id:              id,
+		EmployeePartial: pb.FromEmployeePartial(&employeePartial),
+	})
 	return pb.ToEmployee(response.GetEmployee()), err
 }
 
 // EmployeeDelete can be used to delete a single employee given a
 // valid id
-func (c *client) EmployeeDelete(ctx context.Context, id string) error {
-	_, err := c.EmployeesClient.EmployeeDelete(ctx, &pb.EmployeeDeleteRequest{Id: id})
+func (g *grpcClient) EmployeeDelete(ctx context.Context, id string) error {
+	_, err := g.EmployeesClient.EmployeeDelete(ctx, &pb.EmployeeDeleteRequest{Id: id})
 	return err
 }
 
 // EmployeesRead can be used to read one or more employees, given a set of
 // search parameters
-func (c *client) EmployeesRead(ctx context.Context, search data.EmployeeSearch) ([]*data.Employee, error) {
-	response, err := c.EmployeesClient.EmployeesRead(ctx, &pb.EmployeesReadRequest{
+func (g *grpcClient) EmployeesRead(ctx context.Context, search data.EmployeeSearch) ([]*data.Employee, error) {
+	response, err := g.EmployeesClient.EmployeesRead(ctx, &pb.EmployeesReadRequest{
 		EmployeeSearch: pb.ToEmployeeSearch(&search),
 	})
 	return pb.ToEmployees(response.GetEmployees()), err

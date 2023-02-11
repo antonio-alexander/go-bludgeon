@@ -9,19 +9,19 @@ import (
 	logic "github.com/antonio-alexander/go-bludgeon/employees/logic"
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	restserver "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
+	server "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 
 	"github.com/gorilla/mux"
 )
 
 type restServer struct {
 	logger.Logger
-	logic  logic.Logic
-	router restserver.Router
+	logic logic.Logic
 }
 
 func New() interface {
 	internal.Parameterizer
+	server.RouteBuilder
 } {
 	return &restServer{
 		Logger: logger.NewNullLogger(),
@@ -124,33 +124,16 @@ func (s *restServer) endpointEmployeeDelete() func(http.ResponseWriter, *http.Re
 	}
 }
 
-func (s *restServer) buildRoutes() {
-	for _, route := range []restserver.HandleFuncConfig{
-		{Route: data.RouteEmployees, Method: http.MethodPost, HandleFx: s.endpointEmployeeCreate()},
-		{Route: data.RouteEmployeesSearch, Method: http.MethodGet, HandleFx: s.endpointEmployeesRead()},
-		{Route: data.RouteEmployeesID, Method: http.MethodGet, HandleFx: s.endpointEmployeeRead()},
-		{Route: data.RouteEmployeesID, Method: http.MethodPut, HandleFx: s.endpointEmployeeUpdate()},
-		{Route: data.RouteEmployeesID, Method: http.MethodDelete, HandleFx: s.endpointEmployeeDelete()},
-	} {
-		s.router.HandleFunc(route)
-	}
-}
-
 func (s *restServer) SetParameters(parameters ...interface{}) {
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
 		case logic.Logic:
 			s.logic = p
-		case restserver.Router:
-			s.router = p
-			s.buildRoutes()
 		}
 	}
 	switch {
 	case s.logic == nil:
 		panic("logic not set")
-	case s.router == nil:
-		panic("router not set")
 	}
 }
 
@@ -160,5 +143,15 @@ func (s *restServer) SetUtilities(parameters ...interface{}) {
 		case logger.Logger:
 			s.Logger = p
 		}
+	}
+}
+
+func (s *restServer) BuildRoutes() []server.HandleFuncConfig {
+	return []server.HandleFuncConfig{
+		{Route: data.RouteEmployees, Method: http.MethodPost, HandleFx: s.endpointEmployeeCreate()},
+		{Route: data.RouteEmployeesSearch, Method: http.MethodGet, HandleFx: s.endpointEmployeesRead()},
+		{Route: data.RouteEmployeesID, Method: http.MethodGet, HandleFx: s.endpointEmployeeRead()},
+		{Route: data.RouteEmployeesID, Method: http.MethodPut, HandleFx: s.endpointEmployeeUpdate()},
+		{Route: data.RouteEmployeesID, Method: http.MethodDelete, HandleFx: s.endpointEmployeeDelete()},
 	}
 }

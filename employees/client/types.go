@@ -1,8 +1,6 @@
-package grpc
+package client
 
-import (
-	logic "github.com/antonio-alexander/go-bludgeon/employees/logic"
-)
+import "github.com/antonio-alexander/go-bludgeon/employees/logic"
 
 // Client is an interface that provides all of the functions
 // that should only be accessible by the entity that instantiates

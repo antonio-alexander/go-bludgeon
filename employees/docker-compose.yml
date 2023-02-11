@@ -46,6 +46,40 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
       KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
 
+  changes:
+    container_name: "changes"
+    hostname: "changes"
+    image: ghcr.io/antonio-alexander/go-bludgeon-changes:latest
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: "always"
+    ports:
+      - "8014:8080"
+      - "8015:8081"
+    environment:
+      BLUDGEON_LOG_PREFIX: changes
+      BLUDGEON_LOG_LEVEL: ${BLUDGEON_LOG_LEVEL:-trace}
+      BLUDGEON_META_TYPE: ${BLUDGEON_META_TYPE:-mysql}
+      BLUDGEON_REST_SHUTDOWN_TIMEOUT: ${BLUDGEON_REST_SHUTDOWN_TIMEOUT:-10}
+      DATABASE_HOST: ${DATABASE_HOST:-localhost}
+      DATABASE_PORT: ${DATABASE_PORT:-3306}
+      DATABASE_NAME: ${DATABASE_NAME:-bludgeon}
+      DATABASE_USER: ${DATABASE_USER:-bludgeon}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-bludgeon}
+      BLUDGEON_REST_ENABLED: ${BLUDGEON_REST_ENABLED:-true}
+      BLUDGEON_REST_ADDRESS: ${BLUDGEON_REST_ADDRESS}
+      BLUDGEON_REST_PORT: "8080"
+      BLUDGEON_ALLOWED_ORIGINS: ${BLUDGEON_ALLOWED_ORIGINS:-*}
+      BLUDGEON_ALLOWED_METHODS: ${BLUDGEON_ALLOWED_METHODS:-POST,PUT,GET,DELETE,PATCH}
+      BLUDGEON_CORS_DEBUG: ${BLUDGEON_CORS_DEBUG:-true}
+      BLUDGEON_KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9093}
+      BLUDGEON_KAFKA_GROUP_ID: ${KAFKA_CHANGES_GROUP_ID_EMPLOYEES:-changes_employees}
+      BLUDGEON_KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-true}
+      BLUDGEON_KAFKA_ENABLE_LOG: ${KAFKA_ENABLE_LOG:-true}
+
   employees:
     container_name: "employees"
     hostname: "employees"
@@ -68,6 +102,7 @@ services:
       BLUDGEON_LOG_PREFIX: employees
       BLUDGEON_LOG_LEVEL: ${BLUDGEON_LOG_LEVEL:-trace}
       BLUDGEON_META_TYPE: ${BLUDGEON_META_TYPE:-mysql}
+      BLUDGEON_REST_SHUTDOWN_TIMEOUT: ${BLUDGEON_REST_SHUTDOWN_TIMEOUT:-10}
       DATABASE_HOST: ${DATABASE_HOST:-mysql}
       DATABASE_PORT: ${DATABASE_PORT:-3306}
       DATABASE_NAME: ${DATABASE_NAME:-bludgeon}
@@ -85,37 +120,3 @@ services:
       BLUDGEON_CHANGES_REST_ADDRESS: ${BLUDGEON_CHANGES_ADDRESS:-changes}
       BLUDGEON_CHANGES_REST_PORT: ${BLUDGEON_CHANGES_REST_PORT:-8080}
       BLUDGEON_CHANGES_AUTO_ACKNOWLEDGE: ${BLUDGEON_CHANGES_AUTO_ACKNOWLEDGE:-true}
-
-  changes:
-    container_name: "changes"
-    hostname: "changes"
-    profiles: [ "application" ]
-    image: ghcr.io/antonio-alexander/go-bludgeon-changes:latest
-    depends_on:
-      mysql:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    restart: "always"
-    ports:
-      - "8014:8080"
-      - "8015:8081"
-    environment:
-      BLUDGEON_LOG_PREFIX: changes
-      BLUDGEON_LOG_LEVEL: ${BLUDGEON_LOG_LEVEL:-trace}
-      BLUDGEON_META_TYPE: ${BLUDGEON_META_TYPE:-mysql}
-      DATABASE_HOST: ${DATABASE_HOST:-localhost}
-      DATABASE_PORT: ${DATABASE_PORT:-3306}
-      DATABASE_NAME: ${DATABASE_NAME:-bludgeon}
-      DATABASE_USER: ${DATABASE_USER:-bludgeon}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-bludgeon}
-      BLUDGEON_REST_ENABLED: ${BLUDGEON_REST_ENABLED:-true}
-      BLUDGEON_REST_ADDRESS: ${BLUDGEON_REST_ADDRESS}
-      BLUDGEON_REST_PORT: "8080"
-      BLUDGEON_ALLOWED_ORIGINS: ${BLUDGEON_ALLOWED_ORIGINS:-*}
-      BLUDGEON_ALLOWED_METHODS: ${BLUDGEON_ALLOWED_METHODS:-POST,PUT,GET,DELETE,PATCH}
-      BLUDGEON_CORS_DEBUG: ${BLUDGEON_CORS_DEBUG:-true}
-      BLUDGEON_KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9093}
-      BLUDGEON_KAFKA_GROUP_ID: ${KAFKA_CHANGES_GROUP_ID_EMPLOYEES:-changes_employees}
-      BLUDGEON_KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-true}
-      BLUDGEON_KAFKA_ENABLE_LOG: ${KAFKA_ENABLE_LOG:-true}

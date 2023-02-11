@@ -39,6 +39,7 @@ var (
 	configMetaFile          = new(internal_file.Configuration)
 	configLogger            = new(internal_logger.Configuration)
 	configServer            = new(internal_server.Configuration)
+	configLogic             = new(logic.Configuration)
 	configChangesClientRest = new(changesclientrest.Configuration)
 	letterRunes             = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 )
@@ -94,10 +95,12 @@ func init() {
 	configMetaMysql.FromEnv(envs)
 	configChangesClientRest.Default()
 	configChangesClientRest.FromEnv(envs)
+	configLogic.Default()
+	configLogic.FromEnv(envs)
 	configServer.Default()
 	configServer.FromEnv(envs)
 	configServer.Address = "localhost"
-	configServer.Port = "8081"
+	configServer.Port = "8082"
 }
 
 func newGrpcServiceTest(metaType, protocol string) *grpcServiceTest {
@@ -137,6 +140,7 @@ func newGrpcServiceTest(metaType, protocol string) *grpcServiceTest {
 	logic := logic.New()
 	logic.SetParameters(meta, changesClient)
 	logic.SetUtilities(logger)
+	logic.Configure(configLogic)
 	service := service.New()
 	service.SetUtilities(logger)
 	service.SetParameters(logic)
@@ -173,7 +177,9 @@ func (r *grpcServiceTest) initialize(t *testing.T, metaType, protocol string) {
 	err = r.server.Configure(configServer)
 	assert.Nil(t, err)
 	err = r.server.Initialize()
-	assert.Nil(t, err)
+	if !assert.Nil(t, err) {
+		fmt.Println(err)
+	}
 	r.grpcConn, err = grpc.Dial(fmt.Sprintf("%s:%s", configServer.Address, configServer.Port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.Nil(t, err)
 	r.EmployeesClient = pb.NewEmployeesClient(r.grpcConn)

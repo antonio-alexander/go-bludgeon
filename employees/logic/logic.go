@@ -2,11 +2,13 @@ package logic
 
 import (
 	"context"
+	"sync"
 
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
 	meta "github.com/antonio-alexander/go-bludgeon/employees/meta"
 
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	config "github.com/antonio-alexander/go-bludgeon/internal/config"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	changesclient "github.com/antonio-alexander/go-bludgeon/changes/client"
@@ -14,9 +16,13 @@ import (
 )
 
 type logic struct {
+	sync.WaitGroup
+	sync.RWMutex
 	logger.Logger
 	meta          meta.Employee
 	changesClient changesclient.Client
+	configured    bool
+	config        *Configuration
 }
 
 // New will generate a new instance of logic that implements
@@ -25,10 +31,28 @@ type logic struct {
 func New() interface {
 	Logic
 	internal.Parameterizer
+	internal.Configurer
+	internal.Shutdowner
 } {
 	return &logic{
 		Logger: logger.NewNullLogger(),
 	}
+}
+
+func (l *logic) changeUpsert(changePartial changesdata.ChangePartial) {
+	l.Add(1)
+	go func() {
+		defer l.Done()
+
+		ctx, cancel := context.WithTimeout(context.Background(), l.config.ChangesTimeout)
+		defer cancel()
+		change, err := l.changesClient.ChangeUpsert(ctx, changePartial)
+		if err != nil {
+			l.Error("error while upserting change (%s:%s->%s): %s", *changePartial.DataType, *changePartial.DataId, *changePartial.DataAction, err)
+			return
+		}
+		l.Debug("Upserted change: %s (%s:%s->%s)", change.Id, change.DataType, change.DataId, change.DataAction)
+	}()
 }
 
 func (l *logic) SetParameters(parameters ...interface{}) {
@@ -57,6 +81,41 @@ func (l *logic) SetUtilities(parameters ...interface{}) {
 	}
 }
 
+func (l *logic) Configure(items ...interface{}) error {
+	l.Lock()
+	defer l.Unlock()
+
+	var envs map[string]string
+	var c *Configuration
+
+	for _, item := range items {
+		switch v := item.(type) {
+		case config.Envs:
+			envs = v
+		case *Configuration:
+			c = v
+		}
+	}
+	if c == nil {
+		c = new(Configuration)
+		c.Default()
+		c.FromEnv(envs)
+	}
+	if err := c.Validate(); err != nil {
+		return err
+	}
+	l.config = c
+	l.configured = true
+	return nil
+}
+
+func (l *logic) Shutdown() {
+	l.Lock()
+	defer l.Unlock()
+
+	l.Wait()
+}
+
 // EmployeeCreate can be used to create a single Employee
 // the employee email address is required and must be unique
 // at the time of creation
@@ -66,7 +125,7 @@ func (l *logic) EmployeeCreate(ctx context.Context, e data.EmployeePartial) (*da
 		return nil, err
 	}
 	l.Debug("%s created employee %s", LogAlias, employee.ID)
-	if _, err := l.changesClient.ChangeUpsert(ctx, changesdata.ChangePartial{
+	l.changeUpsert(changesdata.ChangePartial{
 		WhenChanged:     &employee.LastUpdated,
 		ChangedBy:       &employee.LastUpdatedBy,
 		DataId:          &employee.ID,
@@ -74,9 +133,7 @@ func (l *logic) EmployeeCreate(ctx context.Context, e data.EmployeePartial) (*da
 		DataType:        &data.ChangeTypeEmployee,
 		DataAction:      &data.ChangeActionCreate,
 		DataVersion:     &employee.Version,
-	}); err != nil {
-		l.Error("Error while upserting change: %s", err)
-	}
+	})
 	return employee, nil
 }
 
@@ -101,7 +158,7 @@ func (l *logic) EmployeeUpdate(ctx context.Context, id string, e data.EmployeePa
 		return nil, err
 	}
 	l.Debug("%s updated employee %s", LogAlias, employee.ID)
-	if _, err := l.changesClient.ChangeUpsert(ctx, changesdata.ChangePartial{
+	l.changeUpsert(changesdata.ChangePartial{
 		WhenChanged:     &employee.LastUpdated,
 		ChangedBy:       &employee.LastUpdatedBy,
 		DataId:          &employee.ID,
@@ -109,9 +166,7 @@ func (l *logic) EmployeeUpdate(ctx context.Context, id string, e data.EmployeePa
 		DataType:        &data.ChangeTypeEmployee,
 		DataAction:      &data.ChangeActionUpdate,
 		DataVersion:     &employee.Version,
-	}); err != nil {
-		l.Error("Error while upserting change: %s", err)
-	}
+	})
 	return employee, nil
 }
 
@@ -125,14 +180,12 @@ func (l *logic) EmployeeDelete(ctx context.Context, employeeId string) error {
 		return err
 	}
 	l.Debug("%s deleted employee %s", LogAlias, employeeId)
-	if _, err := l.changesClient.ChangeUpsert(ctx, changesdata.ChangePartial{
+	l.changeUpsert(changesdata.ChangePartial{
 		DataId:          &employeeId,
 		DataServiceName: &data.ServiceName,
 		DataType:        &data.ChangeTypeEmployee,
 		DataAction:      &data.ChangeActionDelete,
-	}); err != nil {
-		l.Error("Error while upserting change: %s", err)
-	}
+	})
 	return nil
 }
 

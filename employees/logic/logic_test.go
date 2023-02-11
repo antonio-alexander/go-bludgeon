@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	data "github.com/antonio-alexander/go-bludgeon/employees/data"
 	logic "github.com/antonio-alexander/go-bludgeon/employees/logic"
@@ -37,6 +38,7 @@ var (
 	configChangesClientRest  = new(changesclientrest.Configuration)
 	configChangesClientKafka = new(changesclientkafka.Configuration)
 	configKafkaClient        = new(internal_kafka.Configuration)
+	configLogic              = new(logic.Configuration)
 	letterRunes              = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 )
 
@@ -56,6 +58,7 @@ type logicTest struct {
 		internal.Configurer
 		changesclient.Handler
 	}
+	logic internal.Shutdowner
 	logic.Logic
 }
 
@@ -77,6 +80,8 @@ func init() {
 	configKafkaClient.Default()
 	configKafkaClient.Brokers = []string{"localhost:9092"}
 	configChangesClientKafka.Default()
+	configLogic.Default()
+	configLogic.FromEnv(envs)
 }
 
 func randomString(nLetters ...int) string {
@@ -140,10 +145,12 @@ func newLogicTest(metaType, protocol string) *logicTest {
 	logic := logic.New()
 	logic.SetUtilities(logger)
 	logic.SetParameters(meta, changesClient)
+	logic.Configure(configLogic)
 	return &logicTest{
 		changesClient:  changesClient,
 		changesHandler: changesHandler,
 		meta:           meta,
+		logic:          logic,
 		Logic:          logic,
 	}
 }
@@ -178,6 +185,7 @@ func (l *logicTest) initialize(t *testing.T, metaType, protocol string) {
 func (l *logicTest) shutdown(t *testing.T) {
 	l.meta.Shutdown()
 	l.changesClient.Shutdown()
+	l.logic.Shutdown()
 }
 
 func (l *logicTest) TestChanges(t *testing.T) {
@@ -204,6 +212,9 @@ func (l *logicTest) TestChanges(t *testing.T) {
 		}
 	}()
 
+	//wait for change to be written
+	time.Sleep(time.Second)
+
 	//validate create change
 	changesRead, err := l.changesClient.ChangesRead(ctx, changesdata.ChangeSearch{
 		DataIds:      []string{employeeId},
@@ -229,6 +240,9 @@ func (l *logicTest) TestChanges(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, employeeUpdated)
 
+	//wait for change to be written
+	time.Sleep(time.Second)
+
 	//validate update change
 	changesRead, err = l.changesClient.ChangesRead(ctx, changesdata.ChangeSearch{
 		DataIds:      []string{employeeId},
@@ -248,6 +262,9 @@ func (l *logicTest) TestChanges(t *testing.T) {
 	// delete employee
 	err = l.EmployeeDelete(ctx, employeeId)
 	assert.Nil(t, err)
+
+	//wait for change to be written
+	time.Sleep(time.Second)
 
 	//validate delete change
 	changesRead, err = l.changesClient.ChangesRead(ctx, changesdata.ChangeSearch{
