@@ -100,11 +100,16 @@ func (c *client) Connect(ctx context.Context, url string, requestHeader http.Hea
 		return response, err
 	}
 	c.Conn = conn
-	c.connected = true
 	c.SetPingHandler(c.pingHandler)
 	c.SetPongHandler(c.pongHandler)
 	c.connected = true
 	return response, nil
+}
+
+func (c *client) IsConnected() bool {
+	c.RLock()
+	defer c.RUnlock()
+	return c.connected
 }
 
 func (c *client) Write(item interface{}) error {
@@ -153,4 +158,5 @@ func (c *client) Close() {
 	if err := c.Conn.Close(); err != nil {
 		c.Error("error while closing connection: %s", err)
 	}
+	c.connected = false
 }
