@@ -29,7 +29,6 @@ type handler struct {
 	config       *Configuration
 	ctx          context.Context
 	cancel       context.CancelFunc
-	connected    bool
 	disconnected chan struct{}
 	handlerFx    client.HandlerFx
 }
@@ -82,7 +81,7 @@ func (h *handler) launchConnect() {
 		defer tConnect.Stop()
 		close(started)
 		if connectFx() {
-			h.connected = true
+			h.client.IsConnected()
 			tConnect.Stop()
 		}
 		for {
@@ -91,16 +90,14 @@ func (h *handler) launchConnect() {
 				return
 			case <-h.disconnected:
 				if connectFx() {
-					h.connected = true
 					break
 				}
 				tConnect = time.NewTicker(10 * time.Second)
 			case <-tConnect.C:
-				if h.connected {
+				if h.client.IsConnected() {
 					break
 				}
 				if connectFx() {
-					h.connected = true
 					h.Trace(h.logAlias + "connected")
 					tConnect.Stop()
 				}
@@ -116,50 +113,51 @@ func (h *handler) launchChangeReader() error {
 	go func() {
 		defer h.Done()
 
+		businessFx := func() {
+			if !h.client.IsConnected() {
+				time.Sleep(h.config.Websocket.ReadTimeout)
+				return
+			}
+			wrapper := &data.Wrapper{}
+			if err := h.client.Read(wrapper); err != nil {
+				h.Error(h.logAlias+"error while reading websocket: %s", err)
+				return
+			}
+			switch data.MessageType(wrapper.Type) {
+			case data.MessageTypeChange:
+				change := &data.Change{}
+				if err := json.Unmarshal(wrapper.Bytes, change); err != nil {
+					h.Error(h.logAlias+"error while unmarshalling change: %s", err)
+					return
+				}
+				if err := h.handlerFx(change); err != nil {
+					h.Error(h.logAlias+"error while handling change: %s", err)
+					return
+				}
+			case data.MessageTypeChangeDigest:
+				changeDigest := &data.ChangeDigest{}
+				if err := json.Unmarshal(wrapper.Bytes, changeDigest); err != nil {
+					h.Error(logAlias+"error while unmarshalling changes: %s", err)
+					return
+				}
+				if err := h.handlerFx(changeDigest.Changes...); err != nil {
+					h.Error(logAlias+"error while handling changes: %s", err)
+					return
+				}
+			}
+		}
+		tRate := time.NewTicker(10 * time.Second)
+		defer tRate.Stop()
 		close(started)
 		for {
 			select {
 			case <-h.ctx.Done():
 				return
-			default:
-				if !h.connected {
-					time.Sleep(h.config.Websocket.ReadTimeout)
-					break
-				}
-				wrapper := &data.Wrapper{}
-				if err := h.client.Read(wrapper); err != nil {
-					h.Error(h.logAlias+"error while reading websocket: %s", err)
-					break
-				}
-				switch data.MessageType(wrapper.Type) {
-				case data.MessageTypeChange:
-					change := &data.Change{}
-					if err := json.Unmarshal(wrapper.Bytes, change); err != nil {
-						h.Error(h.logAlias+"error while unmarshalling change: %s", err)
-						break
-					}
-					if err := h.handlerFx(change); err != nil {
-						h.Error(h.logAlias+"error while handling change: %s", err)
-						break
-					}
-				case data.MessageTypeChangeDigest:
-					changeDigest := &data.ChangeDigest{}
-					if err := json.Unmarshal(wrapper.Bytes, changeDigest); err != nil {
-						h.Error(logAlias+"error while unmarshalling changes: %s", err)
-						break
-					}
-					if err := h.handlerFx(changeDigest.Changes...); err != nil {
-						h.Error(logAlias+"error while handling changes: %s", err)
-						break
-					}
-				}
+			case <-tRate.C:
+				businessFx()
 			}
 		}
 	}()
 	<-started
 	return nil
-}
-
-func (h *handler) isConnected() bool {
-	return h.connected
 }

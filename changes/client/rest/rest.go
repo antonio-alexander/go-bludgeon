@@ -271,7 +271,7 @@ func (r *restClient) HandlerConnected(handlerId string) (bool, error) {
 	if !ok {
 		return false, errors.New("handler not found")
 	}
-	return handler.isConnected(), nil
+	return handler.client.IsConnected(), nil
 }
 
 func (r *restClient) HandlerDelete(handlerId string) error {

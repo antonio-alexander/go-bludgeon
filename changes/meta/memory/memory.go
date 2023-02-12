@@ -213,7 +213,7 @@ func (m *memory) ChangesDelete(ctx context.Context, changeIds ...string) error {
 		for changeId := range registrationChanges {
 			for _, changeIdToDelete := range changeIds {
 				if changeIdToDelete == changeId {
-					return meta.ErrchangeNotDeletedConflict
+					return meta.ErrChangeNotDeletedConflict
 				}
 			}
 		}

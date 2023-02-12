@@ -25,7 +25,7 @@ var (
 	ErrChangeNotFound               = internal_errors.NewNotFound(errors.New(ChangeNotFound))
 	ErrChangeNotWritten             = internal_errors.NewNotUpdated(errors.New(ChangeNotWritten))
 	ErrChangeConflictWrite          = internal_errors.NewConflict(errors.New(ChangeConflictWrite))
-	ErrchangeNotDeletedConflict     = internal_errors.NewConflict(errors.New(ChangeNotDeletedConflict))
+	ErrChangeNotDeletedConflict     = internal_errors.NewConflict(errors.New(ChangeNotDeletedConflict))
 	ErrRegistrationNotFound         = internal_errors.NewNotFound(errors.New(RegistrationNotFound))
 	ErrRegistrationNotWritten       = internal_errors.NewNotFound(errors.New(RegistrationNotWritten))
 	ErrRegistrationChangeNotWritten = internal_errors.NewNotFound(errors.New(RegistrationChangeNotWritten))

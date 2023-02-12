@@ -147,7 +147,7 @@ jobs:
           cd /home/runner/work/go-bludgeon/go-bludgeon/changes
           go mod download
           make dep
-          go test -v $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-changes.out | tee /tmp/go-bludgeon-changes.log; test ${PIPESTATUS[0]} -eq 0
+          go test -v -parallel=1 -cover -count=1 $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-changes.out | tee /tmp/go-bludgeon-changes.log; test ${PIPESTATUS[0]} -eq 0
           docker compose logs >> /tmp/go-bludgeon-changes_services.log
       - name: Docker clean-up
         if: always()
@@ -242,7 +242,7 @@ jobs:
           cd /home/runner/work/go-bludgeon/go-bludgeon/changes
           go mod download
           make run
-          go test -v ./client/... -coverprofile /tmp/go-bludgeon-changes-client.out | tee /tmp/go-bludgeon-changes-client.log; test ${PIPESTATUS[0]} -eq 0
+          go test -v -parallel=1 -cover -count=1 ./client/... -coverprofile /tmp/go-bludgeon-changes-client.out | tee /tmp/go-bludgeon-changes-client.log; test ${PIPESTATUS[0]} -eq 0
           docker compose logs >> /tmp/go-bludgeon-changes-client_services.log
       - name: Docker clean-up
         if: always()
