@@ -35,9 +35,9 @@ RUN git clone --depth=1 --branch ${GIT_BRANCH} ${GIT_REPO}
 WORKDIR /swagger
 
 RUN \
-    cd /go/src/github.com/antonio-alexander/go-bludgeon/employees/service/rest/swagger \
+    cd /go/src/github.com/antonio-alexander/go-bludgeon/employees/internal/swagger \
     && swagger generate spec -o /swagger/swagger_employees.json --scan-models \
-    && cd /go/src/github.com/antonio-alexander/go-bludgeon/timers/service/rest/swagger\
+    && cd /go/src/github.com/antonio-alexander/go-bludgeon/timers/internal/swagger\
     && swagger generate spec -o /swagger/swagger_timers.json --scan-models \
     && cd /go/src/github.com/antonio-alexander/go-bludgeon/changes/internal/swagger\
     && swagger generate spec -o /swagger/swagger_changes.json --scan-models 

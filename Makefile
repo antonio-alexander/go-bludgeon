@@ -4,7 +4,7 @@ check-swagger:
 
 swagger: check-swagger
 	@swagger generate spec --work-dir=./timers/service/rest/swagger --output ./tmp/swagger/swagger_timers.json --scan-models
-	@swagger generate spec --work-dir=./employees/service/rest/swagger --output ./tmp/swagger/swagger_employees.json --scan-models
+	@swagger generate spec --work-dir=./employees/internal/swagger --output ./tmp/swagger/swagger_employees.json --scan-models
 	@swagger generate spec --work-dir=./changes/internal/swagger --output ./tmp/swagger/swagger_changes.json --scan-models
 
 serve-swagger: swagger
