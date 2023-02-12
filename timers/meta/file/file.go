@@ -3,71 +3,117 @@ package file
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"sync"
 
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 	data "github.com/antonio-alexander/go-bludgeon/timers/data"
 	meta "github.com/antonio-alexander/go-bludgeon/timers/meta"
 	memory "github.com/antonio-alexander/go-bludgeon/timers/meta/memory"
 
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
 )
 
 type file struct {
 	sync.RWMutex
 	logger.Logger
-	internal_file.Owner
-	internal_file.File
-	meta.Serializer
+	memory interface {
+		meta.Serializer
+		internal.Parameterizer
+		internal.Initializer
+	}
+	file interface {
+		internal_file.File
+		internal.Configurer
+		internal.Initializer
+		internal.Parameterizer
+	}
 	meta.Timer
 	meta.TimeSlice
 }
 
-func New(parameters ...interface{}) File {
-	memory := memory.New(parameters...)
-	internalFile := internal_file.New(parameters...)
-	m := &file{
-		Serializer: memory,
-		Timer:      memory,
-		TimeSlice:  memory,
-		File:       internalFile,
-		Owner:      internalFile,
+func New() interface {
+	meta.Timer
+	meta.TimeSlice
+	internal.Initializer
+	internal.Parameterizer
+	internal.Configurer
+} {
+	memory := memory.New()
+	return &file{
+		Logger:    logger.NewNullLogger(),
+		file:      internal_file.New(),
+		memory:    memory,
+		Timer:     memory,
+		TimeSlice: memory,
 	}
+}
+
+func (m *file) write() error {
+	serializedData, err := m.memory.Serialize()
+	if err != nil {
+		return err
+	}
+	return m.file.Write(serializedData)
+}
+
+func (m *file) read() error {
+	serializedData := &meta.SerializedData{}
+	if err := m.file.Read(serializedData); err != nil {
+		return err
+	}
+	return m.memory.Deserialize(serializedData)
+}
+
+func (m *file) SetParameters(parameters ...interface{}) {
+	m.file.SetParameters(parameters...)
+	m.memory.SetParameters(parameters...)
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case interface {
+			meta.Timer
+			meta.TimeSlice
+			meta.Serializer
+			internal.Parameterizer
+			internal.Initializer
+		}:
+			m.memory = p
+			m.Timer = p
+			m.TimeSlice = p
+		case meta.Timer:
+			m.Timer = p
+		case meta.TimeSlice:
+			m.TimeSlice = p
+		}
+	}
+}
+
+func (m *file) SetUtilities(parameters ...interface{}) {
+	m.file.SetUtilities(parameters...)
+	m.memory.SetUtilities(parameters...)
 	for _, p := range parameters {
 		switch p := p.(type) {
 		case logger.Logger:
 			m.Logger = p
 		}
 	}
-	return m
 }
 
-func (m *file) Write() error {
-	serializedData, err := m.Serialize()
-	if err != nil {
-		return err
-	}
-	return m.File.Write(serializedData)
+func (m *file) Configure(items ...interface{}) error {
+	return m.file.Configure(items...)
 }
 
-func (m *file) Read() error {
-	serializedData := &meta.SerializedData{}
-	if err := m.File.Read(serializedData); err != nil {
-		return err
-	}
-	return m.Deserialize(serializedData)
-}
-
-func (m *file) Initialize(config *internal_file.Configuration) error {
+func (m *file) Initialize() error {
 	m.Lock()
 	defer m.Unlock()
-	if err := m.Owner.Initialize(config); err != nil {
+	if err := m.memory.Initialize(); err != nil {
 		return err
 	}
-	if err := m.Read(); err != nil {
-		folder := filepath.Dir(config.File)
-		return os.MkdirAll(folder, os.ModePerm)
+	if err := m.file.Initialize(); err != nil {
+		return err
+	}
+	if err := m.read(); err != nil && !os.IsNotExist(err) {
+		return err
 	}
 	return nil
 }
@@ -75,7 +121,8 @@ func (m *file) Initialize(config *internal_file.Configuration) error {
 func (m *file) Shutdown() {
 	m.Lock()
 	defer m.Unlock()
-	if err := m.Write(); err != nil {
+
+	if err := m.write(); err != nil {
 		m.Error("error while shutting down: %s", err.Error())
 	}
 }
@@ -87,7 +134,7 @@ func (m *file) TimerCreate(ctx context.Context, t data.TimerPartial) (*data.Time
 	if err != nil {
 		return nil, err
 	}
-	if err := m.Write(); err != nil {
+	if err := m.write(); err != nil {
 		return nil, err
 	}
 	return timer, nil
@@ -100,7 +147,7 @@ func (m *file) TimerUpdate(ctx context.Context, id string, t data.TimerPartial) 
 	if err != nil {
 		return nil, err
 	}
-	if err := m.Write(); err != nil {
+	if err := m.write(); err != nil {
 		return nil, err
 	}
 	return timer, nil
@@ -112,7 +159,7 @@ func (m *file) TimerDelete(ctx context.Context, id string) error {
 	if err := m.Timer.TimerDelete(ctx, id); err != nil {
 		return err
 	}
-	if err := m.Write(); err != nil {
+	if err := m.write(); err != nil {
 		return err
 	}
 	return nil
@@ -125,7 +172,7 @@ func (m *file) TimerStart(ctx context.Context, id string) (*data.Timer, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := m.Write(); err != nil {
+	if err := m.write(); err != nil {
 		return nil, err
 	}
 	return timer, nil
@@ -138,7 +185,7 @@ func (m *file) TimerStop(ctx context.Context, id string) (*data.Timer, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := m.Write(); err != nil {
+	if err := m.write(); err != nil {
 		return nil, err
 	}
 	return timer, nil
@@ -151,7 +198,7 @@ func (m *file) TimeSliceCreate(ctx context.Context, t data.TimeSlicePartial) (*d
 	if err != nil {
 		return nil, err
 	}
-	if err := m.Write(); err != nil {
+	if err := m.write(); err != nil {
 		return nil, err
 	}
 	return timeSlice, nil
@@ -164,7 +211,7 @@ func (m *file) TimeSliceUpdate(ctx context.Context, id string, t data.TimeSliceP
 	if err != nil {
 		return nil, err
 	}
-	if err := m.Write(); err != nil {
+	if err := m.write(); err != nil {
 		return nil, err
 	}
 	return timeSlice, nil
@@ -176,7 +223,7 @@ func (m *file) TimeSliceDelete(ctx context.Context, id string) error {
 	if err := m.TimeSlice.TimeSliceDelete(ctx, id); err != nil {
 		return err
 	}
-	if err := m.Write(); err != nil {
+	if err := m.write(); err != nil {
 		return err
 	}
 	return nil

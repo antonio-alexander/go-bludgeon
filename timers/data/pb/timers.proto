@@ -22,11 +22,8 @@ service Timers {
     // timers_read
     rpc timers_read(TimersReadRequest) returns (TimersReadResponse) {}
 
-    // timer_update_comment
-    rpc timer_update_comment(TimerUpdateCommentRequest) returns (TimerUpdateCommentResponse) {}
-
-    // timer_archive
-    rpc timer_archive(TimerArchiveRequest) returns (TimerArchiveResponse) {}
+    // timer_update
+    rpc timer_update(TimerUpdateRequest) returns (TimerUpdateResponse) {}
 
     // timer_start
     rpc timer_start(TimerStartRequest) returns (TimerStartResponse) {}

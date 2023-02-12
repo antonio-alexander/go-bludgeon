@@ -8,7 +8,7 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/timers/data"
 )
 
-//error constants
+// error constants
 const (
 	TimerNotFound       string = "timer not found"
 	TimerNotUpdated     string = "timer not updated"
@@ -18,17 +18,17 @@ const (
 	TimeSliceNotFound   string = "time slice not found"
 )
 
-//error variables
+// error variables
 var (
-	ErrTimerNotFound       = errors.NewNotFound(TimerNotFound)
-	ErrTimerNotUpdated     = errors.NewNotupdated(TimerNotUpdated)
-	ErrTimerNotCreated     = errors.NewNotCreated(TimerNotCreated)
-	ErrTimerConflictCreate = errors.NewConflict(TimerConflictCreate)
-	ErrTimerConflictUpdate = errors.NewConflict(TimerConflictUpdate)
-	ErrTimeSliceNotFound   = errors.NewNotFound(TimeSliceNotFound)
+	ErrTimerNotFound       = errors.NewNotFound(errors.New(TimerNotFound))
+	ErrTimerNotUpdated     = errors.NewNotUpdated(errors.New(TimerNotUpdated))
+	ErrTimerNotCreated     = errors.NewNotCreated(errors.New(TimerNotCreated))
+	ErrTimerConflictCreate = errors.NewConflict(errors.New(TimerConflictCreate))
+	ErrTimerConflictUpdate = errors.NewConflict(errors.New(TimerConflictUpdate))
+	ErrTimeSliceNotFound   = errors.NewNotFound(errors.New(TimeSliceNotFound))
 )
 
-//SerializedData provides a struct that describes the representation
+// SerializedData provides a struct that describes the representation
 // of the data when serialized
 type SerializedData struct {
 	Timers     map[string]data.Timer     `json:"timers"`
@@ -37,7 +37,7 @@ type SerializedData struct {
 
 type Type string
 
-//task states
+// task states
 const (
 	TypeInvalid Type = "invalid"
 	TypeFile    Type = "file"
@@ -76,7 +76,7 @@ type Serializer interface {
 	Deserialize(data *SerializedData) error
 }
 
-//Timer provides an interface that can be used to interact with timers
+// Timer provides an interface that can be used to interact with timers
 type Timer interface {
 	//TimerCreate can be used to create a timer, although
 	// all fields are available, the only fields that will
@@ -112,7 +112,7 @@ type Timer interface {
 	TimersRead(ctx context.Context, search data.TimerSearch) ([]*data.Timer, error)
 }
 
-//TimeSlice provides an interface that can be used to interact with time slices
+// TimeSlice provides an interface that can be used to interact with time slices
 type TimeSlice interface {
 	//TimeSliceCreate can be used to create a single time
 	// slice

@@ -1,97 +1,142 @@
 package internal
 
 import (
-	"errors"
 	"path/filepath"
 
-	config "github.com/antonio-alexander/go-bludgeon/internal/config"
-	servergrpc "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
-	serverrest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 	logic "github.com/antonio-alexander/go-bludgeon/timers/logic"
-	metatimers "github.com/antonio-alexander/go-bludgeon/timers/meta"
+	meta "github.com/antonio-alexander/go-bludgeon/timers/meta"
 	metafile "github.com/antonio-alexander/go-bludgeon/timers/meta/file"
 	metamemory "github.com/antonio-alexander/go-bludgeon/timers/meta/memory"
 	metamysql "github.com/antonio-alexander/go-bludgeon/timers/meta/mysql"
 	servicegrpc "github.com/antonio-alexander/go-bludgeon/timers/service/grpc"
 	servicerest "github.com/antonio-alexander/go-bludgeon/timers/service/rest"
+
+	changesclient "github.com/antonio-alexander/go-bludgeon/changes/client"
+	changesclientkafka "github.com/antonio-alexander/go-bludgeon/changes/client/kafka"
+	changesclientrest "github.com/antonio-alexander/go-bludgeon/changes/client/rest"
+
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	internal_config "github.com/antonio-alexander/go-bludgeon/internal/config"
+	internal_server_grpc "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
+	internal_server_rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 )
 
-func getConfig(pwd string, envs map[string]string) *config.Configuration {
-	c := config.NewConfiguration()
-	c.Default(pwd)
-	configFile := filepath.Join(pwd, config.DefaultConfigPath, config.DefaultConfigFile)
-	if err := c.Read(configFile); err == nil {
-		return c
+func getConfig(pwd string, envs map[string]string) *Configuration {
+	configFile := filepath.Join(pwd, internal_config.DefaultConfigPath, internal_config.DefaultConfigFile)
+	config := new(Configuration)
+	config.Default(pwd)
+	if err := config.Read(configFile); err == nil {
+		return config
 	}
-	c.FromEnv(pwd, envs)
-	return c
+	config.FromEnv(pwd, envs)
+	return config
 }
 
-func getLogger(config *config.Configuration) logger.Logger {
-	config.Logger.Prefix = serviceName
-	logger := logger.New(config.Logger)
-	return logger
-}
+func parameterize(config *Configuration) (interface {
+	internal_logger.Logger
+	internal_logger.Printer
+	internal.Configurer
+}, []interface{}) {
+	var timersMeta interface {
+		internal.Initializer
+		internal.Configurer
+		internal.Parameterizer
+		meta.Timer
+		meta.TimeSlice
+	}
+	var parameters []interface{}
+	var changesClient interface {
+		internal.Parameterizer
+		internal.Initializer
+		internal.Configurer
+		changesclient.Client
+	}
+	var changesHandler interface {
+		internal.Parameterizer
+		internal.Initializer
+		internal.Configurer
+		changesclient.Handler
+	}
 
-func startMeta(config *config.Configuration, parameters ...interface{}) (interface {
-	metatimers.Timer
-	metatimers.TimeSlice
-	meta.Owner
-}, error) {
-	switch v := config.Meta.Type; v {
+	logger := internal_logger.New()
+	switch v := config.MetaType; v {
+	case internal_meta.TypeMemory:
+		timersMeta = metamemory.New()
+	case internal_meta.TypeFile:
+		timersMeta = metafile.New()
+	case internal_meta.TypeMySQL:
+		timersMeta = metamysql.New()
+	}
+	switch {
 	default:
-		return nil, meta.ErrUnsupportedMeta(v)
-	case meta.TypeMemory:
-		return metamemory.New(parameters...), nil
-	case meta.TypeFile:
-		meta := metafile.New(parameters...)
-		if err := meta.Initialize(config.Meta.File); err != nil {
-			return nil, err
+		c := changesclientrest.New()
+		changesHandler, changesClient = c, c
+	case config.ClientChangesKafkaEnabled:
+		switch {
+		default:
+			changesClient = changesclientrest.New()
 		}
-		return meta, nil
-	case meta.TypeMySQL:
-		meta := metamysql.New(parameters...)
-		if err := meta.Initialize(config.Meta.Mysql); err != nil {
-			return nil, err
-		}
-		return meta, nil
+		changesHandler = changesclientkafka.New()
 	}
+	changesClient.SetUtilities(logger)
+	changesHandler.SetUtilities(logger)
+	timersMeta.SetUtilities(logger)
+	timersLogic := logic.New()
+	timersLogic.SetUtilities(logger)
+	timersLogic.SetParameters(timersMeta, changesClient, changesHandler)
+	parameters = append(parameters, timersMeta, timersLogic, changesClient, changesHandler)
+	if config.ServiceRestEnabled {
+		restServer := internal_server_rest.New()
+		timersRestService := servicerest.New()
+		timersRestService.SetUtilities(logger)
+		restServer.SetUtilities(logger)
+		restServer.SetParameters(timersRestService)
+		timersRestService.SetParameters(restServer, timersLogic)
+		parameters = append(parameters, restServer, timersRestService)
+	}
+	if config.ServiceGrpcEnabled {
+		timersGrpcService := servicegrpc.New()
+		timersGrpcService.SetUtilities(logger)
+		timersGrpcService.SetParameters(timersLogic, timersGrpcService)
+		grpcServer := internal_server_grpc.New()
+		grpcServer.SetUtilities(logger)
+		grpcServer.SetParameters(timersGrpcService)
+		parameters = append(parameters, grpcServer, timersGrpcService)
+	}
+	return logger, parameters
 }
 
-func startLogic(config *config.Configuration, parameters ...interface{}) (interface {
-	logic.Logic
-}, error) {
-	logic := logic.New(parameters...)
-	return logic, nil
+func configure(pwd string, envs map[string]string, parameters ...interface{}) error {
+	//TODO: allow this to be able to accept configuration from a json
+	// file
+	for _, p := range parameters {
+		switch p := p.(type) {
+		case internal.Configurer:
+			if err := p.Configure(internal_config.Envs(envs)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
-func startServices(config *config.Configuration, parameters ...interface{}) (func(), error) {
-	if !config.Server.RestEnabled && !config.Server.GrpcEnabled {
-		return nil, errors.New("no servers enabled")
-	}
-	restServer := serverrest.New(parameters...)
-	if config.Server.RestEnabled {
-		servicerest.New(append(parameters, restServer)...)
-		if err := restServer.Start(config.Server.Rest); err != nil {
-			return nil, err
+func initialize(parameters ...interface{}) error {
+	for _, p := range parameters {
+		if p, ok := p.(internal.Initializer); ok {
+			if err := p.Initialize(); err != nil {
+				return err
+			}
 		}
 	}
-	grpcServer := servergrpc.New(parameters...)
-	if config.Server.GrpcEnabled {
-		grpcService := servicegrpc.New(append(parameters, grpcServer)...)
-		if err := grpcServer.Initialize(config.Server.Grpc,
-			grpcService.Register); err != nil {
-			return nil, err
+	return nil
+}
+
+func shutdown(parameters ...interface{}) {
+	for _, p := range parameters {
+		if p, ok := p.(internal.Initializer); ok {
+			p.Shutdown()
 		}
 	}
-	return func() {
-		if config.Server.RestEnabled {
-			restServer.Stop()
-		}
-		if config.Server.GrpcEnabled {
-			grpcServer.Shutdown()
-		}
-	}, nil
 }

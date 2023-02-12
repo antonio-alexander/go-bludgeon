@@ -1,6 +1,8 @@
 package data
 
-//route constants
+var ServiceName = "bludgeon_timers"
+
+// route constants
 const (
 	RouteBase             string = "/api/v1"
 	RouteTimers           string = RouteBase + "/timers"
@@ -23,10 +25,10 @@ const (
 	RouteTimeSlicesIDf    string = RouteTimeSlices + "/%s"
 )
 
-//path constants
+// path constants
 const PathID string = "id"
 
-//parameter constants
+// parameter constants
 const (
 	ParameterIDs         string = "ids"
 	ParameterEmployeeID  string = "employee_id"
@@ -37,7 +39,7 @@ const (
 	ParameterTimerIDs    string = "timer_ids"
 )
 
-//Contract is used for requests that don't have a
+// Contract is used for requests that don't have a
 // solid data type to communicate data in the body
 // of a request
 type Contract struct {
@@ -46,3 +48,14 @@ type Contract struct {
 	// example: 1653719229
 	Finish int64 `json:"finish_time,omitempty"`
 }
+
+// contracts for changes
+var (
+	ChangeTypeTimer    = "timer"
+	ChangeActionStart  = "start"
+	ChangeActionStop   = "stop"
+	ChangeActionSubmit = "submit"
+	ChangeActionCreate = "create"
+	ChangeActionUpdate = "update"
+	ChangeActionDelete = "delete"
+)

@@ -5,10 +5,12 @@ import (
 	"sync"
 	"time"
 
-	grpcserver "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 	pb "github.com/antonio-alexander/go-bludgeon/timers/data/pb"
 	logic "github.com/antonio-alexander/go-bludgeon/timers/logic"
+
+	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	server "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
+	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 
 	"google.golang.org/grpc"
 )
@@ -19,53 +21,46 @@ type grpcService struct {
 	logger.Logger
 	pb.UnimplementedTimersServer
 	pb.UnimplementedTimeSlicesServer
-	logic  logic.Logic
-	server interface {
-		grpcserver.Owner
-		grpc.ServiceRegistrar
-	}
+	logic logic.Logic
 }
 
-//KIM: we don't need to expose this interface, but we need
+// KIM: we don't need to expose this interface, but we need
 // to implement it for grpc's sake
 var (
 	_ pb.TimersServer     = &grpcService{}
 	_ pb.TimeSlicesServer = &grpcService{}
 )
 
-type Owner interface {
-	Register()
+func New(parameters ...interface{}) interface {
+	internal.Parameterizer
+	server.Registerer
+} {
+	return &grpcService{
+		Logger: logger.NewNullLogger(),
+	}
 }
 
-func New(parameters ...interface{}) interface {
-	Owner
-} {
-	s := &grpcService{}
+func (s *grpcService) SetUtilities(parameters ...interface{}) {
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
-		case interface {
-			grpcserver.Owner
-			grpc.ServiceRegistrar
-		}:
-			s.server = p
-		case logic.Logic:
-			s.logic = p
 		case logger.Logger:
 			s.Logger = p
 		}
 	}
-	if s.server == nil {
-		panic("server not set")
-	}
-	if s.Logger == nil {
-		s.Logger = logger.New()
-	}
-	return s
 }
 
-func (s *grpcService) Register() {
-	pb.RegisterTimersServer(s.server, s)
-	pb.RegisterTimeSlicesServer(s.server, s)
+func (s *grpcService) SetParameters(parameters ...interface{}) {
+	for _, parameter := range parameters {
+		switch p := parameter.(type) {
+		case logic.Logic:
+			s.logic = p
+		}
+	}
+}
+
+func (s *grpcService) Register(server grpc.ServiceRegistrar) {
+	pb.RegisterTimersServer(server, s)
+	pb.RegisterTimeSlicesServer(server, s)
 }
 
 func (s *grpcService) TimerCreate(ctx context.Context, request *pb.TimerCreateRequest) (*pb.TimerCreateResponse, error) {
@@ -78,14 +73,9 @@ func (s *grpcService) TimerRead(ctx context.Context, request *pb.TimerReadReques
 	return &pb.TimerReadResponse{Timer: pb.FromTimer(timer)}, err
 }
 
-func (s *grpcService) TimerUpdateComment(ctx context.Context, request *pb.TimerUpdateCommentRequest) (*pb.TimerUpdateCommentResponse, error) {
-	timer, err := s.logic.TimerUpdateComment(ctx, request.GetId(), request.GetComment())
-	return &pb.TimerUpdateCommentResponse{Timer: pb.FromTimer(timer)}, err
-}
-
-func (s *grpcService) TimerArchive(ctx context.Context, request *pb.TimerArchiveRequest) (*pb.TimerArchiveResponse, error) {
-	timer, err := s.logic.TimerArchive(ctx, request.GetId(), request.GetArchive())
-	return &pb.TimerArchiveResponse{Timer: pb.FromTimer(timer)}, err
+func (s *grpcService) TimerUpdate(ctx context.Context, request *pb.TimerUpdateRequest) (*pb.TimerUpdateResponse, error) {
+	timer, err := s.logic.TimerUpdate(ctx, request.GetId(), *pb.ToTimerPartial(request.GetTimerPartial()))
+	return &pb.TimerUpdateResponse{Timer: pb.FromTimer(timer)}, err
 }
 
 func (s *grpcService) TimerDelete(ctx context.Context, request *pb.TimerDeleteRequest) (*pb.TimerDeleteResponse, error) {
@@ -113,7 +103,7 @@ func (s *grpcService) TimerSubmit(ctx context.Context, request *pb.TimerSubmitRe
 	if request.FinishOneof != nil {
 		finish = time.Unix(0, request.GetFinish())
 	}
-	timer, err := s.logic.TimerSubmit(ctx, request.GetId(), &finish)
+	timer, err := s.logic.TimerSubmit(ctx, request.GetId(), finish.UnixNano())
 	return &pb.TimerSubmitResponse{Timer: pb.FromTimer(timer)}, err
 }
 

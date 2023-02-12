@@ -1,0 +1,374 @@
+name: timers_push
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "timers/**"
+      - ".github/workflows/timers_push.yml"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  environment:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_SHA: ${{ github.sha }}
+      GITHUB_REF: ${{ github.ref }}
+    steps:
+      - name: Get git source
+        run: |
+          git_source=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
+          git_source=`echo $git_source | sed 's/refs\/tags\///'`
+          git_source=`echo $git_source | sed 's/refs\\///'`
+          echo $git_source
+          echo "git_source=$git_source" >> $GITHUB_ENV
+      - name: Get git SHA
+        run: |
+          git_sha=`echo $GITHUB_SHA`
+          echo $git_sha
+          echo "git_sha=$git_sha" >> $GITHUB_ENV
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+      - name: Get version
+        run: |
+          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/timers/version.json | jq '.Version' | sed 's/"//g'`
+          echo $version_source
+          echo "version_source=$version_source" >> $GITHUB_ENV
+      - name: Generate build artifacts
+        run: |
+          mkdir -p /tmp
+          echo ${{ env.version_source }} >> /tmp/version_source
+          echo ${{ env.git_source }} >> /tmp/git_source
+          echo ${{ env.git_sha }} >> /tmp/git_sha
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: |
+            /tmp/version_source
+            /tmp/git_source
+            /tmp/git_sha
+
+  go_lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+      - uses: actions/checkout@v3
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.44.2
+          working-directory: ./timers
+          args: --verbose
+
+  go_test:
+    needs: [go_lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+      - name: Test timers (exclude client)
+        run: |
+          cd /home/runner/work/go-bludgeon/go-bludgeon/timers
+          go mod download
+          make dep
+          go test -v $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-timers.out | tee /tmp/go-bludgeon-timers.log; test ${PIPESTATUS[0]} -eq 0
+          docker compose logs >> /tmp/go-bludgeon-timers_services.log
+      - name: Docker clean-up
+        if: always()
+        run: |
+          make stop
+          docker image prune -f
+          docker container prune -f
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: |
+            /tmp/go-bludgeon-timers.log
+            /tmp/go-bludgeon-timers.out
+            /tmp/go-bludgeon-timers_services.log
+
+  docker_build_images:
+    needs: [environment, go_test, swagger_validate, proto_validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PLATFORM_AMD64: linux/amd64
+      PLATFORM_ARMV7: linux/arm/v7
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+          git_source=`cat /tmp/git_source`
+          echo "git_source=$git_source" >> $GITHUB_ENV
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Build docker timers
+        run: |
+          cd timers
+          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_source }}  --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
+          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_source }}  --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
+      - name: Generate build artifacts
+        run: |
+          mkdir -p /tmp
+          docker save -o /tmp/go-bludgeon-timers_amd64-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}
+          docker save -o /tmp/go-bludgeon-timers_armv7-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: |
+            /tmp/go-bludgeon-timers_amd64-${{ env.version }}.tar.gz
+            /tmp/go-bludgeon-timers_armv7-${{ env.version }}.tar.gz
+          retention-days: 1
+      - name: Docker clean-up
+        run: |
+          docker image prune -f
+          docker container prune -f
+
+  go_test_client:
+    needs: [docker_build_images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Load Docker Images
+        run: |
+          docker load -i /tmp/go-bludgeon-timers_amd64-${{ env.version }}.tar.gz
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+      - name: Test timers client
+        run: |
+          cd /home/runner/work/go-bludgeon/go-bludgeon/timers
+          go mod download
+          make run
+          go test -v ./client/... -coverprofile /tmp/go-bludgeon-timers_client.out | tee /tmp/go-bludgeon-timers_client.log; test ${PIPESTATUS[0]} -eq 0
+          docker compose logs >> /tmp/go-bludgeon-timers-client_services.log
+      - name: Docker clean-up
+        if: always()
+        run: |
+          make stop
+          docker image prune -f
+          docker container prune -f
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: |
+            /tmp/go-bludgeon-timers-client.log
+            /tmp/go-bludgeon-timers-client.out
+            /tmp/go-bludgeon-timers-client_services.log
+
+  swagger_validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+      - name: Validate swagger spec
+        run: |
+          cd /home/runner/work/go-bludgeon/go-bludgeon/timers
+          go mod download
+          make validate-swagger
+
+  proto_lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      - name: Lint Protos
+        uses: yoheimuta/action-protolint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          level: error
+          protolint_version: "0.38.3"
+          protolint_flags: -config_path=./timers/.protolint.yaml ./timers/data/pb/*.proto
+
+  proto_validate:
+    needs: [proto_lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+      - name: Install Protoc
+        run: |
+          PROTOC_ZIP=protoc-3.20.1-linux-x86_64.zip
+          curl -OL --silent https://github.com/protocolbuffers/protobuf/releases/download/v3.20.1/$PROTOC_ZIP
+          sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
+          sudo unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
+          rm -f $PROTOC_ZIP
+      - name: Install protoc-gen-go
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
+      - name: Install protoc-gen-go-grpc
+        run: |
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+      - name: Build protos
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/
+        run: |
+          protoc -I="./pb" --go_opt=paths=source_relative --go_out="/tmp" --go-grpc_opt=paths=source_relative --go-grpc_out="/tmp" ./pb/*.proto
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: |
+            /tmp/timers.pb.go
+            /tmp/timers_grpc.pb.go
+      - name: Compare timers.pb.go
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
+        run: |
+          if cmp --silent -- "./timers.pb.go" "/tmp/timers.pb.go"; then
+            echo "generated proto files are identical"
+          else
+            echo "one or more proto files generated don't match"
+            exit 1
+          fi
+      - name: Compare timers_grpc.pb.go
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
+        run: |
+          if cmp --silent -- "./timers_grpc.pb.go" "/tmp/timers_grpc.pb.go"; then
+          echo "generated proto files are identical"
+          else
+          echo "one or more proto files generated don't match"
+          exit 1
+          fi
+      - name: Compare timeslices.pb.go
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
+        run: |
+          if cmp --silent -- "./timeslices.pb.go" "/tmp/timeslices.pb.go"; then
+            echo "generated proto files are identical"
+          else
+            echo "one or more proto files generated don't match"
+            exit 1
+          fi
+      - name: Compare timeslices_grpc.pb.go
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
+        run: |
+          if cmp --silent -- "./timeslices_grpc.pb.go" "/tmp/timeslices_grpc.pb.go"; then
+          echo "generated proto files are identical"
+          else
+          echo "one or more proto files generated don't match"
+          exit 1
+          fi
+
+  git_push_tag:
+    needs: [go_test_client, go_lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: "0"
+      # - name: Push/Update version
+      #   uses: anothrNick/github-tag-action@1.36.0
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     WITH_V: true
+      #     CUSTOM_TAG: timers/v${{ env.version }}
+
+  docker_push_images:
+    needs: [go_test_client, docker_build_images]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Login to ghcr.io
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Load Docker Images
+        run: |
+          docker load -i /tmp/go-bludgeon-timers_amd64-${{ env.version }}.tar.gz
+          docker load -i /tmp/go-bludgeon-timers_armv7-${{ env.version }}.tar.gz
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
+      # - name: Push Docker Images
+      #   run: |
+      #     docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}
+      #     docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_latest
+      #     docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
+      #     docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
+      # - name: Create/Push Docker manifest
+      #   run: |
+      #     docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
+      #     docker manifest annotate --arch arm --os linux --variant 7 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
+      #     docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:${{ env.version }} --purge
+      #     docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
+      #     docker manifest annotate --arch arm --os linux --variant 7 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
+      #     docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest --purge
+      - name: Docker clean-up
+        run: |
+          docker image prune -f
+          docker container prune -f
