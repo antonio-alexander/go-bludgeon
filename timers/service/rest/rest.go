@@ -3,14 +3,17 @@ package rest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"time"
 
 	data "github.com/antonio-alexander/go-bludgeon/timers/data"
 	logic "github.com/antonio-alexander/go-bludgeon/timers/logic"
+	meta "github.com/antonio-alexander/go-bludgeon/timers/meta"
 
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 	internal_rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 
@@ -33,6 +36,41 @@ func New() interface {
 	}
 }
 
+func (s *restService) handleResponse(writer http.ResponseWriter, err error, bytes []byte) error {
+	if err != nil {
+		var e internal_errors.Error
+
+		switch {
+		default:
+			writer.WriteHeader(http.StatusInternalServerError)
+		case errors.Is(err, meta.ErrTimerNotFound):
+			writer.WriteHeader(http.StatusNotFound)
+		case errors.Is(err, meta.ErrTimerNotUpdated):
+			writer.WriteHeader(http.StatusNotModified)
+		case errors.Is(err, meta.ErrTimerConflictCreate) || errors.Is(err, meta.ErrTimerConflictUpdate):
+			writer.WriteHeader(http.StatusConflict)
+		}
+		switch i := err.(type) {
+		case internal_errors.Error:
+			e = i
+		default:
+			e = internal_errors.New(err.Error())
+		}
+		bytes, err = json.Marshal(&e)
+		if err != nil {
+			return err
+		}
+		_, err = writer.Write(bytes)
+		return err
+	}
+	if bytes == nil {
+		writer.WriteHeader(http.StatusNoContent)
+	}
+	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, err = writer.Write(bytes)
+	return err
+}
+
 func (s *restService) endpointTimerCreate() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		var timerPartial data.TimerPartial
@@ -47,7 +85,7 @@ func (s *restService) endpointTimerCreate() func(http.ResponseWriter, *http.Requ
 				}
 			}
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("timer create -  %s", err)
 		}
 	}
@@ -63,7 +101,7 @@ func (s *restService) endpointTimerRead() func(http.ResponseWriter, *http.Reques
 		if timer, err = s.TimerRead(request.Context(), id); err == nil {
 			bytes, err = json.Marshal(timer)
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("timer read -  %s", err)
 		}
 	}
@@ -80,7 +118,7 @@ func (s *restService) endpointTimersRead() func(http.ResponseWriter, *http.Reque
 		if timers, err = s.TimersRead(request.Context(), search); err == nil {
 			bytes, err = json.Marshal(timers)
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("timer read -  %s", err)
 		}
 	}
@@ -92,7 +130,7 @@ func (s *restService) endpointTimerDelete() func(http.ResponseWriter, *http.Requ
 
 		id := idFromPath(mux.Vars(request))
 		err = s.TimerDelete(request.Context(), id)
-		if err = handleResponse(writer, err, nil); err != nil {
+		if err = s.handleResponse(writer, err, nil); err != nil {
 			s.Error("timer delete -  %s", err)
 		}
 	}
@@ -108,7 +146,7 @@ func (s *restService) endpointTimerStart() func(http.ResponseWriter, *http.Reque
 		if timer, err = s.TimerStart(request.Context(), id); err == nil {
 			bytes, err = json.Marshal(&timer)
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("timer start -  %s", err)
 		}
 	}
@@ -124,7 +162,7 @@ func (s *restService) endpointTimerStop() func(http.ResponseWriter, *http.Reques
 		if timer, err = s.TimerStop(request.Context(), id); err == nil {
 			bytes, err = json.Marshal(&timer)
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("timer pause -  %s", err)
 		}
 	}
@@ -153,7 +191,7 @@ func (s *restService) endpointTimerSubmit() func(http.ResponseWriter, *http.Requ
 				}
 			}
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("timer submit -  %s", err)
 		}
 	}
@@ -175,7 +213,7 @@ func (s *restService) endpointTimerUpdate() func(http.ResponseWriter, *http.Requ
 				}
 			}
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("timer submit -  %s", err)
 		}
 	}
@@ -195,7 +233,7 @@ func (s *restService) endpointTimeSliceCreate() func(http.ResponseWriter, *http.
 				}
 			}
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("time slice create -  %s", err)
 		}
 	}
@@ -211,7 +249,7 @@ func (s *restService) endpointTimeSliceRead() func(http.ResponseWriter, *http.Re
 		if timeSlice, err = s.TimeSliceRead(request.Context(), id); err == nil {
 			bytes, err = json.Marshal(timeSlice)
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("time slice read -  %s", err)
 		}
 	}
@@ -228,7 +266,7 @@ func (s *restService) endpointTimeSlicesRead() func(http.ResponseWriter, *http.R
 		if timeSlices, err = s.TimeSlicesRead(request.Context(), search); err == nil {
 			bytes, err = json.Marshal(timeSlices)
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("time slices read -  %s", err)
 		}
 	}
@@ -249,7 +287,7 @@ func (s *restService) endpointTimeSliceUpdate() func(http.ResponseWriter, *http.
 				}
 			}
 		}
-		if err = handleResponse(writer, err, bytes); err != nil {
+		if err = s.handleResponse(writer, err, bytes); err != nil {
 			s.Error("timer slice create -  %s", err)
 		}
 	}
@@ -261,7 +299,7 @@ func (s *restService) endpointTimeSliceDelete() func(http.ResponseWriter, *http.
 
 		id := idFromPath(mux.Vars(request))
 		err = s.TimeSliceDelete(request.Context(), id)
-		if err = handleResponse(writer, err, nil); err != nil {
+		if err = s.handleResponse(writer, err, nil); err != nil {
 			s.Error("timer delete -  %s", err)
 		}
 	}

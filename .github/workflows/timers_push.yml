@@ -318,12 +318,12 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: "0"
-      # - name: Push/Update version
-      #   uses: anothrNick/github-tag-action@1.36.0
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #     WITH_V: true
-      #     CUSTOM_TAG: timers/v${{ env.version }}
+      - name: Push/Update version
+        uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          CUSTOM_TAG: timers/v${{ env.version }}
 
   docker_push_images:
     needs: [go_test_client, docker_build_images]
@@ -354,20 +354,20 @@ jobs:
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
-      # - name: Push Docker Images
-      #   run: |
-      #     docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}
-      #     docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_latest
-      #     docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
-      #     docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
-      # - name: Create/Push Docker manifest
-      #   run: |
-      #     docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
-      #     docker manifest annotate --arch arm --os linux --variant 7 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
-      #     docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:${{ env.version }} --purge
-      #     docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
-      #     docker manifest annotate --arch arm --os linux --variant 7 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
-      #     docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest --purge
+      - name: Push Docker Images
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
+      - name: Create/Push Docker manifest
+        run: |
+          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
+          docker manifest annotate --arch arm --os linux --variant 7 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_${{ env.version }}
+          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:${{ env.version }} --purge
+          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:amd64_latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
+          docker manifest annotate --arch arm --os linux --variant 7 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:armv7_latest
+          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-timers:latest --purge
       - name: Docker clean-up
         run: |
           docker image prune -f

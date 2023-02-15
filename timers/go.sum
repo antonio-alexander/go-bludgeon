@@ -43,12 +43,14 @@ github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRF
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk541a8SKzHPHnH3zbiI+7dagKZ0cgpgrD7Fyho=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
-github.com/antonio-alexander/go-bludgeon/changes v1.0.1 h1:BHhABwKP9GUBgCpmaZNewaOw3T6HdB6QuwOCu8/5JZU=
 github.com/antonio-alexander/go-bludgeon/changes v1.0.1/go.mod h1:Ke71Zr4m8EYxaG4S+1PHpq37uNMlZTKsiOtHDRZL4Dc=
+github.com/antonio-alexander/go-bludgeon/changes v1.0.2 h1:v2FN+6cCKYJL6RYt1qTsYXwRAgvcPWHsWQbSwWSpmnc=
+github.com/antonio-alexander/go-bludgeon/changes v1.0.2/go.mod h1:3FttEiyvmwRIgs9oqqSev3TLHalVmz+RqWFTCSHlgJQ=
 github.com/antonio-alexander/go-bludgeon/employees v1.3.1 h1:rjHOSbGvl0rpylfU924UmKvJ5UB7Ix7THMf8eUTFLlY=
 github.com/antonio-alexander/go-bludgeon/employees v1.3.1/go.mod h1:uwt4OnK2gJq6x2fcloUe+vToO+QvREUK20eIIOJB1LA=
-github.com/antonio-alexander/go-bludgeon/internal v1.4.0 h1:21JCMEm+VSDrDGjDojp4NXc5N5EyUFm4o07jtCAqRTE=
 github.com/antonio-alexander/go-bludgeon/internal v1.4.0/go.mod h1:LUtsZmZetGueW33m13erasT2xz3L7BdnZedvLCN0NZ8=
+github.com/antonio-alexander/go-bludgeon/internal v1.4.1 h1:cy0TAK0zZkQ15HaUiPSX8QrkZdLeeKUltoKxyMeY8Q4=
+github.com/antonio-alexander/go-bludgeon/internal v1.4.1/go.mod h1:LUtsZmZetGueW33m13erasT2xz3L7BdnZedvLCN0NZ8=
 github.com/antonio-alexander/go-queue v1.1.1/go.mod h1:T1+MheS1/xNIsqC9JRhUcQAoRHz3buNWuDQ+D54g8lI=
 github.com/antonio-alexander/go-queue/finite v1.1.2/go.mod h1:6gxQLNWFq/cy/Gor75Hrg090eW++ZX1zU+PXpzIAH6w=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=

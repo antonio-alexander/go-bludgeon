@@ -2,6 +2,7 @@ package logic_test
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"os"
 	"path"
@@ -98,6 +99,7 @@ func init() {
 	configLogic.Default()
 	configLogic.FromEnv(envs)
 	configLogic.ChangeRateRead = time.Second
+	configLogic.ChangesTimeout = 30 * time.Second
 	//KIM: if we use the default it could conflict with the
 	// the timers service/container
 	configLogic.ChangesRegistrationId = randomString()
@@ -259,9 +261,9 @@ func (l *logicTest) shutdown(t *testing.T) {
 	l.changesClient.Shutdown()
 }
 
-func (l *logicTest) assertTimerChange(ctx context.Context, timer *data.Timer, action string) func() bool {
+func (l *logicTest) assertTimerChange(t *testing.T, ctx context.Context, timer *data.Timer, action string) func() bool {
 	return func() bool {
-		checkChangesFx := func() bool {
+		checkChangesFx := func() (string, bool) {
 			changesRead, err := l.changesClient.ChangesRead(ctx, changesdata.ChangeSearch{
 				DataIds:      []string{timer.ID},
 				Types:        []string{data.ChangeTypeTimer},
@@ -269,19 +271,19 @@ func (l *logicTest) assertTimerChange(ctx context.Context, timer *data.Timer, ac
 				Actions:      []string{action},
 			})
 			if err != nil {
-				return false
+				return err.Error(), false
 			}
 			if len(changesRead) != 1 {
-				return false
+				return fmt.Sprintf("Number of changes equal to: %d", len(changesRead)), false
 			}
 			if changesRead[0].DataId != timer.ID {
-				return false
+				return fmt.Sprintf("DataId != %s", timer.ID), false
 			}
 			if changesRead[0].DataAction != data.ChangeActionDelete &&
 				changesRead[0].DataVersion != timer.Version {
-				return false
+				return fmt.Sprintf("Version not equal to %d", timer.Version), false
 			}
-			return true
+			return "", true
 		}
 		tCheck := time.NewTicker(time.Second)
 		defer tCheck.Stop()
@@ -289,10 +291,14 @@ func (l *logicTest) assertTimerChange(ctx context.Context, timer *data.Timer, ac
 		for {
 			select {
 			case <-tStop:
+				reason, success := checkChangesFx()
+				if !success {
+					t.Logf("failure because of: %s", reason)
+				}
 				return false
 			case <-tCheck.C:
-				if checkChangesFx() {
-					return true
+				if _, success := checkChangesFx(); success {
+					return success
 				}
 			}
 		}
@@ -325,7 +331,7 @@ func (l *logicTest) TestTimerChanges(t *testing.T) {
 	time.Sleep(time.Second)
 
 	//validate create change
-	assert.Condition(t, l.assertTimerChange(ctx, timerCreated, data.ChangeActionCreate))
+	assert.Condition(t, l.assertTimerChange(t, ctx, timerCreated, data.ChangeActionCreate))
 
 	//update timer
 	comment = randomString()
@@ -339,7 +345,7 @@ func (l *logicTest) TestTimerChanges(t *testing.T) {
 	time.Sleep(time.Second)
 
 	//validate update change
-	assert.Condition(t, l.assertTimerChange(ctx, timerUpdated, data.ChangeActionUpdate))
+	assert.Condition(t, l.assertTimerChange(t, ctx, timerUpdated, data.ChangeActionUpdate))
 
 	// start timer
 	timerStarted, err := l.TimerStart(ctx, timerId)
@@ -350,7 +356,7 @@ func (l *logicTest) TestTimerChanges(t *testing.T) {
 	time.Sleep(time.Second)
 
 	//validate  change
-	assert.Condition(t, l.assertTimerChange(ctx, timerStarted, data.ChangeActionStart))
+	assert.Condition(t, l.assertTimerChange(t, ctx, timerStarted, data.ChangeActionStart))
 
 	//sleep to give timer a duration/elapsed time
 	time.Sleep(time.Second)
@@ -364,7 +370,7 @@ func (l *logicTest) TestTimerChanges(t *testing.T) {
 	time.Sleep(time.Second)
 
 	//validate  change
-	assert.Condition(t, l.assertTimerChange(ctx, timerStopped, data.ChangeActionStop))
+	assert.Condition(t, l.assertTimerChange(t, ctx, timerStopped, data.ChangeActionStop))
 
 	// submit timer
 	tNow := time.Now()
@@ -376,7 +382,7 @@ func (l *logicTest) TestTimerChanges(t *testing.T) {
 	time.Sleep(time.Second)
 
 	//validate  change
-	assert.Condition(t, l.assertTimerChange(ctx, timerSubmitted, data.ChangeActionSubmit))
+	assert.Condition(t, l.assertTimerChange(t, ctx, timerSubmitted, data.ChangeActionSubmit))
 
 	//delete timer
 	err = l.TimerDelete(ctx, timerId)
@@ -386,7 +392,7 @@ func (l *logicTest) TestTimerChanges(t *testing.T) {
 	time.Sleep(time.Second)
 
 	//validate  change
-	assert.Condition(t, l.assertTimerChange(ctx, timerSubmitted, data.ChangeActionDelete))
+	assert.Condition(t, l.assertTimerChange(t, ctx, timerSubmitted, data.ChangeActionDelete))
 }
 
 func (l *logicTest) TestEmployeeChanges(t *testing.T) {
