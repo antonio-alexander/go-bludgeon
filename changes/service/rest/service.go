@@ -12,6 +12,7 @@ import (
 	meta "github.com/antonio-alexander/go-bludgeon/changes/meta"
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
 
+	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 	rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
 	websocket "github.com/antonio-alexander/go-bludgeon/internal/websocket/server"
@@ -37,32 +38,33 @@ func New() interface {
 }
 
 func (s *restServer) handleResponse(writer http.ResponseWriter, err error, item interface{}) error {
-	var canSendBody bool
-
 	if err != nil {
-		//REVIEW: I don't like to throw away/shadow this error, but it's not
-		bytes, jsonErr := json.Marshal(err)
-		if jsonErr != nil {
-			s.Error(logAlias+"json error on handle response: %s", jsonErr)
-		}
+		var e internal_errors.Error
+
 		switch {
 		default:
-			canSendBody = true
 			writer.WriteHeader(http.StatusInternalServerError)
-		case errors.Is(err, meta.ErrChangeNotWritten):
-			writer.WriteHeader(http.StatusNotModified)
-		case errors.Is(err, meta.ErrChangeNotFound):
-			canSendBody = true
+		case errors.Is(err, meta.ErrChangeNotFound) ||
+			errors.Is(err, meta.ErrRegistrationNotFound):
 			writer.WriteHeader(http.StatusNotFound)
+		case errors.Is(err, meta.ErrChangeNotWritten) ||
+			errors.Is(err, meta.ErrRegistrationNotWritten):
+			writer.WriteHeader(http.StatusNotModified)
 		case errors.Is(err, meta.ErrChangeConflictWrite):
-			canSendBody = true
 			writer.WriteHeader(http.StatusConflict)
 		}
-		if canSendBody {
-			_, err = writer.Write(bytes)
+		switch i := err.(type) {
+		case internal_errors.Error:
+			e = i
+		default:
+			e = internal_errors.New(err.Error())
+		}
+		bytes, err := json.Marshal(&e)
+		if err != nil {
 			return err
 		}
-		return nil
+		_, err = writer.Write(bytes)
+		return err
 	}
 	switch {
 	default:
