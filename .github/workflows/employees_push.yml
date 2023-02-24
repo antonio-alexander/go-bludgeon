@@ -11,6 +11,12 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  LINTER_VERSION: "v1.51.2"
+  GO_VERSION: "1.19"
+  PROTOC_VERSION: "3.20.1"
+  PROTOC_GEN_GO_VERSION: "v1.28.0"
+  PROTOC_GEN_GO_GRPC_VERSION: "v1.2"
+  PROTO_LINT_VERSION: "0.38.3"
 
 jobs:
   environment:
@@ -58,12 +64,12 @@ jobs:
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v3
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.44.2
+          version: ${{ env.LINTER_VERSION }}
           working-directory: ./employees
           args: --verbose
 
@@ -78,7 +84,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Test employees (exclude client)
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/employees
@@ -103,7 +109,7 @@ jobs:
             /tmp/go-bludgeon-employees_services.log
 
   docker_build_images:
-    needs: [environment, go_test, swagger_validate, proto_validate]
+    needs: [environment, go_test, proto_validate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -171,7 +177,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Test employees client
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/employees
@@ -194,29 +200,12 @@ jobs:
             /tmp/go-bludgeon-employees_client.out
             /tmp/go-bludgeon-employees-client_services.log
 
-  swagger_validate:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.16
-      - name: Validate swagger spec
-        run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/employees
-          go mod download
-          make validate-swagger
-
   proto_lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Checkout Repository
         uses: actions/checkout@v3
       - name: Lint Protos
@@ -224,7 +213,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           level: error
-          protolint_version: "0.38.3"
+          protolint_version: ${{ env.PROTO_LINT_VERSION }}
           protolint_flags: -config_path=./employees/.protolint.yaml ./employees/data/pb/employees.proto
 
   proto_validate:
@@ -233,28 +222,30 @@ jobs:
     steps:
       - name: Install Protoc
         run: |
-          PROTOC_ZIP=protoc-3.20.1-linux-x86_64.zip
-          curl -OL --silent https://github.com/protocolbuffers/protobuf/releases/download/v3.20.1/$PROTOC_ZIP
+          PROTOC_ZIP=protoc-${{ env.PROTOC_VERSION }}-linux-x86_64.zip
+          curl -OL --silent https://github.com/protocolbuffers/protobuf/releases/download/v${{ env.PROTOC_VERSION }}/$PROTOC_ZIP
           sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
           sudo unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
           rm -f $PROTOC_ZIP
       - name: Setup go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Install protoc-gen-go
         run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@${{ env.PROTOC_GEN_GO_VERSION }}
       - name: Install protoc-gen-go-grpc
         run: |
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@${{ env.PROTOC_GEN_GO_GRPC_VERSION }}
       - name: Checkout repository code
         uses: actions/checkout@v3
       - name: Build protos
         working-directory: /home/runner/work/go-bludgeon/go-bludgeon/employees/data/
         run: |
-          protoc -I="./pb" --go_opt=paths=source_relative --go_out="/tmp" --go-grpc_opt=paths=source_relative --go-grpc_out="/tmp" ./pb/employees.proto
+          protoc -I="./pb" --go_opt=paths=source_relative --go_out="/tmp" --go-grpc_opt=paths=source_relative \
+           --go-grpc_out="/tmp" ./pb/employees.proto
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: artifacts
@@ -262,6 +253,7 @@ jobs:
             /tmp/employees.pb.go
             /tmp/employees_grpc.pb.go
       - name: Compare employees.pb.go
+        if: always()
         working-directory: /home/runner/work/go-bludgeon/go-bludgeon/employees/data/pb/
         run: |
           if cmp --silent -- "./employees.pb.go" "/tmp/employees.pb.go"; then
@@ -271,6 +263,7 @@ jobs:
             exit 1
           fi
       - name: Compare employees_grpc.pb.go
+        if: always()
         working-directory: /home/runner/work/go-bludgeon/go-bludgeon/employees/data/pb/
         run: |
           if cmp --silent -- "./employees_grpc.pb.go" "/tmp/employees_grpc.pb.go"; then

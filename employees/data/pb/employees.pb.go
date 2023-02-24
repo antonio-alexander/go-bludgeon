@@ -522,16 +522,19 @@ type EmployeePartial struct {
 	// first_name_oneof
 	//
 	// Types that are assignable to FirstNameOneof:
+	//
 	//	*EmployeePartial_FirstName
 	FirstNameOneof isEmployeePartial_FirstNameOneof `protobuf_oneof:"first_name_oneof"`
 	// last_name_oneof
 	//
 	// Types that are assignable to LastNameOneof:
+	//
 	//	*EmployeePartial_LastName
 	LastNameOneof isEmployeePartial_LastNameOneof `protobuf_oneof:"last_name_oneof"`
 	// email_addressoneof
 	//
 	// Types that are assignable to EmailAddressOneof:
+	//
 	//	*EmployeePartial_EmailAddress
 	EmailAddressOneof isEmployeePartial_EmailAddressOneof `protobuf_oneof:"email_address_oneof"`
 }
@@ -759,6 +762,7 @@ type EmployeeSearch struct {
 	// first_name_oneof
 	//
 	// Types that are assignable to FirstNameOneof:
+	//
 	//	*EmployeeSearch_FirstName
 	FirstNameOneof isEmployeeSearch_FirstNameOneof `protobuf_oneof:"first_name_oneof"`
 	// last_names
@@ -766,11 +770,13 @@ type EmployeeSearch struct {
 	// last_name_oneof
 	//
 	// Types that are assignable to LastNameOneof:
+	//
 	//	*EmployeeSearch_LastName
 	LastNameOneof isEmployeeSearch_LastNameOneof `protobuf_oneof:"last_name_oneof"`
 	// email_addressoneof
 	//
 	// Types that are assignable to EmailAddressOneof:
+	//
 	//	*EmployeeSearch_EmailAddress
 	EmailAddressOneof isEmployeeSearch_EmailAddressOneof `protobuf_oneof:"email_address_oneof"`
 	// email_addresses

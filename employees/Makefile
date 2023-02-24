@@ -11,10 +11,10 @@ help: ## - Show this help.
 	@sed -ne '/@sed/!s/## //p' $(MAKEFILE_LIST)
 
 check-proto: ## - check protoc/proto-gen-go/protolint
-	 @which protolint || (go install github.com/yoheimuta/protolint/cmd/protolint@v0.38.3)
-	 @which protoc || echo protoc v3.20.1 not installed, install https://github.com/protocolbuffers/protobuf/releases/tag/v3.20.1
-	 @which protoc-gen-go || (go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0)
-	 @which protoc-gen-go-grpc || (go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2)
+	@which protolint || (go install github.com/yoheimuta/protolint/cmd/protolint@v0.38.3)
+	@which protoc || echo protoc v3.20.1 not installed, install https://github.com/protocolbuffers/protobuf/releases/tag/v3.20.1
+	@which protoc-gen-go || (go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0)
+	@which protoc-gen-go-grpc || (go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2)
 
 lint-proto: check-proto ## - lint proto
 	@protolint -fix ./data/pb/employees.proto
