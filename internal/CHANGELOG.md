@@ -5,11 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2023-02-22
+
+- upgraded to golang.org/x/net v0.7.0
+
 ## [1.4.2] - 2023-02-22
 
 - fixed security vulnerabilities by updating volumes
 - upgraded to golang.org/x/text v0.3.8
-- upgraded to golang.org/x/net v0.7.0
 - upgraded from Go 1.16 to 1.19
 
 ## [1.4.1] - 2023-02-12
