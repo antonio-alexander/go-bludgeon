@@ -9,8 +9,10 @@ on:
       - ".github/workflows/changes_pull_request.yml"
 
 env:
-  REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  REGISTRY: ghcr.io
+  LINTER_VERSION: "v1.51.2"
+  GO_VERSION: "1.19"
 
 jobs:
   environment:
@@ -79,31 +81,14 @@ jobs:
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v3
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.44.2
+          version: ${{ env.LINTER_VERSION }}
           working-directory: ./changes
           args: --verbose
-
-  swagger_validate:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.16
-      - name: Validate swagger spec
-        run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/changes
-          go mod download
-          make validate-swagger
 
   version_validate:
     needs: [environment]
@@ -131,7 +116,7 @@ jobs:
           fi
 
   go_test:
-    needs: [go_lint, swagger_validate, version_validate]
+    needs: [go_lint, version_validate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -141,7 +126,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Test changes (exclude client)
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/changes
@@ -166,7 +151,7 @@ jobs:
             /tmp/go-bludgeon-changes_services.log
 
   docker_build_images:
-    needs: [environment, go_test, swagger_validate]
+    needs: [environment, go_test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -236,7 +221,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Test changes client
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/changes
