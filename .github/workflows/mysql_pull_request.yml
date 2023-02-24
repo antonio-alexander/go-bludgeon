@@ -1,4 +1,4 @@
-name: mysql
+name: mysql_pull_request
 
 on:
   pull_request:

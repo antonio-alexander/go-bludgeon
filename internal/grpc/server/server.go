@@ -42,7 +42,7 @@ func (s *grpcServer) launchServe(listener net.Listener) {
 		defer s.Done()
 
 		close(started)
-		if err := s.Serve(listener); err != nil {
+		if err := s.Server.Serve(listener); err != nil {
 			s.Error("%s %s", LogAlias, err)
 		}
 	}()
@@ -126,7 +126,7 @@ func (s *grpcServer) Shutdown() {
 	if !s.initialized {
 		return
 	}
-	s.GracefulStop()
+	s.Server.GracefulStop()
 	s.Wait()
 	s.configured, s.initialized = false, false
 	s.registrations = nil
