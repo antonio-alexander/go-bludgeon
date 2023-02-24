@@ -8,6 +8,10 @@ on:
       - "internal/**"
       - ".github/workflows/internal_push.yml"
 
+env:
+  LINTER_VERSION: "v1.51.2"
+  GO_VERSION: "1.19"
+
 jobs:
   environment:
     runs-on: ubuntu-latest
@@ -54,17 +58,17 @@ jobs:
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v3
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.44.2
+          version: ${{ env.LINTER_VERSION }}
           working-directory: ./internal
           args: --verbose
 
   go_test:
-    needs: [go_lint]
+    needs: [go_lint, version_validate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -74,12 +78,12 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Test internal
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/internal
           go mod download
-          docker compose up -d
+          docker compose up -d --wait
           go test -v ./... -coverprofile /tmp/go-bludgeon-internal.out | tee /tmp/go-bludgeon-internal.log; test ${PIPESTATUS[0]} -eq 0
       - name: Docker clean-up
         run: |

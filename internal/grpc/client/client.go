@@ -97,7 +97,7 @@ func (s *grpcClient) Shutdown() {
 	if !s.initialized {
 		return
 	}
-	if err := s.Close(); err != nil {
+	if err := s.ClientConn.Close(); err != nil {
 		s.Error("error while closing: %s", err)
 	}
 	s.initialized, s.configured = false, false
