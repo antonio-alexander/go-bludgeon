@@ -521,21 +521,25 @@ type TimeSlicePartial struct {
 	// timer_id_oneof
 	//
 	// Types that are assignable to TimerIdOneof:
+	//
 	//	*TimeSlicePartial_TimerId
 	TimerIdOneof isTimeSlicePartial_TimerIdOneof `protobuf_oneof:"timer_id_oneof"`
 	// completed_oneof
 	//
 	// Types that are assignable to CompletedOneof:
+	//
 	//	*TimeSlicePartial_Completed
 	CompletedOneof isTimeSlicePartial_CompletedOneof `protobuf_oneof:"completed_oneof"`
 	// start_oneof
 	//
 	// Types that are assignable to StartOneof:
+	//
 	//	*TimeSlicePartial_Start
 	StartOneof isTimeSlicePartial_StartOneof `protobuf_oneof:"start_oneof"`
 	// finish_oneof
 	//
 	// Types that are assignable to FinishOneof:
+	//
 	//	*TimeSlicePartial_Finish
 	FinishOneof isTimeSlicePartial_FinishOneof `protobuf_oneof:"finish_oneof"`
 }
@@ -802,11 +806,13 @@ type TimeSliceSearch struct {
 	// completed_oneof
 	//
 	// Types that are assignable to CompletedOneof:
+	//
 	//	*TimeSliceSearch_Completed
 	CompletedOneof isTimeSliceSearch_CompletedOneof `protobuf_oneof:"completed_oneof"`
 	// timer_id_oneof
 	//
 	// Types that are assignable to TimerIdOneof:
+	//
 	//	*TimeSliceSearch_TimerId
 	TimerIdOneof isTimeSliceSearch_TimerIdOneof `protobuf_oneof:"timer_id_oneof"`
 	// timer_ids
