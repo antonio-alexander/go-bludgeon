@@ -11,4 +11,4 @@ linters:
 
 run:
   skip-dirs:
-    - service/rest/swagger
+    - internal/swagger
