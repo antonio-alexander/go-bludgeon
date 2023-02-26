@@ -719,6 +719,7 @@ type TimerSubmitRequest struct {
 	// fnish_oneof
 	//
 	// Types that are assignable to FinishOneof:
+	//
 	//	*TimerSubmitRequest_Finish
 	FinishOneof isTimerSubmitRequest_FinishOneof `protobuf_oneof:"finish_oneof"`
 }
@@ -1059,6 +1060,7 @@ type TimerSearch struct {
 	// employee_id_oneof
 	//
 	// Types that are assignable to EmployeeIdOneof:
+	//
 	//	*TimerSearch_EmployeeId
 	EmployeeIdOneof isTimerSearch_EmployeeIdOneof `protobuf_oneof:"employee_id_oneof"`
 	// employee_ids
@@ -1066,11 +1068,13 @@ type TimerSearch struct {
 	// completed_oneof
 	//
 	// Types that are assignable to CompletedOneof:
+	//
 	//	*TimerSearch_Completed
 	CompletedOneof isTimerSearch_CompletedOneof `protobuf_oneof:"completed_oneof"`
 	// archived_oneof
 	//
 	// Types that are assignable to ArchivedOneof:
+	//
 	//	*TimerSearch_Archived
 	ArchivedOneof isTimerSearch_ArchivedOneof `protobuf_oneof:"archived_oneof"`
 	// ids
@@ -1207,26 +1211,31 @@ type TimerPartial struct {
 	// completed_oneof
 	//
 	// Types that are assignable to CompletedOneof:
+	//
 	//	*TimerPartial_Completed
 	CompletedOneof isTimerPartial_CompletedOneof `protobuf_oneof:"completed_oneof"`
 	// archived_oneof
 	//
 	// Types that are assignable to ArchivedOneof:
+	//
 	//	*TimerPartial_Archived
 	ArchivedOneof isTimerPartial_ArchivedOneof `protobuf_oneof:"archived_oneof"`
 	// employee_id_oneof
 	//
 	// Types that are assignable to EmployeeIdOneof:
+	//
 	//	*TimerPartial_EmployeeId
 	EmployeeIdOneof isTimerPartial_EmployeeIdOneof `protobuf_oneof:"employee_id_oneof"`
 	// comment_oneof
 	//
 	// Types that are assignable to CommentOneof:
+	//
 	//	*TimerPartial_Comment
 	CommentOneof isTimerPartial_CommentOneof `protobuf_oneof:"comment_oneof"`
 	// finish_oneof
 	//
 	// Types that are assignable to FinishOneof:
+	//
 	//	*TimerPartial_Finish
 	FinishOneof isTimerPartial_FinishOneof `protobuf_oneof:"finish_oneof"`
 }

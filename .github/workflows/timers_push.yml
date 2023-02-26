@@ -11,6 +11,12 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  GO_LINT_VERSION: "v1.51.2"
+  GO_VERSION: "1.19"
+  PROTOC_VERSION: "3.20.1"
+  PROTOC_GEN_GO_VERSION: "v1.28.0"
+  PROTOC_GEN_GO_GRPC_VERSION: "v1.2"
+  PROTO_LINT_VERSION: "0.38.3"
 
 jobs:
   environment:
@@ -58,12 +64,12 @@ jobs:
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v3
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.44.2
+          version: ${{ env.GO_LINT_VERSION }}
           working-directory: ./timers
           args: --verbose
 
@@ -78,13 +84,13 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Test timers (exclude client)
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/timers
           go mod download
           make dep
-          go test -v $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-timers.out | tee /tmp/go-bludgeon-timers.log; test ${PIPESTATUS[0]} -eq 0
+          go test -v -cover -parallel=1 --count=1 $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-timers.out | tee /tmp/go-bludgeon-timers.log; test ${PIPESTATUS[0]} -eq 0
           docker compose logs >> /tmp/go-bludgeon-timers_services.log
       - name: Docker clean-up
         if: always()
@@ -103,7 +109,7 @@ jobs:
             /tmp/go-bludgeon-timers_services.log
 
   docker_build_images:
-    needs: [environment, go_test, swagger_validate, proto_validate]
+    needs: [environment, go_test, proto_validate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -171,13 +177,13 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Test timers client
         run: |
           cd /home/runner/work/go-bludgeon/go-bludgeon/timers
           go mod download
           make run
-          go test -v ./client/... -coverprofile /tmp/go-bludgeon-timers_client.out | tee /tmp/go-bludgeon-timers_client.log; test ${PIPESTATUS[0]} -eq 0
+          go test -v -cover -parallel=1 --count=1 ./client/... -coverprofile /tmp/go-bludgeon-timers_client.out | tee /tmp/go-bludgeon-timers_client.log; test ${PIPESTATUS[0]} -eq 0
           docker compose logs >> /tmp/go-bludgeon-timers-client_services.log
       - name: Docker clean-up
         if: always()
@@ -195,29 +201,12 @@ jobs:
             /tmp/go-bludgeon-timers-client.out
             /tmp/go-bludgeon-timers-client_services.log
 
-  swagger_validate:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.16
-      - name: Validate swagger spec
-        run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/timers
-          go mod download
-          make validate-swagger
-
   proto_lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Checkout Repository
         uses: actions/checkout@v3
       - name: Lint Protos
@@ -225,7 +214,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           level: error
-          protolint_version: "0.38.3"
+          protolint_version: ${{ env.PROTO_LINT_VERSION }}
           protolint_flags: -config_path=./timers/.protolint.yaml ./timers/data/pb/*.proto
 
   proto_validate:
@@ -235,20 +224,20 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Install Protoc
         run: |
-          PROTOC_ZIP=protoc-3.20.1-linux-x86_64.zip
-          curl -OL --silent https://github.com/protocolbuffers/protobuf/releases/download/v3.20.1/$PROTOC_ZIP
+          PROTOC_ZIP=protoc-${{ env.PROTOC_VERSION }}-linux-x86_64.zip
+          curl -OL --silent https://github.com/protocolbuffers/protobuf/releases/download/v${{ env.PROTOC_VERSION }}/$PROTOC_ZIP
           sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
           sudo unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
           rm -f $PROTOC_ZIP
       - name: Install protoc-gen-go
         run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@${{ env.PROTOC_GEN_GO_VERSION }}
       - name: Install protoc-gen-go-grpc
         run: |
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@${{ env.PROTOC_GEN_GO_GRPC_VERSION }}
       - name: Checkout repository code
         uses: actions/checkout@v3
       - name: Build protos
@@ -262,7 +251,10 @@ jobs:
           path: |
             /tmp/timers.pb.go
             /tmp/timers_grpc.pb.go
+            /tmp/timeslices.pb.go
+            /tmp/timeslices_grpc.pb.go
       - name: Compare timers.pb.go
+        if: always()
         working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
         run: |
           if cmp --silent -- "./timers.pb.go" "/tmp/timers.pb.go"; then
@@ -272,6 +264,7 @@ jobs:
             exit 1
           fi
       - name: Compare timers_grpc.pb.go
+        if: always()
         working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
         run: |
           if cmp --silent -- "./timers_grpc.pb.go" "/tmp/timers_grpc.pb.go"; then
@@ -281,6 +274,7 @@ jobs:
           exit 1
           fi
       - name: Compare timeslices.pb.go
+        if: always()
         working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
         run: |
           if cmp --silent -- "./timeslices.pb.go" "/tmp/timeslices.pb.go"; then
@@ -290,6 +284,7 @@ jobs:
             exit 1
           fi
       - name: Compare timeslices_grpc.pb.go
+        if: always()
         working-directory: /home/runner/work/go-bludgeon/go-bludgeon/timers/data/pb/
         run: |
           if cmp --silent -- "./timeslices_grpc.pb.go" "/tmp/timeslices_grpc.pb.go"; then

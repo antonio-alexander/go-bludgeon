@@ -476,6 +476,9 @@ func testLogic(t *testing.T, metaType, protocol string) {
 
 	t.Run("Employee Changes", l.TestEmployeeChanges)
 	t.Run("Timer Changes", l.TestTimerChanges)
+
+	//sleep to ensure separation between tests
+	time.Sleep(5 * time.Second)
 }
 
 func TestLogicMemoryRest(t *testing.T) {

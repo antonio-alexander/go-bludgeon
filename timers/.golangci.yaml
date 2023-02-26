@@ -3,15 +3,12 @@ linters:
   enable:
     # - gosec
     - bodyclose
-    - deadcode
     - gosimple
     - govet
     - staticcheck
-    - structcheck
     - unused
-    - varcheck
     - whitespace
 
 run:
   skip-dirs:
-    - service/rest/swagger
+    - internal/swagger
