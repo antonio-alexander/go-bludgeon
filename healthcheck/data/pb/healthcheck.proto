@@ -1,0 +1,54 @@
+/* 
+    go_bludgeon_healthcheck defines a set of types for use with the healthcheck service
+*/
+
+syntax = "proto3";
+   
+package go_bludgeon_healthcheck;
+  
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/antonio-alexander/go-bludgeon/healthcheck/data/pb";
+
+// HealthChecks
+service HealthChecks { 
+    // healthcheck
+    rpc healthcheck(Empty) returns (HealthCheckResponse) {}
+}
+
+// HealthCheckResponse
+message HealthCheckResponse {
+    // healthcheck
+    HealthCheck healthcheck = 1;
+}
+
+// HealthCheck
+message HealthCheck {
+    // time
+    int64 time = 1;
+}
+
+// Wrapper describes a basic data type for conversion of any
+// other data type
+message Wrapper {
+    // type is a string identifying the type of payload
+    string type = 1;
+
+    // payload describes the payload as protobuf.any
+    google.protobuf.Any payload = 2;
+}
+
+// Bytes makes it easier to provide
+message Bytes {
+    // bytes describes the payload
+    bytes bytes = 1;
+}
+
+// Error
+message Error {
+    // error
+    string error = 1;
+}
+
+// Empty
+message Empty {}
