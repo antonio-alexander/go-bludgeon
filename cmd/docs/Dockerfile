@@ -42,21 +42,10 @@ RUN \
     && go mod download \
     && cd /go/src/github.com/antonio-alexander/go-bludgeon/changes \
     && go mod download \
+    && cd /go/src/github.com/antonio-alexander/go-bludgeon/healthcheck \
+    && go mod download \
     && cd /go/src/github.com/antonio-alexander/go-bludgeon/internal \
     && go mod download
-
-WORKDIR /swagger
-
-RUN \
-    cd /go/src/github.com/antonio-alexander/go-bludgeon/employees/internal/swagger \
-    && swagger generate spec -o /swagger/swagger-employees.json --scan-models \
-    && cd /go/src/github.com/antonio-alexander/go-bludgeon/timers/internal/swagger \
-    && swagger generate spec -o /swagger/swagger-timers.json --scan-models \
-    && cd /go/src/github.com/antonio-alexander/go-bludgeon/changes/internal/swagger \
-    && swagger generate spec -o /swagger/swagger-changes.json --scan-models \
-    && cp -r /tmp/swagger-ui/dist /swagger/dist \
-    && cp /go/src/github.com/antonio-alexander/go-bludgeon/cmd/docs/swagger/index.html /swagger/index.html \
-    && cp /go/src/github.com/antonio-alexander/go-bludgeon/cmd/docs/swagger/swagger-initializer.js /swagger/dist/swagger-initializer.js
 
 WORKDIR /godocs
 
@@ -75,6 +64,21 @@ RUN \
     --no-host-directories \
     http://localhost:8080/pkg &> /dev/null | exit 0 \
     && cp /go/src/github.com/antonio-alexander/go-bludgeon/cmd/docs/godocs/index.html /godocs/index.html
+
+WORKDIR /swagger
+
+RUN \
+    cd /go/src/github.com/antonio-alexander/go-bludgeon/employees/internal/swagger \
+    && swagger generate spec -o /swagger/swagger-employees.json --scan-models \
+    && cd /go/src/github.com/antonio-alexander/go-bludgeon/timers/internal/swagger \
+    && swagger generate spec -o /swagger/swagger-timers.json --scan-models \
+    && cd /go/src/github.com/antonio-alexander/go-bludgeon/changes/internal/swagger \
+    && swagger generate spec -o /swagger/swagger-changes.json --scan-models \
+    && cd /go/src/github.com/antonio-alexander/go-bludgeon/healthcheck/internal/swagger \
+    && swagger generate spec -o /swagger/swagger-healthcheck.json --scan-models \
+    && cp -r /tmp/swagger-ui/dist /swagger/dist \
+    && cp /go/src/github.com/antonio-alexander/go-bludgeon/cmd/docs/swagger/index.html /swagger/index.html \
+    && cp /go/src/github.com/antonio-alexander/go-bludgeon/cmd/docs/swagger/swagger-initializer.js /swagger/dist/swagger-initializer.js
 
 FROM --platform=${PLATFORM} busybox:1.35
 
