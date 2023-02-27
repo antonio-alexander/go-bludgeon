@@ -94,6 +94,7 @@ func init() {
 	configChangesClientRest.Default()
 	configChangesClientRest.FromEnv(envs)
 	configChangesClientRest.Rest.Timeout = 30 * time.Second
+	configChangesClientRest.Rest.Port = "9020"
 	configKafkaClient.Default()
 	configChangesClientKafka.Default()
 	configLogic.Default()
@@ -105,8 +106,10 @@ func init() {
 	configLogic.ChangesRegistrationId = randomString()
 	configEmployeeClientRest.Default()
 	configEmployeeClientRest.FromEnv(envs)
+	configEmployeeClientRest.Port = "9000"
 	configEmployeeClientGrpc.Default()
 	configEmployeeClientGrpc.FromEnv(envs)
+	configEmployeeClientGrpc.Port = "9001"
 	configMetaFile.File = path.Join("../../tmp", filename)
 	os.Remove(configMetaFile.File)
 	configKafkaClient.Brokers = []string{"localhost:9092"}

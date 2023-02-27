@@ -17,6 +17,7 @@ ARG GIT_COMMIT=no_git_commit_provided
 ARG PLATFORM=linux/amd64
 ARG GO_ARCH=amd64
 ARG GO_ARM=7
+ARG HEALTHCHECK_VERSION="v1.0.3"
 
 FROM golang:alpine AS build
 
@@ -26,12 +27,20 @@ ARG GIT_BRANCH
 ARG GIT_COMMIT
 ARG GO_ARCH
 ARG GO_ARM
+ARG HEALTHCHECK_VERSION
+
+RUN env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux CGO_ENABLED=0 \
+    go install github.com/antonio-alexander/go-bludgeon/healthcheck/cmd/healthcheck-client@${HEALTHCHECK_VERSION} \
+    && mv /go/bin/linux_arm/healthcheck-client /go/bin/healthcheck-client 2>/dev/null || :
 
 WORKDIR /go/src/go-bludgeon/timers
 
-COPY . /go/src/go-bludgeon/timers
+COPY go.mod /go/src/go-bludgeon/timers
 
 RUN go mod download
+
+COPY . /go/src/go-bludgeon/timers
+
 RUN VERSION=`cat ./version.json| grep Version | sed 's/"//g' | sed 's/  Version: //g'` \
     && cd cmd/service \
     && env GOARCH=${GO_ARCH} GOARM=${GO_ARM} GOOS=linux go build -ldflags \
@@ -51,12 +60,15 @@ WORKDIR /app
 
 COPY --from=build /go/src/go-bludgeon/timers/cmd/service/bludgeon-timers.tar.gz /app/bludgeon-timers.tar.gz
 COPY --from=build /go/src/go-bludgeon/timers/cmd/service/config/default.json /app/config/default.json
+COPY --from=build /go/bin/healthcheck-client /app/healthcheck-client
 
 LABEL antonio-alexander.git.branch=${GIT_BRANCH}
 LABEL antonio-alexander.git.commit=${GIT_COMMIT}
 LABEL org.opencontainers.image.source=https://github.com/antonio-alexander/go-bludgeon
 
-EXPOSE 8080 2345
+HEALTHCHECK --start-period=10s CMD /app/healthcheck-client --client-type=rest --client-address=localhost --client-port=8080 || exit 1
+
+EXPOSE 8080/tcp 2345/tcp
 
 CMD tar -xzf bludgeon-timers.tar.gz && ./bludgeon-timers
 

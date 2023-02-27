@@ -3,15 +3,16 @@ module github.com/antonio-alexander/go-bludgeon/timers
 go 1.19
 
 require (
-	github.com/antonio-alexander/go-bludgeon/changes v1.0.3
+	github.com/antonio-alexander/go-bludgeon/changes v1.0.4
 	github.com/antonio-alexander/go-bludgeon/employees v1.3.2
+	github.com/antonio-alexander/go-bludgeon/healthcheck v1.0.3
 	github.com/antonio-alexander/go-bludgeon/internal v1.4.3
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.0
-	google.golang.org/grpc v1.48.0
+	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.1
 )
 
@@ -42,6 +43,6 @@ require (
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
-	google.golang.org/genproto v0.0.0-20200825200019-8632dd797987 // indirect
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

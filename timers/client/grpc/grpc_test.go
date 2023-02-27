@@ -33,6 +33,7 @@ func init() {
 	config.Options = []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
+	config.Port = "8081"
 }
 
 type grpcClientTest struct {

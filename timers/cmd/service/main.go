@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"strings"
 
-	internal "github.com/antonio-alexander/go-bludgeon/timers/cmd/internal"
+	internal "github.com/antonio-alexander/go-bludgeon/timers/cmd/service/internal"
 )
 
 func main() {

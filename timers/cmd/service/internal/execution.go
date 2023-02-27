@@ -15,6 +15,9 @@ import (
 	changesclientkafka "github.com/antonio-alexander/go-bludgeon/changes/client/kafka"
 	changesclientrest "github.com/antonio-alexander/go-bludgeon/changes/client/rest"
 
+	healthcheckgrpcservice "github.com/antonio-alexander/go-bludgeon/healthcheck/service/grpc"
+	healthcheckrestservice "github.com/antonio-alexander/go-bludgeon/healthcheck/service/rest"
+
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	internal_config "github.com/antonio-alexander/go-bludgeon/internal/config"
 	internal_server_grpc "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
@@ -89,20 +92,26 @@ func parameterize(config *Configuration) (interface {
 	parameters = append(parameters, timersMeta, timersLogic, changesClient, changesHandler)
 	if config.ServiceRestEnabled {
 		restServer := internal_server_rest.New()
+		healthCheckRestService := healthcheckrestservice.New()
+		healthCheckRestService.SetUtilities(logger)
+		healthCheckRestService.SetParameters(timersLogic)
 		timersRestService := servicerest.New()
 		timersRestService.SetUtilities(logger)
 		restServer.SetUtilities(logger)
-		restServer.SetParameters(timersRestService)
+		restServer.SetParameters(timersRestService, healthCheckRestService)
 		timersRestService.SetParameters(restServer, timersLogic)
 		parameters = append(parameters, restServer, timersRestService)
 	}
 	if config.ServiceGrpcEnabled {
+		healthCheckGrpcService := healthcheckgrpcservice.New()
+		healthCheckGrpcService.SetUtilities(logger)
+		healthCheckGrpcService.SetParameters(timersLogic)
 		timersGrpcService := servicegrpc.New()
 		timersGrpcService.SetUtilities(logger)
 		timersGrpcService.SetParameters(timersLogic, timersGrpcService)
 		grpcServer := internal_server_grpc.New()
 		grpcServer.SetUtilities(logger)
-		grpcServer.SetParameters(timersGrpcService)
+		grpcServer.SetParameters(timersGrpcService, healthCheckGrpcService)
 		parameters = append(parameters, grpcServer, timersGrpcService)
 	}
 	return logger, parameters

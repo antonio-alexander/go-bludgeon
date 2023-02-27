@@ -11,6 +11,8 @@ import (
 	changesclient "github.com/antonio-alexander/go-bludgeon/changes/client"
 	changesdata "github.com/antonio-alexander/go-bludgeon/changes/data"
 	employeesdata "github.com/antonio-alexander/go-bludgeon/employees/data"
+	healthcheckdata "github.com/antonio-alexander/go-bludgeon/healthcheck/data"
+	healthcheck "github.com/antonio-alexander/go-bludgeon/healthcheck/logic"
 
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	config "github.com/antonio-alexander/go-bludgeon/internal/config"
@@ -36,6 +38,7 @@ type logic struct {
 // implements the Logic interface
 func New() interface {
 	Logic
+	healthcheck.Logic
 	internal.Initializer
 	internal.Parameterizer
 	internal.Configurer
@@ -419,4 +422,8 @@ func (l *logic) TimerUpdate(ctx context.Context, id string, timerPartial data.Ti
 		DataVersion:     &timer.Version,
 	})
 	return timer, nil
+}
+
+func (l *logic) HealthCheck(ctx context.Context) (*healthcheckdata.HealthCheck, error) {
+	return &healthcheckdata.HealthCheck{Time: time.Now().UnixNano()}, nil
 }
