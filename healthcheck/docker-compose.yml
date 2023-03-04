@@ -1,0 +1,31 @@
+version: "3"
+services:
+
+  healthcheck:
+    container_name: "healthcheck"
+    hostname: "healthcheck"
+    image: ghcr.io/antonio-alexander/go-bludgeon-healthcheck:latest
+    restart: "always"
+    ports:
+      - "9030:8080"
+      - "9031:8081"
+    build:
+      context: ./
+      dockerfile: ./cmd/healthcheck-service/Dockerfile
+      args:
+        - PLATFORM=${PLATFORM:-linux/amd64}
+        - GO_ARCH=${GO_ARCH:-amd64}
+        - GO_ARM=${GO_ARM:-7}
+    environment:
+      BLUDGEON_LOG_PREFIX: healthcheck
+      BLUDGEON_LOG_LEVEL: ${BLUDGEON_LOG_LEVEL:-trace}
+      BLUDGEON_REST_SHUTDOWN_TIMEOUT: ${BLUDGEON_REST_SHUTDOWN_TIMEOUT:-10}
+      BLUDGEON_REST_ENABLED: ${BLUDGEON_REST_ENABLED:-true}
+      BLUDGEON_REST_ADDRESS: ${BLUDGEON_REST_ADDRESS}
+      BLUDGEON_REST_PORT: "8080"
+      BLUDGEON_ALLOWED_ORIGINS: ${BLUDGEON_ALLOWED_ORIGINS:-*}
+      BLUDGEON_ALLOWED_METHODS: ${BLUDGEON_ALLOWED_METHODS:-POST,PUT,GET,DELETE,PATCH}
+      BLUDGEON_CORS_DEBUG: ${BLUDGEON_CORS_DEBUG:-true}
+      BLUDGEON_GRPC_ENABLED: ${BLUDGEON_GRPC_ENABLED:-true}
+      BLUDGEON_GRPC_ADDRESS: ${BLUDGEON_GRPC_ADDRESS}
+      BLUDGEON_GRPC_PORT: "8081"

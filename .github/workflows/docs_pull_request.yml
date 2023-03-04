@@ -6,6 +6,7 @@ on:
       - "timers/**"
       - "employees/**"
       - "changes/**"
+      - "healthcheck/**"
       - "cmd/docs/**"
       - ".github/workflows/docs_pull_request.yml"
 
@@ -54,6 +55,33 @@ jobs:
             /tmp/git_target
             /tmp/git_source
             /tmp/git_sha
+
+  validate_swagger_healthcheck:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+      - name: Validate swagger spec
+        run: |
+          cd /home/runner/work/go-bludgeon/go-bludgeon/healthcheck
+          go mod download
+          make validate-swagger
+      - name: Generate build artifacts
+        run: |
+          mkdir -p /tmp
+          cp /home/runner/work/go-bludgeon/go-bludgeon/healthcheck/tmp/swagger.json /tmp/swagger-healthcheck.json
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: |
+            /tmp/swagger-healthcheck.json
 
   validate_swagger_changes:
     runs-on: ubuntu-latest
@@ -143,6 +171,7 @@ jobs:
         validate_swagger_changes,
         validate_swagger_employees,
         validate_swagger_timers,
+        validate_swagger_healthcheck,
       ]
     runs-on: ubuntu-latest
     permissions:
@@ -189,6 +218,7 @@ jobs:
         validate_swagger_changes,
         validate_swagger_employees,
         validate_swagger_timers,
+        validate_swagger_healthcheck,
       ]
     runs-on: ubuntu-latest
     env:
@@ -214,6 +244,7 @@ jobs:
           cp /tmp/swagger-timers.json ./tmp/swagger/swagger-timers.json
           cp /tmp/swagger-employees.json ./tmp/swagger/swagger-employees.json
           cp /tmp/swagger-changes.json ./tmp/swagger/swagger-changes.json
+          cp /tmp/swagger-healthcheck.json ./tmp/swagger/swagger-healthcheck.json
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:

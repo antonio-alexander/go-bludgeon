@@ -1,0 +1,6 @@
+tmp/*
+!tmp/.gitkeep
+cmd/service/data/*
+!cmd/service/data/.gitkeep
+cmd/service/config/*
+!cmd/service/config/.gitkeep

@@ -6,7 +6,8 @@ window.onload = function() {
     urls: [   
       { url: "./swagger-employees.json", name: "Employees" },  
       { url: "./swagger-timers.json", name: "Timers" },  
-      { url: "./swagger-changes.json", name: "Changes" }
+      { url: "./swagger-changes.json", name: "Changes" },
+      { url: "./swagger-healthcheck.json", name: "Healthcheck" }     
     ],
     dom_id: '#swagger-ui',
     deepLinking: true,
