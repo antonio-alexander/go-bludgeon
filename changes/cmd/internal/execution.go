@@ -11,6 +11,8 @@ import (
 	servicekafka "github.com/antonio-alexander/go-bludgeon/changes/service/kafka"
 	servicerest "github.com/antonio-alexander/go-bludgeon/changes/service/rest"
 
+	healthcheckrestservice "github.com/antonio-alexander/go-bludgeon/healthcheck/service/rest"
+
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	config "github.com/antonio-alexander/go-bludgeon/internal/config"
 	kafka "github.com/antonio-alexander/go-bludgeon/internal/kafka"
@@ -63,10 +65,14 @@ func parameterize(config *Configuration) (interface {
 		changesRestService := servicerest.New()
 		changesRestService.SetUtilities(logger)
 		changesRestService.SetParameters(changesLogic)
+		healthCheckRestService := healthcheckrestservice.New()
+		healthCheckRestService.SetUtilities(logger)
+		healthCheckRestService.SetParameters(changesLogic)
 		restServer := serverrest.New()
 		restServer.SetUtilities(logger)
-		restServer.SetParameters(changesRestService)
-		parameters = append(parameters, changesMeta, restServer, changesRestService)
+		restServer.SetParameters(changesRestService, healthCheckRestService)
+		parameters = append(parameters, changesMeta, restServer,
+			changesRestService, healthCheckRestService)
 	}
 	if config.KafkaEnabled {
 		kafkaClient := kafka.New()

@@ -3,6 +3,7 @@ module github.com/antonio-alexander/go-bludgeon/changes
 go 1.19
 
 require (
+	github.com/antonio-alexander/go-bludgeon/healthcheck v1.0.3
 	github.com/antonio-alexander/go-bludgeon/internal v1.4.3
 	github.com/antonio-alexander/go-queue v1.2.2
 	github.com/go-sql-driver/mysql v1.7.0

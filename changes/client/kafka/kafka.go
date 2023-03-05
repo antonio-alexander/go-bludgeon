@@ -137,6 +137,9 @@ func (k *kafkaClient) Configure(items ...interface{}) error {
 		c.Default()
 	}
 	k.config = c
+	if err := k.config.Validate(); err != nil {
+		return err
+	}
 	k.configured = true
 	return nil
 }

@@ -3,11 +3,15 @@ package logic
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/antonio-alexander/go-bludgeon/changes/data"
 	"github.com/antonio-alexander/go-bludgeon/changes/meta"
 	"github.com/antonio-alexander/go-bludgeon/internal"
 	"github.com/antonio-alexander/go-queue/finite"
+
+	healthcheckdata "github.com/antonio-alexander/go-bludgeon/healthcheck/data"
+	healthchecklogic "github.com/antonio-alexander/go-bludgeon/healthcheck/logic"
 
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 
@@ -49,11 +53,12 @@ func changeDequeue(queue goqueue.Dequeuer) (*data.Change, bool) {
 	return change, false
 }
 
-//New will generate a new instance of logic that implements
+// New will generate a new instance of logic that implements
 // the interfaces Logic and Owner, from the provided parameters
 // we can set the logger and the employee meta (required)
 func New() interface {
 	Logic
+	healthchecklogic.Logic
 	internal.Initializer
 	internal.Parameterizer
 } {
@@ -281,4 +286,8 @@ func (l *logic) HandlerDelete(ctx context.Context, handlerId string) error {
 	}
 	l.Trace(logAlias+"deleted handler %s", handlerId)
 	return nil
+}
+
+func (l *logic) HealthCheck(ctx context.Context) (*healthcheckdata.HealthCheck, error) {
+	return &healthcheckdata.HealthCheck{Time: time.Now().UnixNano()}, nil
 }

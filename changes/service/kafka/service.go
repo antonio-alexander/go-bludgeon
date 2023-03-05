@@ -43,6 +43,7 @@ func (k *kafkaService) readTopics() []string {
 	k.muHandlers.RLock()
 	defer k.muHandlers.RUnlock()
 	var topics []string
+
 	for topic := range k.handlers {
 		topics = append(topics, topic)
 	}
