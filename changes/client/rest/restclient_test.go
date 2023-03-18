@@ -22,6 +22,7 @@ import (
 var config = new(restclient.Configuration)
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
 	envs := make(map[string]string)
 	for _, env := range os.Environ() {
 		if s := strings.Split(env, "="); len(s) > 1 {
@@ -30,7 +31,7 @@ func init() {
 	}
 	config.Default()
 	config.FromEnv(envs)
-	rand.Seed(time.Now().UnixNano())
+	config.Rest.Port = "8080"
 }
 
 // REFERENCE: https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go

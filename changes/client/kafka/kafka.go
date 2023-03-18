@@ -9,6 +9,7 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/changes/data"
 	"github.com/antonio-alexander/go-bludgeon/internal"
 
+	"github.com/antonio-alexander/go-bludgeon/internal/config"
 	internal_kafka "github.com/antonio-alexander/go-bludgeon/internal/kafka"
 	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
@@ -121,6 +122,7 @@ func (k *kafkaClient) Configure(items ...interface{}) error {
 	k.Lock()
 	defer k.Unlock()
 
+	var envs map[string]string
 	var c *Configuration
 
 	if err := k.kafkaClient.Configure(items...); err != nil {
@@ -128,6 +130,8 @@ func (k *kafkaClient) Configure(items ...interface{}) error {
 	}
 	for _, item := range items {
 		switch v := item.(type) {
+		case config.Envs:
+			envs = v
 		case *Configuration:
 			c = v
 		}
@@ -135,6 +139,10 @@ func (k *kafkaClient) Configure(items ...interface{}) error {
 	if c == nil {
 		c = new(Configuration)
 		c.Default()
+		c.FromEnv(envs)
+	}
+	if err := c.Validate(); err != nil {
+		return err
 	}
 	k.config = c
 	k.configured = true

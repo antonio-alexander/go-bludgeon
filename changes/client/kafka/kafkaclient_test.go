@@ -29,19 +29,21 @@ var (
 )
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
 	envs := make(map[string]string)
 	for _, env := range os.Environ() {
 		if s := strings.Split(env, "="); len(s) > 1 {
 			envs[s[0]] = strings.Join(s[1:], "=")
 		}
 	}
-	rand.Seed(time.Now().UnixNano())
 	configKafka.Default()
 	configKafka.FromEnv(envs)
+	configKafka.Brokers = []string{"localhost:9092"}
+	configKafka.ToSarama()
 	configChangesRest.Default()
 	configChangesRest.FromEnv(envs)
+	configChangesRest.Rest.Port = "8080"
 	configChangesKafka.Default()
-	configKafka.Brokers = []string{"localhost:9092"}
 }
 
 // REFERENCE: https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go
@@ -102,6 +104,8 @@ func (r *kafkaClientTest) Initialize(t *testing.T) {
 		Prefix: "bludgeon_rest_server_test",
 	})
 	assert.Nil(t, err)
+
+	//create topic
 	err = r.changesClient.Configure(configChangesRest)
 	assert.Nil(t, err)
 	err = r.changesClient.Initialize()
@@ -143,6 +147,8 @@ func (r *kafkaClientTest) TestChangeStreaming(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
+	time.Sleep(10 * time.Second)
+
 	//upsert change
 	change, err = r.changesClient.ChangeUpsert(ctx, data.ChangePartial{
 		DataId:          &dataId,
@@ -171,7 +177,6 @@ func TestChangesKafkaClient(t *testing.T) {
 	r.Initialize(t)
 	defer r.Shutdown(t)
 
-	//test
 	t.Run("Change Streaming", r.TestChangeStreaming)
 	//TODO: test consumer group?
 }

@@ -1,4 +1,4 @@
-package kafkaclient
+package service
 
 import "errors"
 

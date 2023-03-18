@@ -58,8 +58,8 @@ services:
         condition: service_healthy
     restart: "always"
     ports:
-      - "8014:8080"
-      - "8015:8081"
+      - "8080:8080"
+      - "8081:8081"
     build:
       context: ./
       dockerfile: ./cmd/service/Dockerfile
@@ -82,6 +82,7 @@ services:
       BLUDGEON_ALLOWED_ORIGINS: ${BLUDGEON_ALLOWED_ORIGINS:-*}
       BLUDGEON_ALLOWED_METHODS: ${BLUDGEON_ALLOWED_METHODS:-POST,PUT,GET,DELETE,PATCH}
       BLUDGEON_CORS_DEBUG: ${BLUDGEON_CORS_DEBUG:-true}
+      BLUDGEON_CHANGES_TOPIC: ${BLUDGEON_CHANGES_TOPIC:-changes}
       BLUDGEON_KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9093}
       BLUDGEON_KAFKA_GROUP_ID: ${BLUDGEON_KAFKA_GROUP_ID_CHANGES:-changes}
       BLUDGEON_KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-true}

@@ -26,7 +26,8 @@
                 "DATABASE_PASSWORD": "bludgeon",
                 "BLUDGEON_REST_ENABLED": "true",
                 "BLUDGEON_REST_ADDRESS": "",
-                "BLUDGEON_REST_PORT": "8014",
+                "BLUDGEON_REST_PORT": "8080",
+                "BLUDGEON_REST_SHUTDOWN_TIMEOUT": "15",
                 "BLUDGEON_DISABLE_CORS": "true",
                 "BLUDGEON_ALLOW_CREDENTIALS": "true",
                 "BLUDGEON_ALLOWED_ORIGINS": "*",
@@ -37,7 +38,6 @@
                 "BLUDGEON_KAFKA_GROUP_ID": "changes",
                 "BLUDGEON_KAFKA_CONSUMER_GROUP": "true",
                 "BLUDGEON_KAFKA_ENABLE_LOG": "true",
-                "BLUDGEON_REST_SHUTDOWN_TIMEOUT": "15"
             },
         }
     ]
