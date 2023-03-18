@@ -34,7 +34,7 @@ const filename string = "bludgeon_meta.json"
 var (
 	kafkaBrokers    = []string{"localhost:9092"}
 	serviceName     = generateId()
-	changeTopic     = "change." + serviceName
+	changeTopic     = "changes"
 	kafkaConfig     = new(internal_kafka.Configuration)
 	testKafkaConfig = new(internal_kafka.Configuration)
 	mysqlConfig     = new(internal_mysql.Configuration)
@@ -151,7 +151,7 @@ func newKafkaServiceTest(metaType string) *kafkaServiceTest {
 	service := service_kafka.New()
 	service.SetParameters(logger, logic, kafkaClient)
 	service.Configure(&service_kafka.Configuration{
-		Topics: kafkaBrokers,
+		Topic: changeTopic,
 	})
 	kafkaClientTest := internal_kafka.New()
 	kafkaClientTest.Configure(kafkaConfig)
@@ -248,12 +248,12 @@ func (k *kafkaServiceTest) testChangeHandler(t *testing.T) {
 			return
 		}
 		switch v := item.(type) {
-		case *data.ResponseChange:
-			if changeId == v.Change.Id {
+		case *data.Change:
+			if changeId == v.Id {
 				select {
 				default:
 					close(changeReceived)
-					changeId = v.Change.Id
+					changeId = v.Id
 					return
 				case <-changeReceived:
 				}

@@ -44,7 +44,6 @@ func init() {
 	configChangesRest.FromEnv(envs)
 	configChangesRest.Rest.Port = "8080"
 	configChangesKafka.Default()
-	configChangesKafka.Topic = "changes." + randomString()
 }
 
 // REFERENCE: https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go
@@ -147,6 +146,8 @@ func (r *kafkaClientTest) TestChangeStreaming(t *testing.T) {
 		return nil
 	})
 	assert.Nil(t, err)
+
+	time.Sleep(10 * time.Second)
 
 	//upsert change
 	change, err = r.changesClient.ChangeUpsert(ctx, data.ChangePartial{

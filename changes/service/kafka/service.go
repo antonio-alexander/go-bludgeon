@@ -9,6 +9,7 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/changes/logic"
 	"github.com/antonio-alexander/go-bludgeon/internal"
 
+	"github.com/antonio-alexander/go-bludgeon/internal/config"
 	"github.com/antonio-alexander/go-bludgeon/internal/kafka"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 )
@@ -79,6 +80,7 @@ func (k *kafkaService) handleFx(topic string) logic.HandlerFx {
 			k.Error(logAlias, "error while publishing to topic \"%s\", handler \"%s\": %s", topic, handlerId, err)
 			return err
 		}
+		k.Trace("published change(s) to topic \"%s\", handler \"%s\"", topic, handlerId)
 		return nil
 	}
 }
@@ -113,10 +115,13 @@ func (k *kafkaService) Configure(items ...interface{}) error {
 	k.Lock()
 	defer k.Unlock()
 
+	var envs map[string]string
 	var c *Configuration
 
 	for _, item := range items {
 		switch v := item.(type) {
+		case config.Envs:
+			envs = v
 		case *Configuration:
 			c = v
 		}
@@ -124,6 +129,10 @@ func (k *kafkaService) Configure(items ...interface{}) error {
 	if c == nil {
 		c = new(Configuration)
 		c.Default()
+		c.FromEnv(envs)
+	}
+	if err := c.Validate(); err != nil {
+		return err
 	}
 	k.config = c
 	k.configured = true
@@ -140,13 +149,13 @@ func (k *kafkaService) Initialize() error {
 		return errors.New("not configured")
 	}
 	k.ctx, k.cancel = context.WithCancel(context.Background())
-	for _, topic := range k.config.Topics {
-		handlerId, err := k.logic.HandlerCreate(k.ctx, k.handleFx(topic))
-		if err != nil {
-			return err
-		}
-		k.writeHandler(topic, handlerId)
+	topic := k.config.Topic
+	handlerId, err := k.logic.HandlerCreate(k.ctx, k.handleFx(topic))
+	if err != nil {
+		return err
 	}
+	k.writeHandler(topic, handlerId)
+	k.Info("created handler \"%s\" for topic \"%s\"", handlerId, topic)
 	k.initialized = true
 	k.Info(logAlias + "initialized")
 	return nil

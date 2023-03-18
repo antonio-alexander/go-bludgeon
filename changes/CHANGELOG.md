@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.4] - 03-05-23
 
 - integrated healthcheck into swagger/logic/service
+- exposed kafka configuration via environmental variable
 
 ## [1.0.3] - 02-22-23
 
