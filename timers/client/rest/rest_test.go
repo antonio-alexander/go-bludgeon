@@ -28,6 +28,7 @@ func init() {
 	}
 	config.Default()
 	config.FromEnv(envs)
+	config.Port = "8080"
 }
 
 type restClientTest struct {
