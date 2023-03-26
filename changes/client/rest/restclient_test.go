@@ -12,14 +12,28 @@ import (
 	client "github.com/antonio-alexander/go-bludgeon/changes/client"
 	restclient "github.com/antonio-alexander/go-bludgeon/changes/client/rest"
 	data "github.com/antonio-alexander/go-bludgeon/changes/data"
+
+	internal_cache "github.com/antonio-alexander/go-bludgeon/changes/internal/cache"
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+
+	goqueue "github.com/antonio-alexander/go-queue"
+	finite "github.com/antonio-alexander/go-queue/finite"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
-var config = new(restclient.Configuration)
+const (
+	queueSize int    = 10
+	restPort  string = "8080"
+)
+
+var (
+	config       = restclient.NewConfiguration()
+	configCache  = internal_cache.NewConfiguration()
+	configLogger = new(logger.Configuration)
+)
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
@@ -31,7 +45,9 @@ func init() {
 	}
 	config.Default()
 	config.FromEnv(envs)
-	config.Rest.Port = "8080"
+	config.Rest.Port = restPort
+	configLogger.Level = logger.Trace
+	configCache.Default()
 }
 
 // REFERENCE: https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go
@@ -53,29 +69,116 @@ func generateId() string {
 }
 
 type restClientTest struct {
+	logger interface {
+		logger.Logger
+		logger.Printer
+		internal.Configurer
+	}
 	client interface {
 		client.Client
 		client.Handler
 		internal.Configurer
 		internal.Initializer
 	}
+	cache interface {
+		internal_cache.Cache
+		internal.Configurer
+		internal.Initializer
+		internal.Parameterizer
+	}
+	queue interface {
+		goqueue.Owner
+		goqueue.GarbageCollecter
+		goqueue.Dequeuer
+		goqueue.Enqueuer
+		goqueue.EnqueueInFronter
+		goqueue.Length
+		goqueue.Event
+		goqueue.Peeker
+		finite.EnqueueLossy
+		finite.Resizer
+		finite.Capacity
+	}
 }
 
 func newRestclientTest() *restClientTest {
 	logger := logger.New()
-	// logger.Configure(&logger.Configuration{
-	// 	Level:  logger.Trace,
-	// 	Prefix: "bludgeon_rest_server_test",
-	// })
+	queue := finite.New(queueSize)
+	cache := internal_cache.New()
+	cache.SetUtilities(logger)
 	client := restclient.New()
 	client.SetUtilities(logger)
+	client.SetParameters(cache, queue)
 	return &restClientTest{
 		client: client,
+		cache:  cache,
+		queue:  queue,
+		logger: logger,
+	}
+}
+
+func (r *restClientTest) assertChange(t *testing.T, ctx context.Context, change *data.Change) func() bool {
+	return func() bool {
+		dataId, dataType := change.DataId, change.DataType
+		dataAction, dataServiceName := change.DataAction, change.DataServiceName
+		tStop := time.After(10 * time.Second)
+		tCheck := time.NewTicker(time.Second)
+		defer tCheck.Stop()
+		checkChange := func() bool {
+			changes, err := r.client.ChangesRead(ctx, data.ChangeSearch{
+				DataIds:      []string{dataId},
+				Types:        []string{dataType},
+				Actions:      []string{dataAction},
+				ServiceNames: []string{dataServiceName},
+			})
+			if err != nil {
+				return false
+			}
+			if len(changes) == 0 {
+				return false
+			}
+			for _, change := range changes {
+				switch {
+				case change.DataId != dataId:
+					t.Logf("change: %s, dataId(%s) doesn't match", change.Id, dataId)
+					continue
+				case change.DataType != dataType:
+					t.Logf("change: %s, dataType(%s) doesn't match", change.Id, dataType)
+					continue
+				case change.DataAction != dataAction:
+					t.Logf("change: %s, dataAction(%s) doesn't match", change.Id, dataAction)
+					continue
+				case change.DataServiceName != dataServiceName:
+					t.Logf("change: %s, serviceName(%s) doesn't match", change.Id, dataServiceName)
+					continue
+				}
+				return true
+			}
+			return false
+		}
+		for {
+			select {
+			case <-tStop:
+				return checkChange()
+			case <-tCheck.C:
+				if checkChange() {
+					return true
+				}
+			}
+		}
 	}
 }
 
 func (r *restClientTest) Initialize(t *testing.T) {
-	err := r.client.Configure(config)
+	//configure
+	err := r.logger.Configure(configLogger)
+	assert.Nil(t, err)
+	err = r.client.Configure(config)
+	assert.Nil(t, err)
+	err = r.cache.Configure(configCache)
+	assert.Nil(t, err)
+	//initialize
+	err = r.cache.Initialize()
 	assert.Nil(t, err)
 	err = r.client.Initialize()
 	assert.Nil(t, err)
@@ -83,6 +186,7 @@ func (r *restClientTest) Initialize(t *testing.T) {
 
 func (r *restClientTest) Shutdown(t *testing.T) {
 	r.client.Shutdown()
+	r.cache.Shutdown()
 }
 
 func (r *restClientTest) TestChangeOperations(t *testing.T) {
@@ -180,14 +284,157 @@ func (r *restClientTest) TestChangeStreaming(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestEmployeesRestClient(t *testing.T) {
-	r := newRestclientTest()
+func (r *restClientTest) TestRegistrationOperations(t *testing.T) {
+	ctx := context.TODO()
 
+	// generate dynamic constants
+	registrationId := randomString()
+	dataId, dataVersion := generateId(), rand.Intn(1000)
+	whenChanged, serviceName := time.Now().UnixNano(), randomString()
+	dataType := "test"
+
+	// create registration
+	err := r.client.RegistrationUpsert(ctx, registrationId)
+	assert.Nil(t, err)
+
+	// upsert change
+	changeCreated, err := r.client.ChangeUpsert(ctx, data.ChangePartial{
+		DataId:          &dataId,
+		DataVersion:     &dataVersion,
+		DataType:        &dataType,
+		DataServiceName: &serviceName,
+		WhenChanged:     &whenChanged,
+	})
+	assert.Nil(t, err)
+	assert.NotNil(t, changeCreated)
+
+	// read registration changes
+	changes, err := r.client.RegistrationChangesRead(ctx, registrationId)
+	assert.Nil(t, err)
+	assert.NotNil(t, changes)
+	assert.Contains(t, changes, changeCreated)
+
+	// acknowledge change
+	err = r.client.RegistrationChangeAcknowledge(ctx, registrationId, changeCreated.Id)
+	assert.Nil(t, err)
+
+	// read registration changes
+	changes, err = r.client.RegistrationChangesRead(ctx, registrationId)
+	assert.Nil(t, err)
+	assert.Empty(t, changes)
+
+	// delete registration
+	err = r.client.RegistrationDelete(ctx, registrationId)
+	assert.Nil(t, err)
+}
+
+func (r *restClientTest) TestChangeUpsertQueue(t *testing.T) {
+	ctx := context.TODO()
+
+	//initialize with the cache disabled and the queue enabled
+	config.DisableCache, config.DisableQueue = true, false
+	config.Rest.Port = "7999" //this is an invalid port to force use of the queue
 	r.Initialize(t)
 	defer r.Shutdown(t)
 
+	//generate dynamic constants
+	dataId, dataVersion := generateId(), rand.Intn(1000)
+	whenChanged, serviceName := time.Now().UnixNano(), randomString()
+	dataType := "test"
+
+	//upsert change
+	changePartial := data.ChangePartial{
+		DataId:          &dataId,
+		DataVersion:     &dataVersion,
+		DataType:        &dataType,
+		DataServiceName: &serviceName,
+		WhenChanged:     &whenChanged,
+	}
+	changeCreated, err := r.client.ChangeUpsert(ctx, changePartial)
+	assert.Nil(t, err)
+	assert.NotNil(t, changeCreated)
+	assert.Empty(t, changeCreated.Id)
+
+	// wait for two cycles for additional code coverage
+	time.Sleep(2 * config.UpsertQueueRate)
+
+	//shutdown
+	r.Shutdown(t)
+
+	// validate item in the queue
+	item, overflow := r.queue.PeekHead()
+	assert.False(t, overflow)
+	assert.NotNil(t, item)
+	assert.Equal(t, item, changePartial)
+
+	//re-initialize with a valid port
+	config.DisableCache, config.DisableQueue = true, false
+	config.Rest.Port = restPort //this is an invalid port to force use of the queue
+	r.Initialize(t)
+
+	//wait for the go routine to start
+	time.Sleep(time.Second)
+
+	//wait for the change to be upserted by underlying code/queue
+	assert.Condition(t, r.assertChange(t, ctx, changeCreated))
+}
+
+func (r *restClientTest) TestChangeCache(t *testing.T) {
+	ctx := context.TODO()
+
+	//initialize
+	config.DisableCache, config.DisableQueue = false, true
+	r.Initialize(t)
+	defer r.Shutdown(t)
+
+	//generate dynamic constants
+	dataId, dataVersion := generateId(), rand.Intn(1000)
+	whenChanged, serviceName := time.Now().UnixNano(), randomString()
+	dataType := "test"
+
+	//upsert change
+	changeCreated, err := r.client.ChangeUpsert(ctx, data.ChangePartial{
+		DataId:          &dataId,
+		DataVersion:     &dataVersion,
+		DataType:        &dataType,
+		DataServiceName: &serviceName,
+		WhenChanged:     &whenChanged,
+	})
+	assert.Nil(t, err)
+	assert.NotNil(t, changeCreated)
+	assert.NotEmpty(t, changeCreated.Id)
+	changeId := changeCreated.Id
+
+	//validate change cached
+	changeCached := r.cache.Read(changeId)
+	assert.Equal(t, changeCreated, changeCached)
+
+	//delete change
+	err = r.client.ChangeDelete(ctx, changeId)
+	assert.Nil(t, err)
+
+	//validate change removed
+	changeCached = r.cache.Read(changeId)
+	assert.Nil(t, changeCached)
+}
+
+func testEmployeesRestClient(t *testing.T) {
+	r := newRestclientTest()
+
+	config.DisableCache, config.DisableQueue = true, true
+	r.Initialize(t)
 	t.Run("Test Change Operations", r.TestChangeOperations)
+	t.Run("Test Registration Operations", r.TestRegistrationOperations)
 	//KIM: this test is disabled because reading via websockets
 	// is Janky
 	// t.Run("Test Change Streaming", r.TestChangeStreaming)
+	r.Shutdown(t)
+
+	//these internally initialize/shutdown
+	t.Run("Test Change Upsert Queue", r.TestChangeUpsertQueue)
+	t.Run("Test Change Cache", r.TestChangeCache)
+}
+
+func TestEmployeesRestClient(t *testing.T) {
+	testEmployeesRestClient(t)
 }

@@ -11,7 +11,7 @@ help: ## - Show this help.
 	@sed -ne '/@sed/!s/## //p' $(MAKEFILE_LIST)
 
 check-lint: ## - validate/install golangci-lint installation
-	which golangci-lint || (go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2)
+	@which golangci-lint || (go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2)
 
 lint: check-lint ## - lint the source
 	@golangci-lint run
@@ -21,7 +21,7 @@ lint-verbose: check-lint ## - lint the source with verbose output
 
 # Reference: https://medium.com/@pedram.esmaeeli/generate-swagger-specification-from-go-source-code-648615f7b9d9
 check-swagger: ## - validate/install swagger (v0.29.0)
-	which swagger || (go install github.com/go-swagger/go-swagger/cmd/swagger@v0.29.0)
+	@which swagger || (go install github.com/go-swagger/go-swagger/cmd/swagger@v0.29.0)
 
 swagger: check-swagger ## - generate the swagger.json
 	@swagger generate spec --work-dir=./internal/swagger --output ./tmp/swagger.json --scan-models

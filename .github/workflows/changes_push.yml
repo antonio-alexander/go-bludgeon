@@ -75,15 +75,15 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Check out repository code
+      - name: Checkout repository code
         uses: actions/checkout@v3
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Test changes (exclude client)
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/changes
         run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/changes
           go mod download
           make dep
           go test -v -parallel=1 -cover -count=1 $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-changes.out | tee /tmp/go-bludgeon-changes.log; test ${PIPESTATUS[0]} -eq 0
@@ -104,13 +104,55 @@ jobs:
             /tmp/go-bludgeon-changes.out
             /tmp/go-bludgeon-changes_services.log
 
-  docker_build_images:
+  docker_build_image_amd64:
     needs: [environment, go_test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
       PLATFORM_AMD64: linux/amd64
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+          git_source=`cat /tmp/git_source`
+          echo "git_source=$git_source" >> $GITHUB_ENV
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+      - name: Build docker changes
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/changes
+        run: |
+          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_source }} --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
+      - name: Generate build artifacts
+        run: |
+          mkdir -p /tmp
+          docker save -o /tmp/go-bludgeon-changes_amd64-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:amd64_${{ env.version }}
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: |
+            /tmp/go-bludgeon-changes_amd64-${{ env.version }}.tar.gz
+          retention-days: 1
+      - name: Docker clean-up
+        if: always()
+        run: |
+          docker image prune -f
+          docker container prune -f
+
+  docker_build_image_armv7:
+    needs: [environment, go_test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
       PLATFORM_ARMV7: linux/arm/v7
     steps:
       - name: Download artifacts
@@ -124,17 +166,15 @@ jobs:
           echo "version=$version" >> $GITHUB_ENV
           git_source=`cat /tmp/git_source`
           echo "git_source=$git_source" >> $GITHUB_ENV
-      - name: Check out repository code
+      - name: Checkout repository code
         uses: actions/checkout@v3
       - name: Build docker changes
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/changes
         run: |
-          cd changes
-          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_source }}  --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
-          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_source }}  --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
+          docker build -f ./cmd/service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_source }} --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
       - name: Generate build artifacts
         run: |
           mkdir -p /tmp
-          docker save -o /tmp/go-bludgeon-changes_amd64-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:amd64_${{ env.version }}
           docker save -o /tmp/go-bludgeon-changes_armv7-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:armv7_${{ env.version }}
       - name: Upload artifacts
         if: always()
@@ -142,16 +182,16 @@ jobs:
         with:
           name: artifacts
           path: |
-            /tmp/go-bludgeon-changes_amd64-${{ env.version }}.tar.gz
             /tmp/go-bludgeon-changes_armv7-${{ env.version }}.tar.gz
           retention-days: 1
       - name: Docker clean-up
+        if: always()
         run: |
           docker image prune -f
           docker container prune -f
 
-  go_test_client:
-    needs: [environment, docker_build_images]
+  docker_test:
+    needs: [docker_build_image_amd64, docker_build_image_armv7]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -169,15 +209,46 @@ jobs:
         run: |
           docker load -i /tmp/go-bludgeon-changes_amd64-${{ env.version }}.tar.gz
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:latest
-      - name: Check out repository code
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+      - name: Test Docker Image
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/changes
+        run: |
+          make run
+          if [ `docker inspect --format='{{ .State.Health.Status}}' changes` != "healthy" ]; then
+               echo "container is not healthy"
+               exit 1
+          fi
+          make stop
+
+  go_test_client:
+    needs: [environment, docker_test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version_source`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Load Docker Images
+        run: |
+          docker load -i /tmp/go-bludgeon-changes_amd64-${{ env.version }}.tar.gz
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-changes:latest
+      - name: Checkout repository code
         uses: actions/checkout@v3
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Test changes client
+        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/changes
         run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/changes
           go mod download
           make run
           go test -v -parallel=1 -cover -count=1 ./client/... -coverprofile /tmp/go-bludgeon-changes-client.out | tee /tmp/go-bludgeon-changes-client.log; test ${PIPESTATUS[0]} -eq 0
@@ -213,7 +284,7 @@ jobs:
         run: |
           version=`cat /tmp/version_source`
           echo "version=$version" >> $GITHUB_ENV
-      - name: Check out repository code
+      - name: Checkout repository code
         uses: actions/checkout@v3
         with:
           fetch-depth: "0"
@@ -225,7 +296,7 @@ jobs:
           CUSTOM_TAG: changes/v${{ env.version }}
 
   docker_push_images:
-    needs: [go_test_client, docker_build_images]
+    needs: [go_test_client, docker_build_image_amd64, docker_build_image_armv7]
     runs-on: ubuntu-latest
     permissions:
       packages: write

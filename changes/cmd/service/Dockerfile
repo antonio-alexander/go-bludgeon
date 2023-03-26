@@ -19,7 +19,7 @@ ARG GO_ARCH=amd64
 ARG GO_ARM=7
 ARG HEALTHCHECK_VERSION="v1.0.3"
 
-FROM --platform=${PLATFORM} golang:alpine AS build
+FROM golang:alpine AS build
 
 ENV GOPROXY=https://proxy.golang.org,direct
 

@@ -12,10 +12,10 @@ type Client interface {
 	ChangesRead(ctx context.Context, search data.ChangeSearch) ([]*data.Change, error)
 	ChangeDelete(ctx context.Context, changeId string) error
 
-	RegistrationUpsert(ctx context.Context, serviceName string) error
+	RegistrationUpsert(ctx context.Context, registrationId string) error
 	RegistrationChangesRead(ctx context.Context, registrationId string) ([]*data.Change, error)
-	RegistrationChangeAcknowledge(ctx context.Context, serviceName string, changeIds ...string) error
-	RegistrationDelete(ctx context.Context, serviceName string) error
+	RegistrationChangeAcknowledge(ctx context.Context, registrationId string, changeIds ...string) error
+	RegistrationDelete(ctx context.Context, registrationId string) error
 }
 
 type Handler interface {

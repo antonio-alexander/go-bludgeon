@@ -93,3 +93,15 @@ type ChangePartial struct {
 	// example: 1
 	DataVersion *int `json:"data_version,omitempty"`
 }
+
+func (c *ChangePartial) Type() MessageType {
+	return MessageTypeChangePartial
+}
+
+func (c *ChangePartial) MarshalBinary() ([]byte, error) {
+	return json.Marshal(c)
+}
+
+func (c *ChangePartial) UnmarshalBinary(bytes []byte) error {
+	return json.Unmarshal(bytes, c)
+}

@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"syscall"
+	"time"
 
 	client "github.com/antonio-alexander/go-bludgeon/changes/client"
 	data "github.com/antonio-alexander/go-bludgeon/changes/data"
 
+	internal_cache "github.com/antonio-alexander/go-bludgeon/changes/internal/cache"
+	internal_queue "github.com/antonio-alexander/go-bludgeon/changes/internal/queue"
 	internal "github.com/antonio-alexander/go-bludgeon/internal"
 	config "github.com/antonio-alexander/go-bludgeon/internal/config"
 	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
@@ -24,17 +28,24 @@ type restClient struct {
 	sync.RWMutex
 	sync.WaitGroup
 	logger.Logger
-	client interface {
+	ctx      context.Context
+	cancel   context.CancelFunc
+	handlers map[string]*handler
+	queue    internal_queue.Queue
+	cache    interface {
+		internal_cache.Cache
+		internal.Configurer
+		internal.Initializer
+		internal.Parameterizer
+	}
+	initialized bool
+	configured  bool
+	config      *Configuration
+	client      interface {
 		restclient.Client
 		internal.Configurer
 		internal.Parameterizer
 	}
-	ctx         context.Context
-	cancel      context.CancelFunc
-	handlers    map[string]*handler
-	initialized bool
-	configured  bool
-	config      *Configuration
 }
 
 // New can be used to create a concrete instance of the rest client
@@ -46,14 +57,82 @@ func New() interface {
 	internal.Configurer
 	internal.Parameterizer
 } {
+	cache := internal_cache.New()
+
+	queue := internal_queue.New(QueueSize)
 	return &restClient{
 		client:   restclient.New(),
 		handlers: make(map[string]*handler),
+		cache:    cache,
+		queue:    queue,
 		Logger:   logger.NewNullLogger(),
 	}
 }
 
-func (r *restClient) doRequest(ctx context.Context, uri string, method string, data []byte) ([]byte, error) {
+func (r *restClient) cacheRead(changeId string) *data.Change {
+	if r.config.DisableCache {
+		return nil
+	}
+	return r.cache.Read(changeId)
+}
+
+func (r *restClient) cacheWrite(change *data.Change) {
+	if r.config.DisableCache {
+		return
+	}
+	r.cache.Write(change)
+}
+
+func (r *restClient) cacheDelete(changeId string) {
+	if r.config.DisableCache {
+		return
+	}
+	r.cache.Delete(changeId)
+}
+
+func (r *restClient) queueEnqueue(item interface{}) bool {
+	return r.queue.Enqueue(item)
+}
+
+func (r *restClient) launchUpsertQueue() {
+	if r.config.DisableQueue {
+		return
+	}
+	started := make(chan struct{})
+	r.Add(1)
+	go func() {
+		defer r.Done()
+
+		tQueueReadeRate := time.NewTicker(r.config.UpsertQueueRate)
+		defer tQueueReadeRate.Stop()
+		queueReadFx := func() {
+			var changePartialsToEnqueue []data.ChangePartial
+
+			for _, changePartial := range internal_queue.ChangePartialFlush(r.queue) {
+				if _, err := r.changeUpsert(r.ctx, changePartial); err != nil {
+					r.Error("error while attempting to upsert: %s", err)
+					changePartialsToEnqueue = append(changePartialsToEnqueue,
+						changePartial)
+				}
+			}
+			if _, overflow := internal_queue.ChangePartialEnqueueMultiple(r.queue, changePartialsToEnqueue); overflow {
+				r.Info("overflow encountered while enqueueing multiple changes")
+			}
+		}
+		close(started)
+		for {
+			select {
+			case <-r.ctx.Done():
+				return
+			case <-tQueueReadeRate.C:
+				queueReadFx()
+			}
+		}
+	}()
+	<-started
+}
+
+func (r *restClient) doRequest(ctx context.Context, uri, method string, data []byte) ([]byte, error) {
 	bytes, statusCode, err := r.client.DoRequest(ctx, uri, method, data)
 	if err != nil {
 		return nil, err
@@ -71,6 +150,23 @@ func (r *restClient) doRequest(ctx context.Context, uri string, method string, d
 	}
 }
 
+func (r *restClient) changeUpsert(ctx context.Context, changePartial data.ChangePartial) (*data.Change, error) {
+	bytes, err := json.Marshal(&changePartial)
+	if err != nil {
+		return nil, err
+	}
+	uri := fmt.Sprintf("http://%s:%s"+data.RouteChanges, r.config.Rest.Address, r.config.Rest.Port)
+	bytes, err = r.doRequest(ctx, uri, data.MethodChangeUpsert, bytes)
+	if err != nil {
+		return nil, err
+	}
+	change := &data.Change{}
+	if err = json.Unmarshal(bytes, change); err != nil {
+		return nil, err
+	}
+	return change, nil
+}
+
 func (r *restClient) SetUtilities(parameters ...interface{}) {
 	r.client.SetUtilities(parameters)
 	for _, parameter := range parameters {
@@ -82,9 +178,20 @@ func (r *restClient) SetUtilities(parameters ...interface{}) {
 }
 
 func (r *restClient) SetParameters(parameters ...interface{}) {
-	r.client.SetParameters(parameters)
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
+		case internal_queue.Queue:
+			if r.queue != nil {
+				r.queue.Close()
+			}
+			r.queue = p
+		case interface {
+			internal_cache.Cache
+			internal.Configurer
+			internal.Initializer
+			internal.Parameterizer
+		}:
+			r.cache = p
 		case interface {
 			restclient.Client
 			internal.Configurer
@@ -93,6 +200,16 @@ func (r *restClient) SetParameters(parameters ...interface{}) {
 			r.client = p
 		}
 	}
+	switch {
+	case r.queue == nil:
+		panic("queue is nil")
+	case r.cache == nil:
+		panic("cache is nil")
+	case r.client == nil:
+		panic("client is nil")
+	}
+	r.client.SetParameters(parameters...)
+	r.cache.SetParameters(parameters...)
 }
 
 func (r *restClient) Configure(items ...interface{}) error {
@@ -111,15 +228,20 @@ func (r *restClient) Configure(items ...interface{}) error {
 		}
 	}
 	if c == nil {
-		c = new(Configuration)
+		c = NewConfiguration()
 		c.Default()
 		c.FromEnv(envs)
 	}
 	if err := c.Validate(); err != nil {
 		return err
 	}
-	if err := r.client.Configure(&c.Rest); err != nil {
+	if err := r.client.Configure(c.Rest); err != nil {
 		return err
+	}
+	if !c.DisableCache {
+		if err := r.cache.Configure(c.Cache); err != nil {
+			return err
+		}
 	}
 	r.config = c
 	r.configured = true
@@ -138,6 +260,7 @@ func (r *restClient) Initialize() error {
 		return errors.New("not configured")
 	}
 	r.ctx, r.cancel = context.WithCancel(context.Background())
+	r.launchUpsertQueue()
 	r.initialized = true
 	return nil
 }
@@ -151,27 +274,53 @@ func (r *restClient) Shutdown() {
 	}
 	r.cancel()
 	r.Wait()
+	if !r.config.DisableQueue {
+		for _, changePartial := range internal_queue.ChangePartialFlush(r.queue) {
+			if _, err := r.changeUpsert(context.Background(), changePartial); err != nil {
+				r.queueEnqueue(changePartial)
+			}
+		}
+	}
 	r.initialized = false
 }
 
 func (r *restClient) ChangeUpsert(ctx context.Context, changePartial data.ChangePartial) (*data.Change, error) {
-	bytes, err := json.Marshal(&changePartial)
+	r.Lock()
+	defer r.Unlock()
+
+	if !r.initialized {
+		return nil, errors.New("not initialized")
+	}
+	change, err := r.changeUpsert(ctx, changePartial)
 	if err != nil {
-		return nil, err
+		r.Error("error while upserting change: %s", err)
+		switch {
+		default:
+			return nil, err
+		case errors.Is(err, syscall.ECONNREFUSED),
+			errors.Is(err, syscall.ECONNRESET),
+			errors.Is(err, syscall.ECONNABORTED),
+			errors.Is(err, syscall.ETIMEDOUT):
+			if !r.config.DisableQueue {
+				r.Trace("attempting to enqueue change")
+				if overflow := r.queueEnqueue(changePartial); overflow {
+					r.Trace("failed to enqueue change")
+					return nil, err
+				}
+				r.Trace("successfully enqueued change")
+				return changePartialToChange(changePartial), nil
+			}
+			return nil, err
+		}
 	}
-	uri := fmt.Sprintf("http://%s:%s"+data.RouteChanges, r.config.Rest.Address, r.config.Rest.Port)
-	bytes, err = r.doRequest(ctx, uri, data.MethodChangeUpsert, bytes)
-	if err != nil {
-		return nil, err
-	}
-	change := &data.Change{}
-	if err = json.Unmarshal(bytes, change); err != nil {
-		return nil, err
-	}
+	r.cacheWrite(change)
 	return change, nil
 }
 
 func (r *restClient) ChangeRead(ctx context.Context, changeId string) (*data.Change, error) {
+	if change := r.cacheRead(changeId); change != nil {
+		return change, nil
+	}
 	uri := fmt.Sprintf("http://%s:%s"+data.RouteChangesParamf, r.config.Rest.Address, r.config.Rest.Port, changeId)
 	bytes, err := r.doRequest(ctx, uri, data.MethodChangeRead, nil)
 	if err != nil {
@@ -181,6 +330,7 @@ func (r *restClient) ChangeRead(ctx context.Context, changeId string) (*data.Cha
 	if err = json.Unmarshal(bytes, change); err != nil {
 		return nil, err
 	}
+	r.cacheWrite(change)
 	return change, nil
 }
 
@@ -202,6 +352,7 @@ func (r *restClient) ChangeDelete(ctx context.Context, changeId string) error {
 	if _, err := r.doRequest(ctx, uri, data.MethodChangeDelete, nil); err != nil {
 		return err
 	}
+	r.cacheDelete(changeId)
 	return nil
 }
 
