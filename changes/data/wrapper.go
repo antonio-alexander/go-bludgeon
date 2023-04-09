@@ -12,6 +12,7 @@ type MessageType string
 const (
 	MessageTypeEmpty               MessageType = "empty"
 	MessageTypeChange              MessageType = "change"
+	MessageTypeChangePartial       MessageType = "change_partial"
 	MessageTypeChangeDigest        MessageType = "change_digest"
 	MessageTypeRequestRegister     MessageType = "request_register"
 	MessageTypeRequestAcknowledge  MessageType = "request_acknowledge"

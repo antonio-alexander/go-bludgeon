@@ -24,7 +24,7 @@ import (
 
 var (
 	configKafka        = new(internal_kafka.Configuration)
-	configChangesRest  = new(restclient.Configuration)
+	configChangesRest  = restclient.NewConfiguration()
 	configChangesKafka = new(kafkaclient.Configuration)
 )
 
