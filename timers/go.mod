@@ -3,21 +3,23 @@ module github.com/antonio-alexander/go-bludgeon/timers
 go 1.19
 
 require (
-	github.com/antonio-alexander/go-bludgeon/changes v1.0.4
+	github.com/antonio-alexander/go-bludgeon/changes v1.1.0
 	github.com/antonio-alexander/go-bludgeon/employees v1.3.2
 	github.com/antonio-alexander/go-bludgeon/healthcheck v1.0.3
 	github.com/antonio-alexander/go-bludgeon/internal v1.4.3
+	github.com/antonio-alexander/go-stash v1.0.3
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/pkg/errors v0.9.1
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.2
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.1
 )
 
 require (
 	github.com/Shopify/sarama v1.36.0 // indirect
+	github.com/antonio-alexander/go-queue v1.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/eapache/go-resiliency v1.3.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21 // indirect

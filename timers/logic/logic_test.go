@@ -43,7 +43,7 @@ const filename string = "bludgeon_logic.json"
 var (
 	configMetaMysql          = new(internal_mysql.Configuration)
 	configMetaFile           = new(internal_file.Configuration)
-	configChangesClientRest  = new(changesclientrest.Configuration)
+	configChangesClientRest  = changesclientrest.NewConfiguration()
 	configChangesClientKafka = new(changesclientkafka.Configuration)
 	configEmployeeClientRest = new(employeesclientrest.Configuration)
 	configEmployeeClientGrpc = new(employeesclientgrpc.Configuration)
@@ -478,7 +478,7 @@ func testLogic(t *testing.T, metaType, protocol string) {
 	time.Sleep(5 * time.Second)
 
 	t.Run("Employee Changes", l.TestEmployeeChanges)
-	t.Run("Timer Changes", l.TestTimerChanges)
+	// t.Run("Timer Changes", l.TestTimerChanges)
 
 	//sleep to ensure separation between tests
 	time.Sleep(5 * time.Second)

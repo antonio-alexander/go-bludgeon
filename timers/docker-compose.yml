@@ -13,6 +13,7 @@ services:
       MYSQL_DATABASE: ${DATABASE_NAME}
       MYSQL_USER: ${DATABASE_USER}
       MYSQL_PASSWORD: ${DATABASE_PASSWORD}
+      BLUDGEON_MICROSERVICE: ${BLUDGEON_MICROSERVICE:-false}
 
   zookeeper:
     hostname: zookeeper
@@ -51,7 +52,10 @@ services:
     hostname: "employees"
     image: ghcr.io/antonio-alexander/go-bludgeon-employees:latest
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+      changes:
+        condition: service_healthy
     restart: "always"
     ports:
       - "9000:8080"
@@ -78,6 +82,10 @@ services:
       BLUDGEON_CHANGES_REST_ADDRESS: ${BLUDGEON_CHANGES_ADDRESS:-changes}
       BLUDGEON_CHANGES_REST_PORT: ${BLUDGEON_CHANGES_REST_PORT:-8080}
       BLUDGEON_CHANGES_AUTO_ACKNOWLEDGE: ${BLUDGEON_CHANGES_AUTO_ACKNOWLEDGE:-true}
+      BLUDGEON_KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9093}
+      BLUDGEON_KAFKA_GROUP_ID: ${KAFKA_CHANGES_GROUP_ID_EMPLOYEES:-employees}
+      BLUDGEON_KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-true}
+      BLUDGEON_KAFKA_ENABLE_LOG: ${KAFKA_ENABLE_LOG:-true}
 
   changes:
     container_name: "changes"
@@ -121,7 +129,10 @@ services:
     profiles: [ "application" ]
     restart: "always"
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+      changes:
+        condition: service_healthy
     ports:
       - "8080:8080"
       - "8081:8081"
@@ -157,7 +168,7 @@ services:
       BLUDGEON_CHANGES_TOPIC: ${BLUDGEON_CHANGES_TOPIC:-changes}
       BLUDGEON_CHANGES_CLIENT_REST_ENABLED: "true"
       BLUDGEON_CHANGES_CLIENT_KAFKA_ENABLED: "true"
-      BLUDGEON_KAFKA_BROKERS: "kafka:9093"
-      BLUDGEON_KAFKA_GROUP_ID: "changes"
-      BLUDGEON_KAFKA_CONSUMER_GROUP: "true"
-      BLUDGEON_KAFKA_ENABLE_LOG: "true"
+      BLUDGEON_KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9093}
+      BLUDGEON_KAFKA_GROUP_ID: ${KAFKA_CHANGES_GROUP_ID_TIMERS:-timers}
+      BLUDGEON_KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-true}
+      BLUDGEON_KAFKA_ENABLE_LOG: ${KAFKA_ENABLE_LOG:-true}

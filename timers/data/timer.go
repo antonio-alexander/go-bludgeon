@@ -1,7 +1,9 @@
 package data
 
+import "encoding/json"
+
 // swagger:model Timer
-//Timer is a high-level object that describes a single unit of time for a given "task". A timer may
+// Timer is a high-level object that describes a single unit of time for a given "task". A timer may
 // be started and paused many times, but only submitted once. Although there's an obvious desire to
 // be able to edit a timer after its submitted, but before it's billed/invoiced. Prior to submission
 // elapsed time should "always" be the sum of all the associated active timers and won't necessarily
@@ -58,8 +60,16 @@ type Timer struct {
 	Version int `json:"version"`
 }
 
+func (t *Timer) MarshalBinary() ([]byte, error) {
+	return json.Marshal(t)
+}
+
+func (t *Timer) UnmarshalBinary(bytes []byte) error {
+	return json.Unmarshal(bytes, t)
+}
+
 // swagger:model TimerPartial
-//TimerPartial represents the properties in timer that can be
+// TimerPartial represents the properties in timer that can be
 // modified from the outside
 type TimerPartial struct {
 	//Whether or not a timer has been completed

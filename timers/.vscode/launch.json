@@ -35,13 +35,14 @@
                 "BLUDGEON_CORS_DEBUG": "true",
                 "BLUDGEON_CHANGES_CLIENT_REST_ENABLED": "true",
                 "BLUDGEON_CHANGES_REST_ADDRESS": "localhost",
-                "BLUDGEON_CHANGES_REST_PORT": "8014",
+                "BLUDGEON_CHANGES_REST_PORT": "9020",
                 "BLUDGEON_CHANGES_CLIENT_KAFKA_ENABLED": "true",
                 "BLUDGEON_KAFKA_BROKERS": "localhost:9092",
                 "BLUDGEON_KAFKA_CLIENT_ID": "bludgeon_timers",
                 "BLUDGEON_KAFKA_GROUP_ID": "bludgeon_timers",
-                "BLUDGEON_KAFKA_CONSUMER_GROUP": "true",
+                "BLUDGEON_KAFKA_CONSUMER_GROUP": "false",
                 "BLUDGEON_KAFKA_ENABLE_LOG": "true",
+                "BLUDGEON_CHANGE_READ_RATE": "1",
             },
         }
     ]

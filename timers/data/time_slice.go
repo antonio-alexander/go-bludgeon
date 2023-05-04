@@ -1,7 +1,9 @@
 package data
 
+import "encoding/json"
+
 // swagger:model TimeSlice
-//TimeSlice is the basic unit of "time", the idea is that a task may span over multiple slices that
+// TimeSlice is the basic unit of "time", the idea is that a task may span over multiple slices that
 // aren't necessarily contiguous, but can be added together to get an altogether time.  This should
 // reduce the overall error when you pause and restart timers (not time slices) from multiple locations
 // time slices can be deleted/archived, but not "edited"
@@ -43,6 +45,14 @@ type TimeSlice struct {
 	Version int `json:"version"`
 }
 
+func (t *TimeSlice) MarshalBinary() ([]byte, error) {
+	return json.Marshal(t)
+}
+
+func (t *TimeSlice) UnmarshalBinary(bytes []byte) error {
+	return json.Unmarshal(bytes, t)
+}
+
 func (t *TimeSlice) Validate() bool {
 	if t.TimerID == "" {
 		return false
@@ -80,7 +90,7 @@ func (t *TimeSlice) Contains(tC TimeSlice) bool {
 }
 
 // swagger:model TimeSlicePartial
-//TimeSlicePartial can be used to update fields of a time slice
+// TimeSlicePartial can be used to update fields of a time slice
 // that can be mutated (contrast with Audit)
 type TimeSlicePartial struct {
 	//The ID of the associated timer (v4 UUID), this cannot be
@@ -101,21 +111,21 @@ type TimeSlicePartial struct {
 	Finish *int64
 }
 
-//TimeSliceByStart implements sort.Interface
+// TimeSliceByStart implements sort.Interface
 // var _ sort.Interface = TimeSliceByStart{}
 type TimeSliceByStart []*TimeSlice
 
-//Len is the number of elements in the collection.
+// Len is the number of elements in the collection.
 func (t TimeSliceByStart) Len() int {
 	return len(t)
 }
 
-//Swap swaps the elements with indexes i and j.
+// Swap swaps the elements with indexes i and j.
 func (t TimeSliceByStart) Swap(i, j int) {
 	t[i], t[j] = t[j], t[i]
 }
 
-//Less reports whether the element with index i
+// Less reports whether the element with index i
 // must sort before the element with index j.
 //
 // If both Less(i, j) and Less(j, i) are false,
@@ -124,8 +134,8 @@ func (t TimeSliceByStart) Swap(i, j int) {
 // while Stable preserves the original input order of equal elements.
 //
 // Less must describe a transitive ordering:
-//  - if both Less(i, j) and Less(j, k) are true, then Less(i, k) must be true as well.
-//  - if both Less(i, j) and Less(j, k) are false, then Less(i, k) must be false as well.
+//   - if both Less(i, j) and Less(j, k) are true, then Less(i, k) must be true as well.
+//   - if both Less(i, j) and Less(j, k) are false, then Less(i, k) must be false as well.
 //
 // Note that floating-point comparison (the < operator on float32 or float64 values)
 // is not a transitive ordering when not-a-number (NaN) values are involved.

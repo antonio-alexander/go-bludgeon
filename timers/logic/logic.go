@@ -61,6 +61,7 @@ func (l *logic) changeUpsert(changePartial changesdata.ChangePartial) {
 		l.Debug("Upserted change: %s (%s:%s->%s)", change.Id, change.DataType, change.DataId, change.DataAction)
 	}()
 }
+
 func (l *logic) registrationChangeAcknowledge(serviceName string, changeIds ...string) {
 	if len(changeIds) <= 0 {
 		return
@@ -82,6 +83,8 @@ func (l *logic) handleChanges(changes ...*changesdata.Change) error {
 
 	for _, change := range changes {
 		switch {
+		default:
+			changesToAcknowledge = append(changesToAcknowledge, change.Id)
 		case change.DataType == employeesdata.ChangeTypeEmployee &&
 			change.DataAction == employeesdata.ChangeActionDelete:
 			timers, err := l.TimersRead(context.Background(), data.TimerSearch{EmployeeID: &change.DataId})
