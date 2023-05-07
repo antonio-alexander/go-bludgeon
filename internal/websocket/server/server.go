@@ -9,6 +9,7 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/internal"
 	"github.com/antonio-alexander/go-bludgeon/internal/config"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/websocket"
 )
@@ -36,10 +37,15 @@ func New(parameters ...interface{}) interface {
 	var request *http.Request
 	var header http.Header
 
-	s := &server{config: &Configuration{}}
-	s.config.Default()
+	s := &server{Logger: logger.NewNullLogger()}
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
+		case *Configuration:
+			s.config = p
+			s.configured = true
+		case Configuration:
+			s.config = &p
+			s.configured = true
 		case logger.Logger:
 			s.Logger = p
 		case http.ResponseWriter:
@@ -50,11 +56,8 @@ func New(parameters ...interface{}) interface {
 			header = p
 		}
 	}
-	if s.Logger == nil {
-		s.Logger = logger.New()
-	}
-	if err := s.config.Validate(); err != nil {
-		s.Error(logAlias+"configuration validatation failed: %s", err)
+	if !s.configured {
+		s.Error(logAlias + "not configured")
 		return nil
 	}
 	conn, err := upgrader.Upgrade(writer, request, header)
@@ -170,24 +173,16 @@ func (s *server) Configure(items ...interface{}) error {
 	s.Lock()
 	defer s.Unlock()
 
-	var envs map[string]string
 	var c *Configuration
 
 	for _, item := range items {
 		switch v := item.(type) {
-		case config.Envs:
-			envs = v
 		case *Configuration:
 			c = v
 		}
 	}
 	if c == nil {
-		c = new(Configuration)
-		c.Default()
-		c.FromEnv(envs)
-	}
-	if err := c.Validate(); err != nil {
-		return err
+		return errors.New(config.ErrConfigurationNotFound)
 	}
 	s.config = c
 	s.configured = true

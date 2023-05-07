@@ -3,6 +3,7 @@ package restclient
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 
@@ -42,26 +43,18 @@ func (c *client) SetUtilities(parameters ...interface{}) {
 }
 
 func (c *client) Configure(items ...interface{}) error {
-	var envs map[string]string
-	var configuration *Configuration
+	var cc *Configuration
 
 	for _, item := range items {
 		switch v := item.(type) {
-		case config.Envs:
-			envs = v
 		case *Configuration:
-			configuration = v
+			cc = v
 		}
 	}
 	if c == nil {
-		configuration = new(Configuration)
-		configuration.Default()
-		configuration.FromEnv(envs)
+		return errors.New(config.ErrConfigurationNotFound)
 	}
-	if err := configuration.Validate(); err != nil {
-		return err
-	}
-	c.config = configuration
+	c.config = cc
 	c.Client.Timeout = c.config.Timeout
 	return nil
 }

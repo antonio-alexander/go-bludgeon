@@ -15,21 +15,15 @@ import (
 	_ "github.com/go-sql-driver/mysql" //import for driver support
 )
 
-// common constants
-const (
-	DatabaseIsolation = sql.LevelSerializable
-	LogAlias          = "[mysql_client]"
-)
-
 type DB struct {
 	*sql.DB
 	sync.RWMutex
 	sync.WaitGroup
 	logger.Logger
 	stopper     chan struct{}
-	initialized bool
-	configured  bool
 	config      *Configuration
+	configured  bool
+	initialized bool
 }
 
 func New() *DB {
@@ -89,21 +83,18 @@ func (m *DB) Configure(items ...interface{}) error {
 	m.RWMutex.Lock()
 	defer m.RWMutex.Unlock()
 
-	var envs map[string]string
 	var c *Configuration
 
 	for _, item := range items {
 		switch v := item.(type) {
-		case config.Envs:
-			envs = v
+		case Configuration:
+			c = &v
 		case *Configuration:
 			c = v
 		}
 	}
 	if c == nil {
-		c = new(Configuration)
-		c.Default()
-		c.FromEnv(envs)
+		return errors.New(config.ErrConfigurationNotFound)
 	}
 	if err := c.Validate(); err != nil {
 		return err
@@ -117,6 +108,9 @@ func (m *DB) Initialize() error {
 	m.Lock()
 	defer m.Unlock()
 
+	if m.initialized {
+		return errors.New("already initialized")
+	}
 	if !m.configured {
 		return errors.New("not configured")
 	}

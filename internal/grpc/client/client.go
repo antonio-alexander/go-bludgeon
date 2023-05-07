@@ -48,23 +48,15 @@ func (s *grpcClient) Configure(items ...interface{}) error {
 	defer s.Unlock()
 
 	var c *Configuration
-	var envs map[string]string
 
 	for _, item := range items {
 		switch v := item.(type) {
-		case config.Envs:
-			envs = v
 		case *Configuration:
 			c = v
 		}
 	}
 	if c == nil {
-		c = new(Configuration)
-		c.Default()
-		c.FromEnv(envs)
-	}
-	if err := c.Validate(); err != nil {
-		return err
+		return errors.New(config.ErrConfigurationNotFound)
 	}
 	s.config = c
 	s.configured = true

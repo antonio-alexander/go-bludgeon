@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-//configuration defaults
+// configuration defaults
 const (
 	DefaultHostname       string        = "localhost"
 	DefaultPort           string        = "3306"
@@ -17,7 +17,7 @@ const (
 	DefaultDriver         string        = "mysql"
 )
 
-//environmental variable names
+// environmental variable names
 const (
 	EnvNameDatabaseHost     string = "DATABASE_HOST"
 	EnvNameDatabasePort     string = "DATABASE_PORT"
@@ -26,7 +26,7 @@ const (
 	EnvNameDatabasePassword string = "DATABASE_PASSWORD"
 )
 
-//Configuration is a struct that contains al lthe possible configuration for supported database drivers
+// Configuration is a struct that contains al lthe possible configuration for supported database drivers
 type Configuration struct {
 	Hostname       string        `json:"hostname"`        //hostame to user to access the database
 	Port           string        `json:"port"`            //port to connect to
@@ -36,10 +36,9 @@ type Configuration struct {
 	ConnectTimeout time.Duration `json:"connect_timeout"` //how long to wait to connect
 	QueryTimeout   time.Duration `json:"query_timeout"`   //how long to wait when querying
 	ParseTime      bool          `json:"parse_time"`      //whether or not to parse time
-	// Driver         string        `json:"driver"`          //what driver to use
 }
 
-//Validate is used to ensure that the values being configured make sense
+// Validate is used to ensure that the values being configured make sense
 // it's not necessarily to prevent a misconfiguration, but to use default values in the
 // event a value doesn't exist
 func (c *Configuration) Validate() (err error) {

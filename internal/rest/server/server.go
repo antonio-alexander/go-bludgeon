@@ -135,20 +135,19 @@ func (s *server) SetUtilities(parameters ...interface{}) {
 }
 
 func (s *server) Configure(items ...interface{}) error {
-	var envs map[string]string
 	var c *Configuration
 
 	for _, item := range items {
 		switch v := item.(type) {
 		case config.Envs:
-			envs = v
+			c = new(Configuration)
+			c.FromEnv(v)
 		case *Configuration:
 			c = v
 		}
 	}
 	if c == nil {
-		c = new(Configuration)
-		c.FromEnv(envs)
+		return errors.New(config.ErrConfigurationNotFound)
 	}
 	if err := c.Validate(); err != nil {
 		return err
@@ -161,6 +160,7 @@ func (s *server) Configure(items ...interface{}) error {
 func (s *server) Initialize() (err error) {
 	s.Lock()
 	defer s.Unlock()
+
 	if s.initialized {
 		return errors.New(ErrStarted)
 	}
@@ -180,6 +180,7 @@ func (s *server) Initialize() (err error) {
 func (s *server) Shutdown() {
 	s.Lock()
 	defer s.Unlock()
+
 	if !s.initialized {
 		return
 	}

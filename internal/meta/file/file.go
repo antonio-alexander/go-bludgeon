@@ -91,21 +91,21 @@ func (m *file) Configure(items ...interface{}) error {
 	m.RWMutex.Lock()
 	defer m.RWMutex.Unlock()
 
-	var envs map[string]string
 	var c *Configuration
 
 	for _, item := range items {
 		switch v := item.(type) {
 		case config.Envs:
-			envs = v
+			c := new(Configuration)
+			c.FromEnv(v)
 		case *Configuration:
 			c = v
+		case Configuration:
+			c = &v
 		}
 	}
 	if c == nil {
-		c = new(Configuration)
-		c.Default()
-		c.FromEnv(envs)
+		return errors.New(config.ErrConfigurationNotFound)
 	}
 	if err := c.Validate(); err != nil {
 		return err

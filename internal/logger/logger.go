@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -26,20 +27,18 @@ func New() interface {
 
 func (l *logger) Configure(items ...interface{}) error {
 	var c *Configuration
-	var envs map[string]string
 
 	for _, item := range items {
 		switch v := item.(type) {
 		case config.Envs:
-			envs = v
+			c = new(Configuration)
+			c.FromEnv(v)
 		case *Configuration:
 			c = v
 		}
 	}
 	if c == nil {
-		c = new(Configuration)
-		c.Default()
-		c.FromEnv(envs)
+		return errors.New(config.ErrConfigurationNotFound)
 	}
 	l.config = c
 	l.Logger = log.New(os.Stdout, fmt.Sprintf("[%s] ", l.config.Prefix), log.Ltime|log.Ldate|log.Lmsgprefix)

@@ -9,6 +9,7 @@ import (
 	"github.com/antonio-alexander/go-bludgeon/internal"
 	"github.com/antonio-alexander/go-bludgeon/internal/config"
 	"github.com/antonio-alexander/go-bludgeon/internal/logger"
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/websocket"
 )
@@ -68,26 +69,18 @@ func (c *client) Configure(items ...interface{}) error {
 	c.Lock()
 	defer c.Unlock()
 
-	var envs map[string]string
-	var configuration *Configuration
+	var cc *Configuration
 
 	for _, item := range items {
 		switch v := item.(type) {
-		case config.Envs:
-			envs = v
 		case *Configuration:
-			configuration = v
+			cc = v
 		}
 	}
-	if configuration == nil {
-		configuration = new(Configuration)
-		configuration.Default()
-		configuration.FromEnv(envs)
+	if cc == nil {
+		return errors.New(config.ErrConfigurationNotFound)
 	}
-	if err := configuration.Validate(); err != nil {
-		return err
-	}
-	c.config = configuration
+	c.config = cc
 	c.configured = true
 	return nil
 }
