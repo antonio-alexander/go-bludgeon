@@ -1,4 +1,4 @@
-package restclient
+package rest
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	client "github.com/antonio-alexander/go-bludgeon/changes/client"
 	data "github.com/antonio-alexander/go-bludgeon/changes/data"
 
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
-	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_websocketclient "github.com/antonio-alexander/go-bludgeon/internal/websocket/client"
+	internal "github.com/antonio-alexander/go-bludgeon/common"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
+	internal_websocketclient "github.com/antonio-alexander/go-bludgeon/pkg/websocket/client"
 )
 
 type handler struct {

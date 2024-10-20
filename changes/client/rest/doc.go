@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-	Package restclient provides an implementation of a rest client to interact with
-	the employees service.
+Package restclient provides an implementation of a rest client to interact with
+the employees service.
 */
-package restclient
+package rest

@@ -1,4 +1,4 @@
-package service
+package kafka
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 
 	"github.com/antonio-alexander/go-bludgeon/changes/data"
 	"github.com/antonio-alexander/go-bludgeon/changes/logic"
-	"github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/common"
 
-	"github.com/antonio-alexander/go-bludgeon/internal/config"
-	"github.com/antonio-alexander/go-bludgeon/internal/kafka"
-	"github.com/antonio-alexander/go-bludgeon/internal/logger"
+	internal_config "github.com/antonio-alexander/go-bludgeon/pkg/config"
+	internal_kafka "github.com/antonio-alexander/go-bludgeon/pkg/kafka"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
 )
 
 type kafkaService struct {
@@ -19,8 +19,8 @@ type kafkaService struct {
 	sync.WaitGroup
 	ctx    context.Context
 	cancel context.CancelFunc
-	logger.Logger
-	kafka.Client
+	internal_logger.Logger
+	internal_kafka.Client
 	logic       logic.Logic
 	muHandlers  sync.RWMutex
 	handlers    map[string]string
@@ -30,19 +30,20 @@ type kafkaService struct {
 }
 
 func New() interface {
-	internal.Configurer
-	internal.Initializer
-	internal.Parameterizer
+	common.Configurer
+	common.Initializer
+	common.Parameterizer
 } {
 	return &kafkaService{
 		handlers: make(map[string]string),
-		Logger:   logger.NewNullLogger(),
+		Logger:   internal_logger.NewNullLogger(),
 	}
 }
 
 func (k *kafkaService) readTopics() []string {
 	k.muHandlers.RLock()
 	defer k.muHandlers.RUnlock()
+
 	var topics []string
 
 	for topic := range k.handlers {
@@ -54,6 +55,7 @@ func (k *kafkaService) readTopics() []string {
 func (k *kafkaService) readHandler(topic string) (string, bool) {
 	k.muHandlers.RLock()
 	defer k.muHandlers.RUnlock()
+
 	topic, ok := k.handlers[topic]
 	return topic, ok
 }
@@ -61,6 +63,7 @@ func (k *kafkaService) readHandler(topic string) (string, bool) {
 func (k *kafkaService) writeHandler(topic, handlerId string) {
 	k.muHandlers.Lock()
 	defer k.muHandlers.Unlock()
+
 	if handlerId != "" {
 		k.handlers[topic] = handlerId
 	}
@@ -69,6 +72,7 @@ func (k *kafkaService) writeHandler(topic, handlerId string) {
 func (k *kafkaService) deleteHandler(topic string) {
 	k.muHandlers.Lock()
 	defer k.muHandlers.Unlock()
+
 	delete(k.handlers, topic)
 }
 
@@ -88,7 +92,7 @@ func (k *kafkaService) handleFx(topic string) logic.HandlerFx {
 func (k *kafkaService) SetUtilities(parameters ...interface{}) {
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
-		case logger.Logger:
+		case internal_logger.Logger:
 			k.Logger = p
 		}
 	}
@@ -99,7 +103,7 @@ func (k *kafkaService) SetParameters(parameters ...interface{}) {
 		switch p := parameter.(type) {
 		case logic.Logic:
 			k.logic = p
-		case kafka.Client:
+		case internal_kafka.Client:
 			k.Client = p
 		}
 	}
@@ -115,21 +119,27 @@ func (k *kafkaService) Configure(items ...interface{}) error {
 	k.Lock()
 	defer k.Unlock()
 
-	var envs map[string]string
 	var c *Configuration
 
 	for _, item := range items {
 		switch v := item.(type) {
-		case config.Envs:
-			envs = v
+		default:
+			c = new(Configuration)
+			if err := internal_config.Get(item, configKey, c); err != nil {
+				return err
+			}
+		case internal_config.Envs:
+			c = new(Configuration)
+			c.Default()
+			c.FromEnv(v)
 		case *Configuration:
 			c = v
+		case Configuration:
+			c = &v
 		}
 	}
 	if c == nil {
-		c = new(Configuration)
-		c.Default()
-		c.FromEnv(envs)
+		return errors.New(internal_config.ErrConfigurationNotFound)
 	}
 	if err := c.Validate(); err != nil {
 		return err

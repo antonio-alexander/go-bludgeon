@@ -1,43 +1,39 @@
 package logic_test
 
 import (
-	"context"
-	"math/rand"
 	"os"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/antonio-alexander/go-bludgeon/changes/data"
 	"github.com/antonio-alexander/go-bludgeon/changes/logic"
+	"github.com/antonio-alexander/go-bludgeon/changes/logic/tests"
 	"github.com/antonio-alexander/go-bludgeon/changes/meta"
 	"github.com/antonio-alexander/go-bludgeon/changes/meta/file"
 	"github.com/antonio-alexander/go-bludgeon/changes/meta/memory"
 	"github.com/antonio-alexander/go-bludgeon/changes/meta/mysql"
-	"github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/common"
 
-	"github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
-	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
-	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
+	logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
+	internal_meta "github.com/antonio-alexander/go-bludgeon/pkg/meta"
+	internal_file "github.com/antonio-alexander/go-bludgeon/pkg/meta/file"
+	internal_mysql "github.com/antonio-alexander/go-bludgeon/pkg/meta/mysql"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	mysqlConfig *internal_mysql.Configuration
-	fileConfig  *internal_file.Configuration
-	logConfig   *logger.Configuration
+	mysqlConfig = new(internal_mysql.Configuration)
+	fileConfig  = new(internal_file.Configuration)
+	logConfig   = new(logger.Configuration)
 )
 
 type logicTest struct {
 	meta interface {
-		meta.Change
-		internal.Initializer
+		common.Initializer
+		common.Configurer
 	}
-	logic.Logic
-	internal.Initializer
+	logic common.Initializer
+	*tests.Fixture
 }
 
 func init() {
@@ -58,11 +54,6 @@ func init() {
 	logConfig.FromEnv(envs)
 	logConfig.Level = logger.Trace
 	logConfig.Prefix = "test_logic"
-	rand.Seed(time.Now().UnixNano())
-}
-
-func generateId() string {
-	return uuid.Must(uuid.NewRandom()).String()
 }
 
 func newLogicTest(metaType internal_meta.Type) *logicTest {
@@ -70,9 +61,9 @@ func newLogicTest(metaType internal_meta.Type) *logicTest {
 		meta.Change
 		meta.Registration
 		meta.RegistrationChange
-		internal.Initializer
-		internal.Parameterizer
-		internal.Configurer
+		common.Initializer
+		common.Parameterizer
+		common.Configurer
 	}
 
 	logger := logger.New()
@@ -85,244 +76,54 @@ func newLogicTest(metaType internal_meta.Type) *logicTest {
 		meta = file.New()
 		meta.Configure()
 		meta.SetParameters(logger)
-		meta.Configure(fileConfig)
 	case internal_meta.TypeMySQL:
 		meta = mysql.New()
 		meta.SetParameters(logger)
-		meta.Configure(mysqlConfig)
 	}
 	logic := logic.New()
 	logic.SetParameters(logger, meta)
 	return &logicTest{
-		meta:        meta,
-		Logic:       logic,
-		Initializer: logic,
+		meta:    meta,
+		logic:   logic,
+		Fixture: tests.NewFixture(logic),
 	}
 }
 
-func (l *logicTest) initialize(t *testing.T) {
-	err := l.Initialize()
-	assert.Nil(t, err)
-}
-
-func (l *logicTest) shutdown(t *testing.T) {
-	l.Shutdown()
-	l.meta.Shutdown()
-}
-
-func (l *logicTest) testChangeRegistration(t *testing.T) {
-	var changes []*data.Change
-	ctx := context.TODO()
-
-	//upsert change (neither registration should see this change)
-	dataId := generateId()
-	dataVersion, dataType := rand.Intn(1000), generateId()
-	dataServiceName, whenChanged := generateId(), time.Now().UnixNano()
-	changedBy, dataAction := "test_change_crud", generateId()
-	changeCreated, err := l.ChangeUpsert(ctx, data.ChangePartial{
-		DataId:          &dataId,
-		DataVersion:     &dataVersion,
-		DataType:        &dataType,
-		DataServiceName: &dataServiceName,
-		DataAction:      &dataAction,
-		WhenChanged:     &whenChanged,
-		ChangedBy:       &changedBy,
-	})
-	assert.Nil(t, err)
-	assert.NotNil(t, changeCreated)
-	defer func(changeId string) {
-		l.ChangesDelete(ctx, changeId)
-	}(changeCreated.Id)
-	changes = append(changes, changeCreated)
-
-	//create registration (1)
-	registrationId1 := generateId()
-	err = l.RegistrationUpsert(ctx, registrationId1)
-	assert.Nil(t, err)
-	defer func() {
-		l.RegistrationDelete(ctx, registrationId1)
-	}()
-
-	//validate that registration (1) doesn't include any changes
-	changesRead, err := l.RegistrationChangesRead(ctx, registrationId1)
-	assert.Nil(t, err)
-	assert.Len(t, changesRead, 0)
-
-	//upsert change (to be seen by registration (1))
-	dataId = generateId()
-	dataVersion, dataType = rand.Intn(1000), generateId()
-	dataServiceName, whenChanged = generateId(), time.Now().UnixNano()
-	dataAction, changedBy = generateId(), "test_change_crud"
-	changeCreated, err = l.ChangeUpsert(ctx, data.ChangePartial{
-		DataId:          &dataId,
-		DataVersion:     &dataVersion,
-		DataType:        &dataType,
-		DataServiceName: &dataServiceName,
-		DataAction:      &dataAction,
-		WhenChanged:     &whenChanged,
-		ChangedBy:       &changedBy,
-	})
-	assert.Nil(t, err)
-	assert.NotNil(t, changeCreated)
-	defer func(changeId string) {
-		l.ChangesDelete(ctx, changeId)
-	}(changeCreated.Id)
-	changes = append(changes, changeCreated)
-
-	//validate that registration (1) sees the second change, but not the first
-	changesRead, err = l.RegistrationChangesRead(ctx, registrationId1)
-	assert.Nil(t, err)
-	assert.Len(t, changesRead, 1)
-	assert.Contains(t, changesRead, changes[1])
-	assert.NotContains(t, changesRead, changes[0])
-
-	//create registration
-	registrationId2 := generateId()
-	err = l.RegistrationUpsert(ctx, registrationId2)
-	assert.Nil(t, err)
-	defer func() {
-		l.RegistrationDelete(ctx, registrationId2)
-	}()
-
-	//upsert change (to be seen by registration (1) and (2))
-	dataId = generateId()
-	dataVersion, dataType = rand.Intn(1000), generateId()
-	dataServiceName, whenChanged = generateId(), time.Now().UnixNano()
-	dataAction, changedBy = generateId(), "test_change_crud"
-	changeCreated, err = l.ChangeUpsert(ctx, data.ChangePartial{
-		DataId:          &dataId,
-		DataVersion:     &dataVersion,
-		DataType:        &dataType,
-		DataServiceName: &dataServiceName,
-		DataAction:      &dataAction,
-		WhenChanged:     &whenChanged,
-		ChangedBy:       &changedBy,
-	})
-	assert.Nil(t, err)
-	assert.NotNil(t, changeCreated)
-	defer func(changeId string) {
-		l.ChangesDelete(ctx, changeId)
-	}(changeCreated.Id)
-	changes = append(changes, changeCreated)
-
-	//validate that registration (2) sees the third change, but not the first or second
-	changesRead, err = l.RegistrationChangesRead(ctx, registrationId2)
-	assert.Nil(t, err)
-	assert.Len(t, changesRead, 1)
-	assert.Contains(t, changesRead, changes[2])
-	assert.NotContains(t, changesRead, changes[0])
-	assert.NotContains(t, changesRead, changes[1])
-
-	//acknowledge the initial change for both services and confirm that there's no change
-	err = l.RegistrationChangeAcknowledge(ctx, registrationId1, changes[0].Id)
-	assert.Nil(t, err)
-	changesRead, err = l.RegistrationChangesRead(ctx, registrationId1)
-	assert.Nil(t, err)
-	assert.Len(t, changesRead, 2)
-	err = l.RegistrationChangeAcknowledge(ctx, registrationId2, changes[0].Id)
-	assert.Nil(t, err)
-	changesRead, err = l.RegistrationChangesRead(ctx, registrationId2)
-	assert.Nil(t, err)
-	assert.Len(t, changesRead, 1)
-
-	//validate that initial change has been removed
-	change, err := l.ChangeRead(ctx, changes[0].Id)
-	assert.NotNil(t, err)
-	assert.Nil(t, change)
-
-	//acknowledge the second change for both registrations and confirm actual changes
-	err = l.RegistrationChangeAcknowledge(ctx, registrationId1, changes[1].Id)
-	assert.Nil(t, err)
-	changesRead, err = l.RegistrationChangesRead(ctx, registrationId1)
-	assert.Nil(t, err)
-	assert.Len(t, changesRead, 1)
-	assert.Contains(t, changesRead, changes[2])
-	err = l.RegistrationChangeAcknowledge(ctx, registrationId2, changes[1].Id)
-	assert.Nil(t, err)
-	changesRead, err = l.RegistrationChangesRead(ctx, registrationId2)
-	assert.Nil(t, err)
-	assert.Len(t, changesRead, 1)
-	assert.Contains(t, changesRead, changes[2])
-
-	//validate that second change has been removed
-	change, err = l.ChangeRead(ctx, changes[1].Id)
-	assert.NotNil(t, err)
-	assert.Nil(t, change)
-
-	//delete the initial registration, then re-create it and ensure that there are no changes
-	err = l.RegistrationDelete(ctx, registrationId1)
-	assert.Nil(t, err)
-	err = l.RegistrationUpsert(ctx, registrationId1)
-	assert.Nil(t, err)
-	changesRead, err = l.RegistrationChangesRead(ctx, registrationId1)
-	assert.Nil(t, err)
-	assert.Len(t, changesRead, 0)
-}
-
-func (l *logicTest) testChangeHandlers(t *testing.T) {
-	var changeId string
-
-	ctx := context.TODO()
-	changeReceived := make(chan struct{})
-
-	//create handler
-	handlerId, err := l.HandlerCreate(ctx, func(ctx context.Context, handlerId string, changes []*data.Change) error {
-		for _, change := range changes {
-			if changeId == change.Id {
-				select {
-				default:
-					close(changeReceived)
-				case <-changeReceived:
-				}
-			}
+func (l *logicTest) Initialize(t *testing.T, metaType internal_meta.Type) {
+	switch metaType {
+	case internal_meta.TypeFile:
+		err := l.meta.Configure(fileConfig)
+		if !assert.Nil(t, err) {
+			assert.FailNow(t, "unable to configure meta file")
 		}
-		return nil
-	})
-	assert.Nil(t, err)
-	assert.NotEmpty(t, handlerId)
-	defer func() {
-		l.HandlerDelete(ctx, handlerId)
-	}()
-
-	//upsert change
-	dataId := generateId()
-	dataVersion, dataType := rand.Intn(1000), generateId()
-	dataServiceName, whenChanged := generateId(), time.Now().UnixNano()
-	dataAction, changedBy := generateId(), "test_change_crud"
-	changeCreated, err := l.ChangeUpsert(ctx, data.ChangePartial{
-		DataId:          &dataId,
-		DataVersion:     &dataVersion,
-		DataType:        &dataType,
-		DataServiceName: &dataServiceName,
-		DataAction:      &dataAction,
-		WhenChanged:     &whenChanged,
-		ChangedBy:       &changedBy,
-	})
-	assert.Nil(t, err)
-	assert.NotNil(t, changeCreated)
-	defer func(changeId string) {
-		l.ChangesDelete(ctx, changeId)
-	}(changeCreated.Id)
-	changeId = changeCreated.Id
-
-	//validate change received
-	select {
-	case <-changeReceived:
-	case <-time.After(10 * time.Second):
-		assert.Fail(t, "unable to confirm change received")
+	case internal_meta.TypeMySQL:
+		err := l.meta.Configure(mysqlConfig)
+		if !assert.Nil(t, err) {
+			assert.FailNow(t, "unable to configure meta mysql")
+		}
 	}
+	err := l.meta.Initialize()
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, "unable to initialize meta")
+	}
+	err = l.logic.Initialize()
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, "unable to initialize logic")
+	}
+}
+
+func (l *logicTest) Shutdown(t *testing.T) {
+	l.logic.Shutdown()
+	l.meta.Shutdown()
 }
 
 func testLogic(t *testing.T, metaType internal_meta.Type) {
 	l := newLogicTest(internal_meta.TypeMemory)
+	l.Initialize(t, metaType)
+	defer l.Shutdown(t)
 
-	//initialize
-	l.initialize(t)
-	defer l.shutdown(t)
-
-	//execute tests
-	t.Run("Change Registration", l.testChangeRegistration)
-	t.Run("Change Handlers", l.testChangeHandlers)
+	t.Run("Change Registration", l.TestChangeRegistration)
+	t.Run("Change Handlers", l.TestChangeHandlers)
 }
 
 func TestLogicMemory(t *testing.T) {

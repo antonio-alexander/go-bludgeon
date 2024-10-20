@@ -14,9 +14,6 @@ check-lint: ## - validate/install golangci-lint installation
 	@which golangci-lint || (go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2)
 
 lint: check-lint ## - lint the source
-	@golangci-lint run
-
-lint-verbose: check-lint ## - lint the source with verbose output
 	@golangci-lint run --verbose
 
 # Reference: https://medium.com/@pedram.esmaeeli/generate-swagger-specification-from-go-source-code-648615f7b9d9
@@ -39,7 +36,7 @@ serve-godoc: check-godoc ## - serve (web) the godocs
 	@cd .. && godoc -http :8080
 
 test: run ## - test the source
-	@go test -v -parallel=1 -cover -count=1 ./... -coverprofile ./tmp/go-bludgeon-changes.out | tee ./tmp/go-bludgeon-changes.log
+	@go test -v -p 1 -cover -count=1 ./... -coverprofile ./tmp/go-bludgeon-changes.out | tee ./tmp/go-bludgeon-changes.log
 
 build: ## - build the source (latest)
 	@docker compose --profile application build --build-arg GIT_COMMIT=`git rev-parse HEAD` --build-arg GIT_BRANCH=`git rev-parse --abbrev-ref HEAD`

@@ -1,4 +1,4 @@
-package restclient
+package rest
 
 import (
 	"errors"
@@ -6,8 +6,8 @@ import (
 	"time"
 
 	internal_cache "github.com/antonio-alexander/go-bludgeon/changes/internal/cache"
-	internal_rest_client "github.com/antonio-alexander/go-bludgeon/internal/rest/client"
-	internal_websocket_client "github.com/antonio-alexander/go-bludgeon/internal/websocket/client"
+	internal_rest "github.com/antonio-alexander/go-bludgeon/pkg/rest/client"
+	internal_websocket "github.com/antonio-alexander/go-bludgeon/pkg/websocket/client"
 )
 
 const (
@@ -21,45 +21,30 @@ const (
 const (
 	DefaultAddress         string        = "localhost"
 	DefaultPort            string        = "8014"
-	DefaultAutoAcknowledge bool          = true
 	DefaultUpsertQueueRate time.Duration = time.Second
+	DefaultAutoAcknowledge bool          = true
 	DefaultDisableQueue    bool          = false
 	DefaultDisableCache    bool          = false
-	DefaultQueueSize       int           = 100
 )
 
 type Configuration struct {
-	Rest            *internal_rest_client.Configuration
-	Websocket       *internal_websocket_client.Configuration
-	Cache           *internal_cache.Configuration
+	Rest            internal_rest.Configuration
+	Websocket       internal_websocket.Configuration
+	Cache           internal_cache.Configuration
 	UpsertQueueRate time.Duration
-	QueueSize       int
 	DisableQueue    bool
 	DisableCache    bool
-}
-
-func NewConfiguration() *Configuration {
-	return &Configuration{
-		Rest:            new(internal_rest_client.Configuration),
-		Websocket:       new(internal_websocket_client.Configuration),
-		Cache:           internal_cache.NewConfiguration(),
-		UpsertQueueRate: DefaultUpsertQueueRate,
-		QueueSize:       DefaultQueueSize,
-		DisableQueue:    DefaultDisableQueue,
-		DisableCache:    DefaultDisableCache,
-	}
 }
 
 func (c *Configuration) Default() {
 	c.UpsertQueueRate = DefaultUpsertQueueRate
 	c.Rest.Address = DefaultAddress
 	c.Rest.Port = DefaultPort
-	c.Rest.Timeout = internal_rest_client.DefaultTimeout
-	c.Websocket.ReadTimeout = internal_websocket_client.DefaultReadTimeout
-	c.Websocket.WriteTimeout = internal_websocket_client.DefaultWriteTimeout
+	c.Rest.Timeout = internal_rest.DefaultTimeout
+	c.Websocket.ReadTimeout = internal_websocket.DefaultReadTimeout
+	c.Websocket.WriteTimeout = internal_websocket.DefaultWriteTimeout
 	c.DisableCache = DefaultDisableCache
 	c.DisableQueue = DefaultDisableQueue
-	c.QueueSize = DefaultQueueSize
 }
 
 func (c *Configuration) FromEnv(envs map[string]string) {
@@ -79,10 +64,10 @@ func (c *Configuration) FromEnv(envs map[string]string) {
 
 func (c *Configuration) Validate() error {
 	if c.Rest.Address == "" {
-		return errors.New(internal_rest_client.ErrAddressEmpty)
+		return errors.New(internal_rest.ErrAddressEmpty)
 	}
 	if c.Rest.Port == "" {
-		return errors.New(internal_rest_client.ErrPortEmpty)
+		return errors.New(internal_rest.ErrPortEmpty)
 	}
 	return nil
 }

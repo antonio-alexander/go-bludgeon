@@ -1,8 +1,11 @@
-package service
+package rest
 
-const logAlias string = "[rest_service] "
+const (
+	logAlias  string = "[rest_service] "
+	configKey string = "changes_service_rest"
+)
 
-//error constants specific to the rest service
+// error constants specific to the rest service
 const (
 	ErrAddressEmpty string = "address is empty"
 	ErrPortEmpty    string = "port is empty"
@@ -10,7 +13,7 @@ const (
 	ErrTimeoutBadf  string = "timeout is lte to 0: %v"
 )
 
-//endpoint constants
+// endpoint constants
 const (
 	ErrStarted    string = "already started"
 	ErrNotStarted string = "not started"

@@ -4,7 +4,12 @@ import (
 	data "github.com/antonio-alexander/go-bludgeon/changes/data"
 
 	goqueue "github.com/antonio-alexander/go-queue"
+	finite "github.com/antonio-alexander/go-queue/finite"
 )
+
+func New(queueSize int) Queue {
+	return finite.New(queueSize)
+}
 
 func ChangePartialConvertSingle(item interface{}) data.ChangePartial {
 	switch v := item.(type) {

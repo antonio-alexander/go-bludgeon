@@ -1,16 +1,14 @@
 package mysql
 
-import (
-	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
-)
+import internal_mysql "github.com/antonio-alexander/go-bludgeon/pkg/meta/mysql"
 
 const (
-	// logAlias                 string = "[meta_mysql] "
 	tableChanges             string = "changes"
 	tableRegistrations       string = "registrations"
 	tableRegistrationChanges string = "registration_changes"
 	tableRegistrationsV1     string = "registrations_v1"
 	tableChangesV1           string = "changes_v1"
+	configKey                string = "changes_meta_mysql"
 )
 
 type Owner interface {

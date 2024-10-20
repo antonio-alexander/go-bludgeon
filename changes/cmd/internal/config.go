@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
+	"github.com/antonio-alexander/go-bludgeon/pkg/meta"
 )
 
 const (

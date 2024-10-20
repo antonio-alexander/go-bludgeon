@@ -5,16 +5,16 @@ import (
 	"strings"
 	"testing"
 
-	meta "github.com/antonio-alexander/go-bludgeon/changes/meta/mysql"
+	mysql "github.com/antonio-alexander/go-bludgeon/changes/meta/mysql"
 	tests "github.com/antonio-alexander/go-bludgeon/changes/meta/tests"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	common "github.com/antonio-alexander/go-bludgeon/common"
 
-	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
+	logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var config = new(internal_mysql.Configuration)
+var config = new(mysql.Configuration)
 
 func init() {
 	envs := make(map[string]string)
@@ -28,25 +28,50 @@ func init() {
 	config.ParseTime = false
 }
 
-func TestMetaMysql(t *testing.T) {
-	//create parameters
+type fileMetaTest struct {
+	metaMysql interface {
+		common.Initializer
+		common.Configurer
+	}
+	*tests.Fixture
+}
+
+func newMysqlMetaTest() *fileMetaTest {
 	logger := logger.New()
-	m := meta.New()
+	metaMysql := mysql.New()
+	metaMysql.SetUtilities(logger)
+	return &fileMetaTest{
+		metaMysql: metaMysql,
+		Fixture:   tests.NewFixture(metaMysql),
+	}
+}
 
-	//set parameters
-	m.SetParameters(logger)
+func (m *fileMetaTest) Initialize(t *testing.T) {
+	err := m.metaMysql.Configure(config)
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, "unable to configure meta file")
+	}
+	err = m.metaMysql.Initialize()
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, "unable to initialize persistence")
+	}
+}
 
-	//configure
-	err := m.Configure(nil, nil, config)
-	assert.Nil(t, err)
+func (m *fileMetaTest) Shutdown(t *testing.T) {
+	m.metaMysql.Shutdown()
+}
 
-	//initialize
-	err = m.Initialize()
-	assert.Nil(t, err)
+func testMetaMysql(t *testing.T) {
+	m := newMysqlMetaTest()
+	m.Initialize(t)
+	defer m.Shutdown(t)
 
-	//execute tests
-	t.Run("Change CRUD", tests.TestChangeCRUD(m))
-	t.Run("Changes Search", tests.TestChangeSearch(m))
-	t.Run("Registration CRUD", tests.TestRegistrationCRUD(m))
-	t.Run("Change Registrations", tests.TestRegistrationChanges(m))
+	t.Run("Change CRUD", m.TestChangeCRUD)
+	t.Run("Changes Read", m.TestChangeSearch)
+	t.Run("Registration CRUD", m.TestRegistrationCRUD)
+	t.Run("Change Registrations", m.TestRegistrationChanges)
+}
+
+func TestMetaMysql(t *testing.T) {
+	testMetaMysql(t)
 }
