@@ -1,4 +1,4 @@
-package restclient
+package rest
 
 import "github.com/antonio-alexander/go-bludgeon/changes/data"
 

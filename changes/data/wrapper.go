@@ -18,6 +18,9 @@ const (
 	MessageTypeRequestAcknowledge  MessageType = "request_acknowledge"
 	MessageTypeResponseRegister    MessageType = "response_register"
 	MessageTypeResponseAcknowledge MessageType = "response_acknowledge"
+	MessageTypeRegistration        MessageType = "registration"
+	MessageTypeRegistrationPartial MessageType = "registration_partial"
+	MessageTypeRegistrationDigest  MessageType = "registration_digest"
 )
 
 type Empty struct{}

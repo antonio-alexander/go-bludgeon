@@ -1,4 +1,4 @@
-package restclient
+package rest
 
 import (
 	"context"
@@ -9,16 +9,16 @@ import (
 	"syscall"
 	"time"
 
-	client "github.com/antonio-alexander/go-bludgeon/changes/client"
-	data "github.com/antonio-alexander/go-bludgeon/changes/data"
+	"github.com/antonio-alexander/go-bludgeon/changes/client"
+	"github.com/antonio-alexander/go-bludgeon/changes/data"
 
 	internal_cache "github.com/antonio-alexander/go-bludgeon/changes/internal/cache"
-	internal_queue "github.com/antonio-alexander/go-bludgeon/changes/internal/queue"
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
-	config "github.com/antonio-alexander/go-bludgeon/internal/config"
-	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	restclient "github.com/antonio-alexander/go-bludgeon/internal/rest/client"
+	internal_changes_queue "github.com/antonio-alexander/go-bludgeon/changes/internal/queue"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	internal_config "github.com/antonio-alexander/go-bludgeon/pkg/config"
+	internal_errors "github.com/antonio-alexander/go-bludgeon/pkg/errors"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
+	internal_rest "github.com/antonio-alexander/go-bludgeon/pkg/rest/client"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -27,25 +27,25 @@ import (
 type restClient struct {
 	sync.RWMutex
 	sync.WaitGroup
-	logger.Logger
-	ctx      context.Context
-	cancel   context.CancelFunc
-	handlers map[string]*handler
-	queue    internal_queue.Queue
-	cache    interface {
-		internal_cache.Cache
-		internal.Configurer
-		internal.Initializer
-		internal.Parameterizer
+	internal_logger.Logger
+	internal_rest.Client
+	internal_queue.Queue
+	internal_cache.Cache
+	cache interface {
+		common.Parameterizer
+		common.Configurer
+		common.Initializer
 	}
+	client interface {
+		common.Parameterizer
+		common.Configurer
+	}
+	ctx         context.Context
+	cancel      context.CancelFunc
+	handlers    map[string]*handler
 	initialized bool
 	configured  bool
 	config      *Configuration
-	client      interface {
-		restclient.Client
-		internal.Configurer
-		internal.Parameterizer
-	}
 }
 
 // New can be used to create a concrete instance of the rest client
@@ -53,19 +53,17 @@ type restClient struct {
 func New() interface {
 	client.Client
 	client.Handler
-	internal.Initializer
-	internal.Configurer
-	internal.Parameterizer
+	common.Initializer
+	common.Configurer
+	common.Parameterizer
 } {
-	cache := internal_cache.New()
-
-	queue := internal_queue.New(QueueSize)
+	client := internal_rest.New()
 	return &restClient{
-		client:   restclient.New(),
+		client:   client,
+		Client:   client,
+		Queue:    internal_queue.New(QueueSize),
 		handlers: make(map[string]*handler),
-		cache:    cache,
-		queue:    queue,
-		Logger:   logger.NewNullLogger(),
+		Logger:   internal_logger.NewNullLogger(),
 	}
 }
 
@@ -73,25 +71,25 @@ func (r *restClient) cacheRead(changeId string) *data.Change {
 	if r.config.DisableCache {
 		return nil
 	}
-	return r.cache.Read(changeId)
+	return r.Read(changeId)
 }
 
 func (r *restClient) cacheWrite(change *data.Change) {
 	if r.config.DisableCache {
 		return
 	}
-	r.cache.Write(change)
+	r.Write(change)
 }
 
 func (r *restClient) cacheDelete(changeId string) {
 	if r.config.DisableCache {
 		return
 	}
-	r.cache.Delete(changeId)
+	r.Delete(changeId)
 }
 
 func (r *restClient) queueEnqueue(item interface{}) bool {
-	return r.queue.Enqueue(item)
+	return r.Enqueue(item)
 }
 
 func (r *restClient) launchUpsertQueue() {
@@ -108,14 +106,14 @@ func (r *restClient) launchUpsertQueue() {
 		queueReadFx := func() {
 			var changePartialsToEnqueue []data.ChangePartial
 
-			for _, changePartial := range internal_queue.ChangePartialFlush(r.queue) {
+			for _, changePartial := range internal_changes_queue.ChangePartialFlush(r) {
 				if _, err := r.changeUpsert(r.ctx, changePartial); err != nil {
 					r.Error("error while attempting to upsert: %s", err)
 					changePartialsToEnqueue = append(changePartialsToEnqueue,
 						changePartial)
 				}
 			}
-			if _, overflow := internal_queue.ChangePartialEnqueueMultiple(r.queue, changePartialsToEnqueue); overflow {
+			if _, overflow := internal_changes_queue.ChangePartialEnqueueMultiple(r, changePartialsToEnqueue); overflow {
 				r.Info("overflow encountered while enqueueing multiple changes")
 			}
 		}
@@ -133,7 +131,7 @@ func (r *restClient) launchUpsertQueue() {
 }
 
 func (r *restClient) doRequest(ctx context.Context, uri, method string, data []byte) ([]byte, error) {
-	bytes, statusCode, err := r.client.DoRequest(ctx, uri, method, data)
+	bytes, statusCode, err := r.DoRequest(ctx, uri, method, data)
 	if err != nil {
 		return nil, err
 	}
@@ -168,80 +166,91 @@ func (r *restClient) changeUpsert(ctx context.Context, changePartial data.Change
 }
 
 func (r *restClient) SetUtilities(parameters ...interface{}) {
-	r.client.SetUtilities(parameters)
+	r.Lock()
+	defer r.Unlock()
+
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
-		case logger.Logger:
+		case internal_logger.Logger:
 			r.Logger = p
 		}
 	}
+	r.client.SetUtilities(parameters...)
+	r.cache.SetUtilities(parameters...)
 }
 
 func (r *restClient) SetParameters(parameters ...interface{}) {
+	r.Lock()
+	defer r.Unlock()
+
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
 		case internal_queue.Queue:
-			if r.queue != nil {
-				r.queue.Close()
+			if r.Queue != nil {
+				r.Queue.Close()
 			}
-			r.queue = p
+			r.Queue = p
 		case interface {
 			internal_cache.Cache
-			internal.Configurer
-			internal.Initializer
-			internal.Parameterizer
+			common.Configurer
+			common.Initializer
+			common.Parameterizer
 		}:
 			r.cache = p
 		case interface {
-			restclient.Client
-			internal.Configurer
-			internal.Parameterizer
+			internal_rest.Client
+			common.Configurer
+			common.Parameterizer
 		}:
+			r.Client = p
 			r.client = p
 		}
 	}
 	switch {
-	case r.queue == nil:
-		panic("queue is nil")
-	case r.cache == nil:
-		panic("cache is nil")
-	case r.client == nil:
-		panic("client is nil")
+	case r.Queue == nil:
+		panic("queue is not set")
+	case r.cache == nil || r.Cache == nil:
+		panic("cache is not set")
+	case r.Client == nil || r.client == nil:
+		panic("client is not set")
 	}
 	r.client.SetParameters(parameters...)
-	r.cache.SetParameters(parameters...)
+	r.cache.SetParameters(parameters)
 }
 
 func (r *restClient) Configure(items ...interface{}) error {
 	r.Lock()
 	defer r.Unlock()
 
-	var envs map[string]string
 	var c *Configuration
 
 	for _, item := range items {
 		switch v := item.(type) {
-		case config.Envs:
-			envs = v
+		default:
+			c = new(Configuration)
+			if err := internal_config.Get(item, configKey, c); err != nil {
+				return err
+			}
+		case internal_config.Envs:
+			c = new(Configuration)
+			c.FromEnv(v)
 		case *Configuration:
 			c = v
+		case Configuration:
+			c = &v
 		}
 	}
 	if c == nil {
-		c = NewConfiguration()
-		c.Default()
-		c.FromEnv(envs)
+		return errors.New("no configuration found")
 	}
 	if err := c.Validate(); err != nil {
 		return err
 	}
-	if err := r.client.Configure(c.Rest); err != nil {
+	if err := r.cache.Configure(c.Cache); err != nil {
 		return err
 	}
-	if !c.DisableCache {
-		if err := r.cache.Configure(c.Cache); err != nil {
-			return err
-		}
+	if err := r.client.Configure(c.Rest); err != nil {
+		return err
 	}
 	r.config = c
 	r.configured = true
@@ -275,19 +284,16 @@ func (r *restClient) Shutdown() {
 	r.cancel()
 	r.Wait()
 	if !r.config.DisableQueue {
-		for _, changePartial := range internal_queue.ChangePartialFlush(r.queue) {
+		for _, changePartial := range internal_changes_queue.ChangePartialFlush(r) {
 			if _, err := r.changeUpsert(context.Background(), changePartial); err != nil {
 				r.queueEnqueue(changePartial)
 			}
 		}
 	}
-	r.initialized = false
+	r.initialized, r.configured = false, false
 }
 
 func (r *restClient) ChangeUpsert(ctx context.Context, changePartial data.ChangePartial) (*data.Change, error) {
-	r.Lock()
-	defer r.Unlock()
-
 	if !r.initialized {
 		return nil, errors.New("not initialized")
 	}

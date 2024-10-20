@@ -10,10 +10,11 @@ import (
 
 	"github.com/antonio-alexander/go-bludgeon/changes/data"
 	"github.com/antonio-alexander/go-bludgeon/changes/meta"
-	"github.com/antonio-alexander/go-bludgeon/internal"
-	"github.com/antonio-alexander/go-bludgeon/internal/logger"
 
-	internal_mysql "github.com/antonio-alexander/go-bludgeon/internal/meta/mysql"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	internal_config "github.com/antonio-alexander/go-bludgeon/pkg/config"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
+	internal_mysql "github.com/antonio-alexander/go-bludgeon/pkg/meta/mysql"
 
 	driver_mysql "github.com/go-sql-driver/mysql" //import for driver support
 	errors "github.com/pkg/errors"
@@ -22,7 +23,7 @@ import (
 type mysql struct {
 	sync.RWMutex
 	sync.WaitGroup
-	logger.Logger
+	internal_logger.Logger
 	*internal_mysql.DB
 }
 
@@ -30,25 +31,54 @@ func New() interface {
 	meta.Change
 	meta.Registration
 	meta.RegistrationChange
-	internal.Initializer
-	internal.Configurer
-	internal.Parameterizer
+	common.Initializer
+	common.Configurer
+	common.Parameterizer
 } {
 	return &mysql{DB: internal_mysql.New()}
 }
 
 func (m *mysql) SetUtilities(parameters ...interface{}) {
-	m.DB.SetUtilities(parameters...)
 	for _, p := range parameters {
 		switch p := p.(type) {
-		case logger.Logger:
+		case internal_logger.Logger:
 			m.Logger = p
 		}
 	}
+	m.DB.SetUtilities(parameters...)
 }
 
 func (m *mysql) SetParameters(parameters ...interface{}) {
 	m.DB.SetParameters(parameters...)
+}
+
+func (m *mysql) Configure(items ...interface{}) error {
+	var c *Configuration
+
+	for _, item := range items {
+		switch v := item.(type) {
+		case internal_config.Envs:
+			c = new(Configuration)
+			c.Default()
+			c.FromEnv(v)
+		case *Configuration:
+			c = v
+		case Configuration:
+			c = &v
+		default:
+			c = new(Configuration)
+			if err := internal_config.Get(item, configKey, c); err != nil {
+				return err
+			}
+		}
+	}
+	if c == nil {
+		return errors.New(internal_config.ErrConfigurationNotFound)
+	}
+	if err := c.Validate(); err != nil {
+		return err
+	}
+	return m.DB.Configure(c.Configuration)
 }
 
 func (m *mysql) ChangeCreate(ctx context.Context, changePartial data.ChangePartial) (*data.Change, error) {
@@ -271,6 +301,53 @@ func (m *mysql) RegistrationUpsert(ctx context.Context, registrationId string) e
 		}
 	}
 	return rowsAffected(result, meta.ErrChangeNotWritten)
+}
+
+func (m *mysql) RegistrationsRead(ctx context.Context, search data.RegistrationSearch) ([]*data.Registration, error) {
+	var registrations []*data.Registration
+	var searchParameters []string
+	var args []interface{}
+	var query string
+
+	if registrationIds := search.RegistrationIds; len(registrationIds) > 0 {
+		var parameters []string
+
+		for _, registrationId := range registrationIds {
+			args = append(args, registrationId)
+			parameters = append(parameters, "?")
+		}
+		searchParameters = append(searchParameters, fmt.Sprintf("registration_id IN(%s)", strings.Join(parameters, ",")))
+	}
+	if len(searchParameters) > 0 {
+		query = fmt.Sprintf(`SELECT registration_id FROM %s WHERE %s`,
+			tableRegistrationsV1, strings.Join(searchParameters, " AND "))
+	} else {
+		query = fmt.Sprintf(`SELECT registration_id FROM %s`, tableRegistrationsV1)
+	}
+	rows, err := m.QueryContext(ctx, query, args...)
+	if err != nil {
+		switch {
+		default:
+			return nil, err
+		case err == sql.ErrNoRows:
+			return nil, meta.ErrRegistrationNotFound
+		case errors.Is(err, &driver_mysql.MySQLError{}):
+			err := err.(*driver_mysql.MySQLError)
+			switch err.Number {
+			default:
+				return nil, err
+			}
+		}
+	}
+	defer rows.Close()
+	for rows.Next() {
+		registration := &data.Registration{}
+		if err := rows.Scan(&registration.Id); err != nil {
+			return nil, err
+		}
+		registrations = append(registrations, registration)
+	}
+	return registrations, nil
 }
 
 func (m *mysql) RegistrationDelete(ctx context.Context, registrationId string) error {

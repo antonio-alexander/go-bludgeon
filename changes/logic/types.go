@@ -4,6 +4,7 @@ import (
 	"context"
 
 	data "github.com/antonio-alexander/go-bludgeon/changes/data"
+	goqueue "github.com/antonio-alexander/go-queue"
 
 	errors "github.com/pkg/errors"
 )
@@ -24,6 +25,16 @@ var (
 	QueueSize                           = DefaultQueueSize
 )
 
+type handler struct {
+	stopper chan struct{}
+	queue   interface {
+		goqueue.Enqueuer
+		goqueue.Dequeuer
+		goqueue.Event
+		goqueue.Owner
+	}
+}
+
 type HandlerFx func(ctx context.Context, handlerId string, changes []*data.Change) error
 
 type Logic interface {
@@ -38,6 +49,7 @@ type Logic interface {
 	RegistrationChangesRead(ctx context.Context, registrationId string) ([]*data.Change, error)
 	RegistrationChangeAcknowledge(ctx context.Context, registrationId string, changeIds ...string) error
 	RegistrationDelete(ctx context.Context, registrationId string) error
+	RegistrationsRead(xt context.Context, search data.RegistrationSearch) ([]*data.Registration, error)
 
 	//handlers
 	HandlerCreate(ctx context.Context, handleFx HandlerFx) (handlerId string, err error)

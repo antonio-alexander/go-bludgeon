@@ -10,13 +10,14 @@ const (
 )
 
 const (
-	ParameterChangeIds     string = "change_ids"
-	ParameterDataIds       string = "data_ids"
-	ParameterTypes         string = "types"
-	ParameterActions       string = "actions"
-	ParameterServiceNames  string = "service_names"
-	ParameterLatestVersion string = "latest_version"
-	ParameterSince         string = "since"
+	ParameterChangeIds       string = "change_ids"
+	ParameterDataIds         string = "data_ids"
+	ParameterTypes           string = "types"
+	ParameterActions         string = "actions"
+	ParameterServiceNames    string = "service_names"
+	ParameterLatestVersion   string = "latest_version"
+	ParameterSince           string = "since"
+	ParameterRegistrationIds string = "registration_ids"
 )
 
 const (
@@ -26,6 +27,7 @@ const (
 	MethodChangeRegister                = http.MethodPut
 	MethodRegistrationChangeAcknowledge = http.MethodPut
 	MethodRegistrationUpsert            = http.MethodPatch
+	MethodRegistrationRead              = http.MethodGet
 	MethodRegistrationDelete            = http.MethodDelete
 )
 
@@ -35,7 +37,8 @@ const (
 	RouteChangesSearch                            string = RouteChanges + "/search"
 	RouteChangesParam                             string = RouteChanges + "/{" + PathChangeId + "}"
 	RouteChangesParamf                            string = RouteChanges + "/%s"
-	RouteChangesRegistration                      string = RouteChanges + "/registration"
+	RouteChangesRegistration                      string = RouteChanges + "/registrations"
+	RouteChangesRegistrationSearch                string = RouteChanges + "/registrations/search"
 	RouteChangesRegistrationParam                 string = RouteChangesRegistration + "/{" + PathRegistrationId + "}"
 	RouteChangesRegistrationParamf                string = RouteChangesRegistration + "/%s"
 	RouteChangesRegistrationParamChanges          string = RouteChangesRegistrationParam + "/changes"

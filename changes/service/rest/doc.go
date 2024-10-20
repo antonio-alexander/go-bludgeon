@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-	Package rest provides a concret implementation of the employees service using
-	REST.
+Package rest provides a concret implementation of the employees service using
+REST.
 */
-package service
+package rest

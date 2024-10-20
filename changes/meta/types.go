@@ -6,7 +6,7 @@ import (
 
 	data "github.com/antonio-alexander/go-bludgeon/changes/data"
 
-	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
+	internal_errors "github.com/antonio-alexander/go-bludgeon/pkg/errors"
 )
 
 // these constants are used to generate change specific errors
@@ -63,6 +63,7 @@ type Change interface {
 type Registration interface {
 	RegistrationUpsert(ctx context.Context, registrationId string) error
 	RegistrationDelete(ctx context.Context, registrationId string) error
+	RegistrationsRead(ctx context.Context, search data.RegistrationSearch) ([]*data.Registration, error)
 }
 
 type RegistrationChange interface {

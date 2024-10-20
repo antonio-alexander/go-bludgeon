@@ -1,7 +1,7 @@
 package swagger
 
 import (
-	"github.com/antonio-alexander/go-bludgeon/internal/errors"
+	"github.com/antonio-alexander/go-bludgeon/pkg/errors"
 )
 
 // swagger:route DELETE /changes/registrations/{registration_id} registrations delete_registrations

@@ -1,4 +1,4 @@
-package kafkaclient
+package kafka
 
 import (
 	"encoding/json"
@@ -7,12 +7,11 @@ import (
 
 	"github.com/antonio-alexander/go-bludgeon/changes/client"
 	"github.com/antonio-alexander/go-bludgeon/changes/data"
-	"github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/common"
 
-	"github.com/antonio-alexander/go-bludgeon/internal/config"
-	internal_kafka "github.com/antonio-alexander/go-bludgeon/internal/kafka"
-	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	internal_config "github.com/antonio-alexander/go-bludgeon/pkg/config"
+	internal_kafka "github.com/antonio-alexander/go-bludgeon/pkg/kafka"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
 
 	"github.com/google/uuid"
 )
@@ -21,29 +20,25 @@ type kafkaClient struct {
 	sync.RWMutex
 	sync.WaitGroup
 	internal_logger.Logger
+	internal_kafka.Client
 	handlers    map[string]client.HandlerFx
+	config      *Configuration
 	subscribeId string
 	initialized bool
 	configured  bool
-	config      *Configuration
-	kafkaClient interface {
-		internal.Configurer
-		internal.Initializer
-		internal.Parameterizer
-		internal_kafka.Client
-	}
 }
 
 func New() interface {
 	client.Handler
-	internal.Initializer
-	internal.Parameterizer
-	internal.Configurer
+	common.Initializer
+	common.Parameterizer
+	common.Configurer
 } {
+	kafka := internal_kafka.New()
 	return &kafkaClient{
-		handlers:    make(map[string]client.HandlerFx),
-		kafkaClient: internal_kafka.New(),
-		Logger:      logger.NewNullLogger(),
+		Client:   kafka,
+		handlers: make(map[string]client.HandlerFx),
+		Logger:   internal_logger.NewNullLogger(),
 	}
 }
 
@@ -90,26 +85,21 @@ func (k *kafkaClient) subscribeFx(topic string, bytes []byte) {
 }
 
 func (k *kafkaClient) SetParameters(parameters ...interface{}) {
-	k.kafkaClient.SetParameters(parameters...)
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
 		case interface {
-			internal.Configurer
-			internal.Initializer
-			internal.Parameterizer
 			internal_kafka.Client
 		}:
-			k.kafkaClient = p
+			k.Client = p
 		}
 	}
 	switch {
-	case k.kafkaClient == nil:
+	case k.Client == nil:
 		panic("kafka client not set")
 	}
 }
 
 func (k *kafkaClient) SetUtilities(parameters ...interface{}) {
-	k.kafkaClient.SetUtilities(parameters...)
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
 		case internal_logger.Logger:
@@ -122,24 +112,27 @@ func (k *kafkaClient) Configure(items ...interface{}) error {
 	k.Lock()
 	defer k.Unlock()
 
-	var envs map[string]string
 	var c *Configuration
 
-	if err := k.kafkaClient.Configure(items...); err != nil {
-		return err
-	}
 	for _, item := range items {
 		switch v := item.(type) {
-		case config.Envs:
-			envs = v
+		default:
+			c = new(Configuration)
+			if err := internal_config.Get(item, configKey, c); err != nil {
+				return err
+			}
+		case internal_config.Envs:
+			c = new(Configuration)
+			c.Default()
+			c.FromEnv(v)
 		case *Configuration:
 			c = v
+		case Configuration:
+			c = &v
 		}
 	}
 	if c == nil {
-		c = new(Configuration)
-		c.Default()
-		c.FromEnv(envs)
+		return errors.New(internal_config.ErrConfigurationNotFound)
 	}
 	if err := c.Validate(); err != nil {
 		return err
@@ -153,10 +146,7 @@ func (k *kafkaClient) Initialize() error {
 	k.Lock()
 	defer k.Unlock()
 
-	if err := k.kafkaClient.Initialize(); err != nil {
-		return err
-	}
-	subscribeId, err := k.kafkaClient.Subscribe(k.config.Topic, k.subscribeFx)
+	subscribeId, err := k.Subscribe(k.config.Topic, k.subscribeFx)
 	if err != nil {
 		return err
 	}
@@ -171,7 +161,7 @@ func (k *kafkaClient) Shutdown() {
 	if !k.initialized {
 		return
 	}
-	k.kafkaClient.Unsubscribe(k.subscribeId)
+	k.Unsubscribe(k.subscribeId)
 	k.initialized, k.subscribeId = false, ""
 	k.Info(logAlias + "shutdown")
 }

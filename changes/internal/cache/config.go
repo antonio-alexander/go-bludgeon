@@ -1,36 +1,37 @@
 package cache
 
 import (
+	"strconv"
 	"time"
 
-	stash "github.com/antonio-alexander/go-stash"
-	stashmemory "github.com/antonio-alexander/go-stash/memory"
-)
+	internal_cache "github.com/antonio-alexander/go-bludgeon/pkg/cache"
 
-const (
-	DefaultMaxSize        int                  = 50 * 1024 * 1024 //50MB
-	DefaultTimeToLive     time.Duration        = time.Hour
-	DefaultDebug          bool                 = true
-	DefaultEvictionPolicy stash.EvictionPolicy = stash.LeastFrequentlyUsed
+	"github.com/antonio-alexander/go-stash"
 )
 
 type Configuration struct {
-	*stashmemory.Configuration
-}
-
-func NewConfiguration() *Configuration {
-	return &Configuration{
-		Configuration: new(stashmemory.Configuration),
-	}
+	internal_cache.Configuration
 }
 
 func (c *Configuration) Default() {
-	c.EvictionPolicy = DefaultEvictionPolicy
-	c.TimeToLive = DefaultTimeToLive
-	c.MaxSize = DefaultMaxSize
-	c.Debug = DefaultDebug
+	c.EvictionPolicy = internal_cache.DefaultEvictionPolicy
+	c.TimeToLive = internal_cache.DefaultTimeToLive
+	c.MaxSize = internal_cache.DefaultMaxSize
+	c.Debug = internal_cache.DefaultDebug
 }
 
 func (c *Configuration) FromEnvs(envs map[string]string) {
-	//
+	if s := envs["BLUDGEON_CACHE_MAX_SIZE"]; s != "" {
+		c.MaxSize, _ = strconv.Atoi(s)
+	}
+	if s := envs["BLUDGEON_CACHE_TIME_TO_LIVE"]; s != "" {
+		i, _ := strconv.Atoi(s)
+		c.TimeToLive = time.Duration(time.Duration(i) * time.Second)
+	}
+	if s := envs["BLUDGEON_CACHE_DEBUG"]; s != "" {
+		c.Debug, _ = strconv.ParseBool(s)
+	}
+	if s := envs["BLUDGEON_CACHE_EVICTION_POLICY"]; s != "" {
+		c.EvictionPolicy = stash.EvictionPolicy(s)
+	}
 }

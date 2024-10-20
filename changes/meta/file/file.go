@@ -2,27 +2,28 @@ package file
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sync"
 
-	data "github.com/antonio-alexander/go-bludgeon/changes/data"
-	meta "github.com/antonio-alexander/go-bludgeon/changes/meta"
-	memory "github.com/antonio-alexander/go-bludgeon/changes/meta/memory"
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/changes/data"
+	"github.com/antonio-alexander/go-bludgeon/changes/meta"
+	"github.com/antonio-alexander/go-bludgeon/changes/meta/memory"
 
-	config "github.com/antonio-alexander/go-bludgeon/internal/config"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	internal_config "github.com/antonio-alexander/go-bludgeon/pkg/config"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
+	internal_file "github.com/antonio-alexander/go-bludgeon/pkg/meta/file"
 )
 
 type file struct {
 	sync.RWMutex
-	logger.Logger
+	internal_logger.Logger
+	internal_file.File
 	file interface {
-		internal.Configurer
-		internal_file.File
-		internal.Initializer
-		internal.Parameterizer
+		common.Configurer
+		common.Initializer
+		common.Parameterizer
 	}
 	meta.Serializer
 	meta.Change
@@ -34,13 +35,15 @@ func New() interface {
 	meta.Change
 	meta.Registration
 	meta.RegistrationChange
-	internal.Configurer
-	internal.Initializer
-	internal.Parameterizer
+	common.Configurer
+	common.Initializer
+	common.Parameterizer
 } {
 	memory := memory.New()
+	internalFile := internal_file.New()
 	return &file{
-		file:               internal_file.New(),
+		file:               internalFile,
+		File:               internalFile,
 		Serializer:         memory,
 		Change:             memory,
 		Registration:       memory,
@@ -53,21 +56,26 @@ func (m *file) write() error {
 	if err != nil {
 		return err
 	}
-	return m.file.Write(serializedData)
+	return m.Write(serializedData)
 }
 
 func (m *file) SetUtilities(parameters ...interface{}) {
-	m.file.SetUtilities(parameters...)
+	m.Lock()
+	defer m.Unlock()
+
 	for _, p := range parameters {
 		switch p := p.(type) {
-		case logger.Logger:
+		case internal_logger.Logger:
 			m.Logger = p
 		}
 	}
+	m.file.SetUtilities(parameters...)
 }
 
 func (m *file) SetParameters(parameters ...interface{}) {
-	m.file.SetParameters(parameters...)
+	m.Lock()
+	defer m.Unlock()
+
 	for _, p := range parameters {
 		switch p := p.(type) {
 		case interface {
@@ -90,29 +98,49 @@ func (m *file) SetParameters(parameters ...interface{}) {
 			m.RegistrationChange = p
 		}
 	}
+	switch {
+	case m.Serializer == nil:
+		panic("serializer not set")
+	case m.Change == nil:
+		panic("change not set")
+	case m.Registration == nil:
+		panic("registration not set")
+	case m.RegistrationChange == nil:
+		panic("registration change not set")
+	}
+	m.file.SetParameters(parameters...)
 }
 
 func (m *file) Configure(items ...interface{}) error {
 	m.Lock()
 	defer m.Unlock()
 
-	var c *internal_file.Configuration
-	var envs map[string]string
+	var c *Configuration
 
 	for _, item := range items {
 		switch v := item.(type) {
-		case config.Envs:
-			envs = v
-		case *internal_file.Configuration:
+		default:
+			c = new(Configuration)
+			if err := internal_config.Get(item, configKey, c); err != nil {
+				return err
+			}
+		case internal_config.Envs:
+			c = new(Configuration)
+			c.Default()
+			c.FromEnv(v)
+		case *Configuration:
 			c = v
+		case Configuration:
+			c = &v
 		}
 	}
 	if c == nil {
-		c = new(internal_file.Configuration)
-		c.Default()
-		c.FromEnv(envs)
+		return errors.New(internal_config.ErrConfigurationNotFound)
 	}
-	return m.file.Configure(c)
+	if err := m.file.Configure(c.Configuration); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *file) Initialize() error {
@@ -123,7 +151,7 @@ func (m *file) Initialize() error {
 		return err
 	}
 	serializedData := &meta.SerializedData{}
-	if err := m.file.Read(serializedData); err != nil && !os.IsNotExist(err) {
+	if err := m.Read(serializedData); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return m.Deserialize(serializedData)
@@ -132,20 +160,19 @@ func (m *file) Initialize() error {
 func (m *file) Shutdown() {
 	m.Lock()
 	defer m.Unlock()
+
 	serializedData, err := m.Serialize()
 	if err != nil {
 		m.Error("error while shutting down: %s", err.Error())
 		return
 	}
-	if err := m.file.Write(serializedData); err != nil {
+	if err := m.Write(serializedData); err != nil {
 		m.Error("error while shutting down: %s", err.Error())
 		return
 	}
 }
 
 func (m *file) ChangeCreate(ctx context.Context, c data.ChangePartial) (*data.Change, error) {
-	m.Lock()
-	defer m.Unlock()
 	change, err := m.Change.ChangeCreate(ctx, c)
 	if err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"path/filepath"
+	"strconv"
 
 	logic "github.com/antonio-alexander/go-bludgeon/changes/logic"
 	meta "github.com/antonio-alexander/go-bludgeon/changes/meta"
@@ -13,42 +14,57 @@ import (
 
 	healthcheckrestservice "github.com/antonio-alexander/go-bludgeon/healthcheck/service/rest"
 
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
-	config "github.com/antonio-alexander/go-bludgeon/internal/config"
-	kafka "github.com/antonio-alexander/go-bludgeon/internal/kafka"
-	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_meta "github.com/antonio-alexander/go-bludgeon/internal/meta"
-	serverrest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	internal_config "github.com/antonio-alexander/go-bludgeon/pkg/config"
+	internal_kafka "github.com/antonio-alexander/go-bludgeon/pkg/kafka"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
+	internal_meta "github.com/antonio-alexander/go-bludgeon/pkg/meta"
+	internal_rest "github.com/antonio-alexander/go-bludgeon/pkg/rest/server"
 )
 
-func getConfig(pwd string, envs map[string]string) *Configuration {
-	configFile := filepath.Join(pwd, config.DefaultConfigPath, config.DefaultConfigFile)
+func getConfig(pwd string, envs map[string]string) interface{} {
+	configFile := filepath.Join(pwd, internal_config.DefaultConfigPath, internal_config.DefaultConfigFile)
 	config := new(Configuration)
 	config.Default(pwd)
 	if err := config.Read(configFile); err == nil {
 		return config
 	}
-	config.FromEnv(pwd, envs)
-	return config
+	return internal_config.Envs(envs)
 }
 
-func parameterize(config *Configuration) (interface {
+func parameterize(config interface{}) (interface {
 	internal_logger.Logger
 	internal_logger.Printer
-	internal.Configurer
+	common.Configurer
 }, []interface{}) {
+	var restEnabled, kafkaEnabled bool
+	var metaType internal_meta.Type
 	var parameters []interface{}
 	var changesMeta interface {
 		meta.Change
 		meta.Registration
 		meta.RegistrationChange
-		internal.Initializer
-		internal.Configurer
-		internal.Parameterizer
+		common.Initializer
+		common.Configurer
+		common.Parameterizer
 	}
 
+	switch v := config.(type) {
+	case internal_config.Envs:
+		restEnabled, _ = strconv.ParseBool(v[EnvNameServiceRestEnabled])
+		kafkaEnabled, _ = strconv.ParseBool(v[EnvNameServiceKafkaEnabled])
+		metaType = internal_meta.Type(v[EnvNameMetaType])
+	case *Configuration:
+		restEnabled = v.RestEnabled
+		kafkaEnabled = v.KafkaEnabled
+		metaType = v.MetaType
+	case Configuration:
+		restEnabled = v.RestEnabled
+		kafkaEnabled = v.KafkaEnabled
+		metaType = v.MetaType
+	}
 	logger := internal_logger.New()
-	switch v := config.MetaType; v {
+	switch metaType {
 	case internal_meta.TypeMemory:
 		changesMeta = metamemory.New()
 	case internal_meta.TypeFile:
@@ -61,38 +77,44 @@ func parameterize(config *Configuration) (interface {
 	changesLogic.SetUtilities(logger)
 	changesLogic.SetParameters(changesMeta)
 	parameters = append(parameters, changesMeta, changesLogic)
-	if config.RestEnabled {
+	if restEnabled {
 		changesRestService := servicerest.New()
 		changesRestService.SetUtilities(logger)
 		changesRestService.SetParameters(changesLogic)
 		healthCheckRestService := healthcheckrestservice.New()
 		healthCheckRestService.SetUtilities(logger)
 		healthCheckRestService.SetParameters(changesLogic)
-		restServer := serverrest.New()
+		restServer := internal_rest.New()
 		restServer.SetUtilities(logger)
 		restServer.SetParameters(changesRestService, healthCheckRestService)
-		parameters = append(parameters, changesMeta, restServer,
-			changesRestService, healthCheckRestService)
+		parameters = append(parameters, restServer, changesRestService,
+			healthCheckRestService)
 	}
-	if config.KafkaEnabled {
-		kafkaClient := kafka.New()
+	if kafkaEnabled {
+		kafkaClient := internal_kafka.New()
 		kafkaClient.SetUtilities(logger)
 		changesKafkaService := servicekafka.New()
 		changesKafkaService.SetUtilities(logger)
 		changesKafkaService.SetParameters(changesLogic, kafkaClient)
-		parameters = append(parameters, changesMeta, kafkaClient, changesKafkaService)
+		parameters = append(parameters, kafkaClient,
+			changesKafkaService)
 	}
 	return logger, parameters
 }
 
-func configure(pwd string, envs map[string]string, parameters ...interface{}) error {
-	//TODO: allow this to be able to accept configuration from a json
-	// file
-	for _, p := range parameters {
-		switch p := p.(type) {
-		case internal.Configurer:
-			if err := p.Configure(config.Envs(envs)); err != nil {
-				return err
+func configure(pwd string, config interface{}, parameters ...interface{}) error {
+	for _, parameter := range parameters {
+		switch p := parameter.(type) {
+		case common.Configurer:
+			switch v := config.(type) {
+			default:
+				if err := p.Configure(v); err != nil {
+					return err
+				}
+			case map[string]string:
+				if err := p.Configure(internal_config.Envs(v)); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -100,8 +122,8 @@ func configure(pwd string, envs map[string]string, parameters ...interface{}) er
 }
 
 func initialize(parameters ...interface{}) error {
-	for _, p := range parameters {
-		if p, ok := p.(internal.Initializer); ok {
+	for _, parameter := range parameters {
+		if p, ok := parameter.(common.Initializer); ok {
 			if err := p.Initialize(); err != nil {
 				return err
 			}
@@ -111,8 +133,8 @@ func initialize(parameters ...interface{}) error {
 }
 
 func shutdown(parameters ...interface{}) {
-	for _, p := range parameters {
-		if p, ok := p.(internal.Initializer); ok {
+	for _, parameter := range parameters {
+		if p, ok := parameter.(common.Initializer); ok {
 			p.Shutdown()
 		}
 	}

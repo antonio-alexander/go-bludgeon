@@ -1,8 +1,6 @@
 package internal
 
-import (
-	"os"
-)
+import "os"
 
 // Main is used to init an instance of the bludgeon changes service
 func Main(pwd string, args []string, envs map[string]string, chSignalInt chan os.Signal) error {

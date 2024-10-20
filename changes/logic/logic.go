@@ -7,39 +7,30 @@ import (
 
 	"github.com/antonio-alexander/go-bludgeon/changes/data"
 	"github.com/antonio-alexander/go-bludgeon/changes/meta"
-	"github.com/antonio-alexander/go-bludgeon/internal"
-	"github.com/antonio-alexander/go-queue/finite"
 
-	healthcheckdata "github.com/antonio-alexander/go-bludgeon/healthcheck/data"
-	healthchecklogic "github.com/antonio-alexander/go-bludgeon/healthcheck/logic"
+	healthdata "github.com/antonio-alexander/go-bludgeon/healthcheck/data"
+	healthlogic "github.com/antonio-alexander/go-bludgeon/healthcheck/logic"
 
-	"github.com/antonio-alexander/go-bludgeon/internal/logger"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
 
 	goqueue "github.com/antonio-alexander/go-queue"
+	finite "github.com/antonio-alexander/go-queue/finite"
+
 	uuid "github.com/google/uuid"
 	errors "github.com/pkg/errors"
 )
 
-type handler struct {
-	stopper chan struct{}
-	queue   interface {
-		goqueue.Enqueuer
-		goqueue.Dequeuer
-		goqueue.Event
-		goqueue.Owner
-	}
-}
-
 type logic struct {
 	sync.RWMutex
 	sync.WaitGroup
-	logger.Logger
+	internal_logger.Logger
 	meta.Change
 	meta.Registration
 	meta.RegistrationChange
 	ctx         context.Context
 	cancel      context.CancelFunc
-	handlersMux sync.RWMutex
+	muHandlers  sync.RWMutex
 	handlers    map[string]handler
 	initialized bool
 }
@@ -58,13 +49,13 @@ func changeDequeue(queue goqueue.Dequeuer) (*data.Change, bool) {
 // we can set the logger and the employee meta (required)
 func New() interface {
 	Logic
-	healthchecklogic.Logic
-	internal.Initializer
-	internal.Parameterizer
+	healthlogic.Logic
+	common.Initializer
+	common.Parameterizer
 } {
 	return &logic{
 		handlers: make(map[string]handler),
-		Logger:   logger.NewNullLogger(),
+		Logger:   internal_logger.NewNullLogger(),
 		ctx:      context.Background(),
 	}
 }
@@ -75,8 +66,8 @@ func (l *logic) handlersWrite(stopper chan struct{}, queue interface {
 	goqueue.Event
 	goqueue.Owner
 }) (handlerId string) {
-	l.handlersMux.Lock()
-	defer l.handlersMux.Unlock()
+	l.muHandlers.Lock()
+	defer l.muHandlers.Unlock()
 	handlerId = uuid.Must(uuid.NewRandom()).String()
 	l.handlers[handlerId] = handler{
 		stopper: stopper,
@@ -86,8 +77,8 @@ func (l *logic) handlersWrite(stopper chan struct{}, queue interface {
 }
 
 func (l *logic) handlersRead() (handlers map[string]goqueue.Enqueuer) {
-	l.handlersMux.RLock()
-	defer l.handlersMux.RUnlock()
+	l.muHandlers.RLock()
+	defer l.muHandlers.RUnlock()
 	handlers = make(map[string]goqueue.Enqueuer)
 	for handlerId, handler := range l.handlers {
 		handlers[handlerId] = handler.queue
@@ -96,8 +87,8 @@ func (l *logic) handlersRead() (handlers map[string]goqueue.Enqueuer) {
 }
 
 func (l *logic) handlersDelete(handlerId string) error {
-	l.handlersMux.Lock()
-	defer l.handlersMux.Unlock()
+	l.muHandlers.Lock()
+	defer l.muHandlers.Unlock()
 	handler, ok := l.handlers[handlerId]
 	if !ok {
 		return errors.New("handler not found")
@@ -167,7 +158,7 @@ func (l *logic) changeBroadcast(change *data.Change) {
 func (l *logic) SetUtilities(parameters ...interface{}) {
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
-		case logger.Logger:
+		case internal_logger.Logger:
 			l.Logger = p
 		}
 	}
@@ -288,6 +279,6 @@ func (l *logic) HandlerDelete(ctx context.Context, handlerId string) error {
 	return nil
 }
 
-func (l *logic) HealthCheck(ctx context.Context) (*healthcheckdata.HealthCheck, error) {
-	return &healthcheckdata.HealthCheck{Time: time.Now().UnixNano()}, nil
+func (l *logic) HealthCheck(ctx context.Context) (*healthdata.HealthCheck, error) {
+	return &healthdata.HealthCheck{Time: time.Now().UnixNano()}, nil
 }

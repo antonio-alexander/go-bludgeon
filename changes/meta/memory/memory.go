@@ -7,8 +7,8 @@ import (
 
 	"github.com/antonio-alexander/go-bludgeon/changes/data"
 	"github.com/antonio-alexander/go-bludgeon/changes/meta"
-	"github.com/antonio-alexander/go-bludgeon/internal"
-	"github.com/antonio-alexander/go-bludgeon/internal/logger"
+	"github.com/antonio-alexander/go-bludgeon/common"
+	"github.com/antonio-alexander/go-bludgeon/pkg/logger"
 
 	"github.com/pkg/errors"
 )
@@ -19,7 +19,7 @@ type memory struct {
 	changesMux          sync.RWMutex
 	changes             map[string]*data.Change
 	registrationsMux    sync.RWMutex
-	registrations       map[string]struct{}
+	registrations       map[string]*data.Registration
 	registrationChanges map[string]map[string]struct{}
 }
 
@@ -28,14 +28,14 @@ func New() interface {
 	meta.Change
 	meta.Registration
 	meta.RegistrationChange
-	internal.Initializer
-	internal.Configurer
-	internal.Parameterizer
+	common.Initializer
+	common.Configurer
+	common.Parameterizer
 } {
 	return &memory{
 		Logger:              logger.NewNullLogger(),
 		changes:             make(map[string]*data.Change),
-		registrations:       make(map[string]struct{}),
+		registrations:       make(map[string]*data.Registration),
 		registrationChanges: make(map[string]map[string]struct{}),
 	}
 }
@@ -111,13 +111,13 @@ func (m *memory) SetParameters(parameters ...interface{}) {
 
 func (m *memory) Configure(...interface{}) error {
 	//KIM: thsi is a dummy place holder to satisfy the
-	// internal.Configurable interface
+	// common.Configurable interface
 	return nil
 }
 
 func (m *memory) Initialize() error {
 	//KIM: thsi is a dummy place holder to satisfy the
-	// internal.Initializer interface
+	// common.Initializer interface
 	return nil
 }
 
@@ -321,7 +321,7 @@ func (m *memory) RegistrationUpsert(ctx context.Context, registrationId string) 
 		return err
 	}
 	if _, ok := m.registrations[registrationId]; !ok {
-		m.registrations[registrationId] = struct{}{}
+		m.registrations[registrationId] = &data.Registration{Id: registrationId}
 	}
 	if _, ok := m.registrationChanges[registrationId]; !ok {
 		m.registrationChanges[registrationId] = make(map[string]struct{})
@@ -341,6 +341,27 @@ func (m *memory) RegistrationDelete(ctx context.Context, registrationId string) 
 	delete(m.registrationChanges, registrationId)
 	m.Debug(logAlias+"deleted registration: %s", registrationId)
 	return nil
+}
+
+func (m *memory) RegistrationsRead(ctx context.Context, search data.RegistrationSearch) ([]*data.Registration, error) {
+	m.registrationsMux.Lock()
+	defer m.registrationsMux.Unlock()
+	var registrations []*data.Registration
+
+	for _, registration := range m.registrations {
+		switch {
+		default:
+			registrations = append(registrations, registration)
+		case len(search.RegistrationIds) > 0:
+			for _, registrationId := range search.RegistrationIds {
+				if registrationId == registration.Id {
+					registrations = append(registrations, registration)
+					break
+				}
+			}
+		}
+	}
+	return registrations, nil
 }
 
 func (m *memory) RegistrationChangeUpsert(ctx context.Context, changeId string) error {

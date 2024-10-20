@@ -1,4 +1,4 @@
-package service
+package rest
 
 func valueFromPath(name string, pathVariables map[string]string) (string, bool) {
 	value, ok := pathVariables[name]

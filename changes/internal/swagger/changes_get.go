@@ -2,7 +2,7 @@ package swagger
 
 import (
 	"github.com/antonio-alexander/go-bludgeon/changes/data"
-	"github.com/antonio-alexander/go-bludgeon/internal/errors"
+	"github.com/antonio-alexander/go-bludgeon/pkg/errors"
 )
 
 // swagger:route GET /changes/{change_id} changes get_change

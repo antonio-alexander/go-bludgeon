@@ -6,18 +6,18 @@ import (
 	"strings"
 	"testing"
 
-	meta "github.com/antonio-alexander/go-bludgeon/changes/meta/file"
+	file "github.com/antonio-alexander/go-bludgeon/changes/meta/file"
 	tests "github.com/antonio-alexander/go-bludgeon/changes/meta/tests"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
 
-	internal_file "github.com/antonio-alexander/go-bludgeon/internal/meta/file"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
 
 	"github.com/stretchr/testify/assert"
 )
 
 const filename string = "bludgeon_meta.json"
 
-var config = new(internal_file.Configuration)
+var config = new(file.Configuration)
 
 func init() {
 	envs := make(map[string]string)
@@ -32,26 +32,51 @@ func init() {
 	os.Remove(config.File)
 }
 
-func TestMetaFile(t *testing.T) {
-	//create meta
+type fileMetaTest struct {
+	metaFile interface {
+		common.Initializer
+		common.Configurer
+	}
+	*tests.Fixture
+}
+
+func newFileMetaTest() *fileMetaTest {
 	logger := logger.New()
-	m := meta.New()
+	metaFile := file.New()
+	metaFile.SetParameters()
+	metaFile.SetUtilities(logger)
+	return &fileMetaTest{
+		metaFile: metaFile,
+		Fixture:  tests.NewFixture(metaFile),
+	}
+}
 
-	//set parameters
-	m.SetParameters(logger)
+func (m *fileMetaTest) Initialize(t *testing.T) {
+	err := m.metaFile.Configure(config)
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, "unable to configure meta file")
+	}
+	err = m.metaFile.Initialize()
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, "unable to initialize persistence")
+	}
+}
 
-	// initialize
-	err := m.Configure(config)
-	assert.Nil(t, err)
-	err = m.Initialize()
-	assert.Nil(t, err)
-	defer func() {
-		m.Shutdown()
-	}()
+func (m *fileMetaTest) Shutdown(t *testing.T) {
+	m.metaFile.Shutdown()
+}
 
-	//test meta
-	t.Run("Change CRUD", tests.TestChangeCRUD(m))
-	t.Run("Changes Read", tests.TestChangeSearch(m))
-	t.Run("Registration CRUD", tests.TestRegistrationCRUD(m))
-	t.Run("Change Registrations", tests.TestRegistrationChanges(m))
+func testMetaFile(t *testing.T) {
+	m := newFileMetaTest()
+	m.Initialize(t)
+	defer m.Shutdown(t)
+
+	t.Run("Change CRUD", m.TestChangeCRUD)
+	t.Run("Changes Read", m.TestChangeSearch)
+	t.Run("Registration CRUD", m.TestRegistrationCRUD)
+	t.Run("Change Registrations", m.TestRegistrationChanges)
+}
+
+func TestMetaFile(t *testing.T) {
+	testMetaFile(t)
 }

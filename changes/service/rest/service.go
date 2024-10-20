@@ -1,4 +1,4 @@
-package service
+package rest
 
 import (
 	"context"
@@ -7,32 +7,36 @@ import (
 	"net/http"
 	"sync"
 
-	data "github.com/antonio-alexander/go-bludgeon/changes/data"
-	logic "github.com/antonio-alexander/go-bludgeon/changes/logic"
-	meta "github.com/antonio-alexander/go-bludgeon/changes/meta"
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/changes/data"
+	"github.com/antonio-alexander/go-bludgeon/changes/logic"
+	"github.com/antonio-alexander/go-bludgeon/changes/meta"
 
-	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
-	websocket "github.com/antonio-alexander/go-bludgeon/internal/websocket/server"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	internal_config "github.com/antonio-alexander/go-bludgeon/pkg/config"
+	internal_errors "github.com/antonio-alexander/go-bludgeon/pkg/errors"
+	internal_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
+	internal_rest "github.com/antonio-alexander/go-bludgeon/pkg/rest/server"
+	internal_websocket "github.com/antonio-alexander/go-bludgeon/pkg/websocket/server"
 
 	"github.com/pkg/errors"
 )
 
 type restServer struct {
 	sync.WaitGroup
-	logger.Logger
-	ctx   context.Context
-	logic logic.Logic
+	internal_logger.Logger
+	ctx        context.Context
+	logic      logic.Logic
+	config     *Configuration
+	configured bool
 }
 
 func New() interface {
-	internal.Parameterizer
-	rest.RouteBuilder
+	common.Parameterizer
+	common.Configurer
+	internal_rest.RouteBuilder
 } {
 	return &restServer{
-		Logger: logger.NewNullLogger(),
+		Logger: internal_logger.NewNullLogger(),
 		ctx:    context.Background(),
 	}
 }
@@ -47,9 +51,6 @@ func (s *restServer) handleResponse(writer http.ResponseWriter, err error, item 
 		case errors.Is(err, meta.ErrChangeNotFound) ||
 			errors.Is(err, meta.ErrRegistrationNotFound):
 			writer.WriteHeader(http.StatusNotFound)
-		case errors.Is(err, meta.ErrChangeNotWritten) ||
-			errors.Is(err, meta.ErrRegistrationNotWritten):
-			writer.WriteHeader(http.StatusNotModified)
 		case errors.Is(err, meta.ErrChangeConflictWrite):
 			writer.WriteHeader(http.StatusConflict)
 		}
@@ -107,7 +108,7 @@ func (s *restServer) endpointChangeRead() func(http.ResponseWriter, *http.Reques
 		var change *data.Change
 		var err error
 
-		if changeId, _ := valueFromPath(data.PathChangeId, rest.Vars(request)); err == nil {
+		if changeId, _ := valueFromPath(data.PathChangeId, internal_rest.Vars(request)); err == nil {
 			if change, err = s.logic.ChangeRead(request.Context(), changeId); err == nil {
 				s.Debug("read change: %d", changeId)
 			}
@@ -132,7 +133,7 @@ func (s *restServer) endpointChangesRead() func(http.ResponseWriter, *http.Reque
 
 func (s *restServer) endpointChangeDelete() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		changeId, _ := valueFromPath(data.PathChangeId, rest.Vars(request))
+		changeId, _ := valueFromPath(data.PathChangeId, internal_rest.Vars(request))
 		err := s.logic.ChangesDelete(request.Context(), changeId)
 		if err = s.handleResponse(writer, err, nil); err != nil {
 			s.Error(logAlias+"change delete: %s", err)
@@ -161,9 +162,21 @@ func (s *restServer) endpointRegistrationUpsert() func(http.ResponseWriter, *htt
 	}
 }
 
+func (s *restServer) endpointRegistrationsRead() func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var search data.RegistrationSearch
+
+		search.FromParams(request.URL.Query())
+		registrations, err := s.logic.RegistrationsRead(request.Context(), search)
+		if err = s.handleResponse(writer, err, &data.RegistrationDigest{Registrations: registrations}); err != nil {
+			s.Error(logAlias+"changes read: %s", err)
+		}
+	}
+}
+
 func (s *restServer) endpointRegistrationChangesRead() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		registrationId, _ := valueFromPath(data.PathRegistrationId, rest.Vars(request))
+		registrationId, _ := valueFromPath(data.PathRegistrationId, internal_rest.Vars(request))
 		changes, err := s.logic.RegistrationChangesRead(request.Context(), registrationId)
 		if err = s.handleResponse(writer, err, &data.ChangeDigest{Changes: changes}); err != nil {
 			s.Error(logAlias+"registration changes read: %s", err)
@@ -176,7 +189,7 @@ func (s *restServer) endpointRegistrationChangeAcknowledge() func(http.ResponseW
 		var bytes []byte
 		var err error
 
-		registrationId, _ := valueFromPath(data.PathRegistrationId, rest.Vars(request))
+		registrationId, _ := valueFromPath(data.PathRegistrationId, internal_rest.Vars(request))
 		acknowledgeRequest := &data.RequestAcknowledge{}
 		if bytes, err = io.ReadAll(request.Body); err == nil {
 			if err = json.Unmarshal(bytes, acknowledgeRequest); err == nil {
@@ -195,7 +208,7 @@ func (s *restServer) endpointRegistrationChangeAcknowledge() func(http.ResponseW
 
 func (s *restServer) endpointRegistrationDelete() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		registrationId, _ := valueFromPath(data.PathRegistrationId, rest.Vars(request))
+		registrationId, _ := valueFromPath(data.PathRegistrationId, internal_rest.Vars(request))
 		err := s.logic.RegistrationDelete(request.Context(), registrationId)
 		if err = s.handleResponse(writer, err, nil); err != nil {
 			s.Error(logAlias+"registration delete -  %s", err)
@@ -207,7 +220,7 @@ func (s *restServer) endpointRegistrationDelete() func(http.ResponseWriter, *htt
 
 func (s *restServer) endpointWebsocket() func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		ws := websocket.New(writer, request, s.Logger)
+		ws := internal_websocket.New(writer, request, s.Logger, s.config.Configuration)
 		if ws == nil {
 			err := errors.New("unable to create websocket")
 			if err := s.handleResponse(writer, err, nil); err != nil {
@@ -237,8 +250,8 @@ func (s *restServer) endpointWebsocket() func(http.ResponseWriter, *http.Request
 	}
 }
 
-func (s *restServer) BuildRoutes() []rest.HandleFuncConfig {
-	return []rest.HandleFuncConfig{
+func (s *restServer) BuildRoutes() []internal_rest.HandleFuncConfig {
+	return []internal_rest.HandleFuncConfig{
 		{Route: data.RouteChangesWebsocket, HandleFx: s.endpointWebsocket()},
 		{Route: data.RouteChanges, Method: data.MethodChangeUpsert, HandleFx: s.endpointChangeUpsert()},
 		{Route: data.RouteChangesSearch, Method: data.MethodChangeRead, HandleFx: s.endpointChangesRead()},
@@ -246,6 +259,7 @@ func (s *restServer) BuildRoutes() []rest.HandleFuncConfig {
 		{Route: data.RouteChangesParam, Method: data.MethodChangeDelete, HandleFx: s.endpointChangeDelete()},
 		{Route: data.RouteChangesRegistrationServiceIdAcknowledge, Method: data.MethodRegistrationChangeAcknowledge, HandleFx: s.endpointRegistrationChangeAcknowledge()},
 		{Route: data.RouteChangesRegistration, Method: data.MethodRegistrationUpsert, HandleFx: s.endpointRegistrationUpsert()},
+		{Route: data.RouteChangesRegistrationSearch, Method: data.MethodRegistrationRead, HandleFx: s.endpointRegistrationsRead()},
 		{Route: data.RouteChangesRegistrationParamChanges, Method: data.MethodChangeRead, HandleFx: s.endpointRegistrationChangesRead()},
 		{Route: data.RouteChangesRegistrationParam, Method: data.MethodRegistrationDelete, HandleFx: s.endpointRegistrationDelete()},
 	}
@@ -254,7 +268,7 @@ func (s *restServer) BuildRoutes() []rest.HandleFuncConfig {
 func (s *restServer) SetUtilities(parameters ...interface{}) {
 	for _, parameter := range parameters {
 		switch p := parameter.(type) {
-		case logger.Logger:
+		case internal_logger.Logger:
 			s.Logger = p
 		}
 	}
@@ -275,4 +289,35 @@ func (s *restServer) SetParameters(parameters ...interface{}) {
 	case s.ctx == nil:
 		panic("context not set")
 	}
+}
+
+func (s *restServer) Configure(items ...interface{}) error {
+	var c *Configuration
+
+	for _, item := range items {
+		switch v := item.(type) {
+		default:
+			c = new(Configuration)
+			if err := internal_config.Get(item, configKey, c); err != nil {
+				return err
+			}
+		case internal_config.Envs:
+			c = new(Configuration)
+			c.Default()
+			c.FromEnv(v)
+		case *Configuration:
+			c = v
+		case Configuration:
+			c = &v
+		}
+	}
+	if c == nil {
+		return errors.New(internal_config.ErrConfigurationNotFound)
+	}
+	if err := c.Validate(); err != nil {
+		return err
+	}
+	s.config = c
+	s.configured = true
+	return nil
 }

@@ -1,4 +1,4 @@
-package service_test
+package tests
 
 import (
 	"bytes"
@@ -7,96 +7,49 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"os"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	data "github.com/antonio-alexander/go-bludgeon/changes/data"
-	logic "github.com/antonio-alexander/go-bludgeon/changes/logic"
-	meta "github.com/antonio-alexander/go-bludgeon/changes/meta"
-	memory "github.com/antonio-alexander/go-bludgeon/changes/meta/memory"
-	service "github.com/antonio-alexander/go-bludgeon/changes/service/rest"
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
+	"github.com/antonio-alexander/go-bludgeon/changes/data"
+	"github.com/antonio-alexander/go-bludgeon/changes/meta"
 
-	internal_error "github.com/antonio-alexander/go-bludgeon/internal/errors"
-	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_server "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
+	internal_errors "github.com/antonio-alexander/go-bludgeon/pkg/errors"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 )
 
-var configServer = new(internal_server.Configuration)
-
-type restServerTest struct {
-	server interface {
-		internal.Initializer
-		internal.Configurer
-	}
-	meta interface {
-		internal.Initializer
-		internal.Configurer
-	}
-	logic interface {
-		internal.Initializer
-	}
-	client *http.Client
+type Fixture struct {
+	*http.Client
+	address string
+	port    string
 }
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
-	envs := make(map[string]string)
-	for _, e := range os.Environ() {
-		if s := strings.Split(e, "="); len(s) > 1 {
-			envs[s[0]] = strings.Join(s[1:], "=")
-		}
-	}
-	configServer.FromEnv(envs)
-	configServer.Address = "localhost"
-	configServer.Port = "9000"
-	configServer.AllowedMethods = []string{http.MethodDelete, http.MethodPatch, http.MethodPost, http.MethodPut, http.MethodGet}
-	configServer.ShutdownTimeout = 15 * time.Second
 }
 
-func newRestServerTest() *restServerTest {
-	logger := internal_logger.New()
-	logger.Configure(&internal_logger.Configuration{
-		Level:  internal_logger.Trace,
-		Prefix: "bludgeon_rest_server_test",
-	})
-	changesMeta := memory.New()
-	changesMeta.SetUtilities(logger)
-	changesLogic := logic.New()
-	changesLogic.SetUtilities(logger)
-	changesLogic.SetParameters(changesMeta)
-	changesService := service.New()
-	changesService.SetUtilities(logger)
-	server := internal_server.New()
-	server.SetUtilities(logger)
-	changesService.SetParameters(changesLogic, server)
-	server.SetParameters(changesService)
-	return &restServerTest{
-		server: server,
-		meta:   changesMeta,
-		logic:  changesLogic,
-		client: &http.Client{},
-	}
-}
-
-func (l *restServerTest) generateId() string {
+func generateId() string {
 	return uuid.Must(uuid.NewRandom()).String()
 }
 
-func (r *restServerTest) doRequest(route, method string, data []byte) ([]byte, int, error) {
-	uri := fmt.Sprintf("http://%s:%s"+route, configServer.Address, configServer.Port)
+func NewFixture(address, port string, items ...interface{}) *Fixture {
+	return &Fixture{
+		address: address,
+		port:    port,
+		Client:  new(http.Client),
+	}
+}
+
+func (f *Fixture) doRequest(route, method string, data []byte) ([]byte, int, error) {
+	uri := fmt.Sprintf("http://%s:%s"+route, f.address, f.port)
 	request, err := http.NewRequest(method, uri, bytes.NewBuffer(data))
 	if err != nil {
 		return nil, -1, err
 	}
-	response, err := r.client.Do(request)
+	response, err := f.Do(request)
 	if err != nil {
 		return nil, -1, err
 	}
@@ -105,7 +58,7 @@ func (r *restServerTest) doRequest(route, method string, data []byte) ([]byte, i
 	return bytes, response.StatusCode, err
 }
 
-func (r *restServerTest) pingHandler(t *testing.T, ws interface {
+func (f *Fixture) pingHandler(t *testing.T, ws interface {
 	WriteControl(messageType int, data []byte, deadline time.Time) error
 }) func(string) error {
 	return func(ping string) error {
@@ -116,40 +69,16 @@ func (r *restServerTest) pingHandler(t *testing.T, ws interface {
 	}
 }
 
-func (r *restServerTest) pongHandler(t *testing.T) func(pong string) error {
+func (f *Fixture) pongHandler(t *testing.T) func(pong string) error {
 	return func(pong string) error {
 		t.Logf("pong: %s", pong)
 		return nil
 	}
 }
 
-func (r *restServerTest) initialize(t *testing.T) {
-	err := r.meta.Initialize()
-	assert.Nil(t, err)
-	err = r.meta.Configure()
-	assert.Nil(t, err)
-	err = r.logic.Initialize()
-	assert.Nil(t, err)
-	err = r.server.Configure(configServer)
-	assert.Nil(t, err)
-	err = r.server.Initialize()
-	assert.Nil(t, err)
-	//KIM: we have to sleep here because the start for the rest
-	// server isn't synchronous
-	time.Sleep(2 * time.Second)
-}
-
-func (r *restServerTest) shutdown(t *testing.T) {
-	//REVIEW: why do we need to sleep?
-	time.Sleep(2 * time.Second)
-	r.server.Shutdown()
-	r.logic.Shutdown()
-	r.meta.Shutdown()
-}
-
-func (r *restServerTest) testChangeOperations(t *testing.T) {
+func (f *Fixture) TestChangeOperations(t *testing.T) {
 	//generate constants
-	dataId, version := r.generateId(), 1
+	dataId, version := generateId(), 1
 	dataType, dataService := "employee", "employees"
 
 	//create change
@@ -161,7 +90,7 @@ func (r *restServerTest) testChangeOperations(t *testing.T) {
 	})
 	assert.Nil(t, err)
 	uri := data.RouteChanges
-	bytes, statusCode, err := r.doRequest(uri, data.MethodChangeUpsert, bytes)
+	bytes, statusCode, err := f.doRequest(uri, data.MethodChangeUpsert, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -172,7 +101,7 @@ func (r *restServerTest) testChangeOperations(t *testing.T) {
 
 	//read change
 	uri = fmt.Sprintf(data.RouteChangesParamf, changeId)
-	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(uri, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -187,18 +116,18 @@ func (r *restServerTest) testChangeOperations(t *testing.T) {
 
 	//delete change
 	uri = fmt.Sprintf(data.RouteChangesParamf, changeId)
-	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeDelete, nil)
+	bytes, statusCode, err = f.doRequest(uri, data.MethodChangeDelete, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNoContent, statusCode)
 	assert.Empty(t, bytes)
 
 	//read change
 	uri = fmt.Sprintf(data.RouteChangesParamf, changeId)
-	bytes, statusCode, err = r.doRequest(uri, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(uri, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNotFound, statusCode)
 	assert.NotEmpty(t, bytes)
-	internalErr := &internal_error.Error{}
+	internalErr := &internal_errors.Error{}
 	err = json.Unmarshal(bytes, internalErr)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, internalErr.Error)
@@ -207,15 +136,15 @@ func (r *restServerTest) testChangeOperations(t *testing.T) {
 	//TODO: add test to acknowledge change
 }
 
-func (r *restServerTest) testChangeStreaming(t *testing.T) {
+func (f *Fixture) TestChangeStreaming(t *testing.T) {
 	var wg sync.WaitGroup
 
 	//generate change
-	dataId, version := r.generateId(), 1
+	dataId, version := generateId(), 1
 	dataType, dataService := "employee", "employees"
 
 	//connect to web socket
-	websocketUri := fmt.Sprintf("ws://%s:%s"+data.RouteChangesWebsocket, configServer.Address, configServer.Port)
+	websocketUri := fmt.Sprintf("ws://%s:%s"+data.RouteChangesWebsocket, f.address, f.port)
 	ws, response, err := websocket.DefaultDialer.Dial(websocketUri, nil)
 	defer response.Body.Close()
 	if err == websocket.ErrBadHandshake {
@@ -223,8 +152,8 @@ func (r *restServerTest) testChangeStreaming(t *testing.T) {
 	}
 	assert.Nil(t, err)
 	assert.NotNil(t, ws)
-	ws.SetPingHandler(r.pingHandler(t, ws))
-	ws.SetPongHandler(r.pongHandler(t))
+	ws.SetPingHandler(f.pingHandler(t, ws))
+	ws.SetPongHandler(f.pongHandler(t))
 
 	//start go rountes to test
 	start := make(chan struct{})
@@ -242,7 +171,7 @@ func (r *restServerTest) testChangeStreaming(t *testing.T) {
 			DataServiceName: &dataService,
 		})
 		assert.Nil(t, err)
-		bytes, statusCode, err := r.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
+		bytes, statusCode, err := f.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
 		assert.Nil(t, err)
 		assert.Equal(t, http.StatusOK, statusCode)
 		assert.NotEmpty(t, bytes)
@@ -291,14 +220,14 @@ func (r *restServerTest) testChangeStreaming(t *testing.T) {
 	wg.Wait()
 }
 
-func (r *restServerTest) testChangeRegistration(t *testing.T) {
+func (f *Fixture) TestChangeRegistration(t *testing.T) {
 	var changes []*data.Change
 
 	//upsert change (neither registration should see this change)
-	dataId := r.generateId()
-	dataVersion, dataType := rand.Intn(1000), r.generateId()
-	dataServiceName, whenChanged := r.generateId(), time.Now().UnixNano()
-	changedBy, dataAction := "test_change_crud", r.generateId()
+	dataId := generateId()
+	dataVersion, dataType := rand.Intn(1000), generateId()
+	dataServiceName, whenChanged := generateId(), time.Now().UnixNano()
+	changedBy, dataAction := "test_change_crud", generateId()
 	bytes, err := json.Marshal(&data.ChangePartial{
 		DataId:          &dataId,
 		DataVersion:     &dataVersion,
@@ -310,7 +239,7 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, bytes)
-	bytes, statusCode, err := r.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
+	bytes, statusCode, err := f.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -320,29 +249,29 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	assert.NotNil(t, changeCreated)
 	defer func(changeId string) {
 		route := fmt.Sprintf(data.RouteChangesParamf, changeId)
-		r.doRequest(route, data.MethodChangeDelete, bytes)
+		f.doRequest(route, data.MethodChangeDelete, bytes)
 	}(changeCreated.Id)
 	changes = append(changes, changeCreated)
 
 	//create registration (1)
-	registrationId1 := r.generateId()
+	registrationId1 := generateId()
 	bytes, err = json.Marshal(&data.RequestRegister{
 		RegistrationId: registrationId1,
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, bytes)
-	bytes, statusCode, err = r.doRequest(data.RouteChangesRegistration, data.MethodRegistrationUpsert, bytes)
+	bytes, statusCode, err = f.doRequest(data.RouteChangesRegistration, data.MethodRegistrationUpsert, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNoContent, statusCode)
 	assert.Empty(t, bytes)
 	defer func(registrationId string) {
 		route := fmt.Sprintf(data.RouteChangesRegistrationParamf, registrationId)
-		r.doRequest(route, data.MethodRegistrationDelete, bytes)
+		f.doRequest(route, data.MethodRegistrationDelete, bytes)
 	}(registrationId1)
 
 	//validate that registration (1) doesn't include any changes
 	route := fmt.Sprintf(data.RouteChangesRegistrationParamChangesf, registrationId1)
-	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(route, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -352,10 +281,10 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	assert.Len(t, changeDigest.Changes, 0)
 
 	//upsert change (to be seen by registration (1))
-	dataId = r.generateId()
-	dataVersion, dataType = rand.Intn(1000), r.generateId()
-	dataServiceName, whenChanged = r.generateId(), time.Now().UnixNano()
-	dataAction, changedBy = r.generateId(), "test_change_crud"
+	dataId = generateId()
+	dataVersion, dataType = rand.Intn(1000), generateId()
+	dataServiceName, whenChanged = generateId(), time.Now().UnixNano()
+	dataAction, changedBy = generateId(), "test_change_crud"
 	bytes, err = json.Marshal(&data.ChangePartial{
 		WhenChanged:     &whenChanged,
 		ChangedBy:       &changedBy,
@@ -367,7 +296,7 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, bytes)
-	bytes, statusCode, err = r.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
+	bytes, statusCode, err = f.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -377,13 +306,13 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	assert.NotNil(t, changeCreated)
 	defer func(changeId string) {
 		route := fmt.Sprintf(data.RouteChangesParamf, changeId)
-		r.doRequest(route, data.MethodChangeDelete, bytes)
+		f.doRequest(route, data.MethodChangeDelete, bytes)
 	}(changeCreated.Id)
 	changes = append(changes, changeCreated)
 
 	//validate that registration (1) sees the second change, but not the first
 	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf, registrationId1)
-	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(route, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -395,26 +324,26 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	assert.NotContains(t, changeDigest.Changes, changes[0])
 
 	//create registration
-	registrationId2 := r.generateId()
+	registrationId2 := generateId()
 	bytes, err = json.Marshal(&data.RequestRegister{
 		RegistrationId: registrationId2,
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, bytes)
-	bytes, statusCode, err = r.doRequest(data.RouteChangesRegistration, data.MethodRegistrationUpsert, bytes)
+	bytes, statusCode, err = f.doRequest(data.RouteChangesRegistration, data.MethodRegistrationUpsert, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNoContent, statusCode)
 	assert.Empty(t, bytes)
 	defer func(registrationId string) {
 		route := fmt.Sprintf(data.RouteChangesRegistrationParamf, registrationId)
-		r.doRequest(route, data.MethodRegistrationDelete, bytes)
+		f.doRequest(route, data.MethodRegistrationDelete, bytes)
 	}(registrationId2)
 
 	//upsert change (to be seen by registration (1) and (2))
-	dataId = r.generateId()
-	dataVersion, dataType = rand.Intn(1000), r.generateId()
-	dataServiceName, whenChanged = r.generateId(), time.Now().UnixNano()
-	dataAction, changedBy = r.generateId(), "test_change_crud"
+	dataId = generateId()
+	dataVersion, dataType = rand.Intn(1000), generateId()
+	dataServiceName, whenChanged = generateId(), time.Now().UnixNano()
+	dataAction, changedBy = generateId(), "test_change_crud"
 	bytes, err = json.Marshal(&data.ChangePartial{
 		WhenChanged:     &whenChanged,
 		ChangedBy:       &changedBy,
@@ -426,7 +355,7 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, bytes)
-	bytes, statusCode, err = r.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
+	bytes, statusCode, err = f.doRequest(data.RouteChanges, data.MethodChangeUpsert, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -436,13 +365,13 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	assert.NotNil(t, changeCreated)
 	defer func(changeId string) {
 		route := fmt.Sprintf(data.RouteChangesParamf, changeId)
-		r.doRequest(route, data.MethodChangeDelete, bytes)
+		f.doRequest(route, data.MethodChangeDelete, bytes)
 	}(changeCreated.Id)
 	changes = append(changes, changeCreated)
 
 	//validate that registration (2) sees the third change, but not the first or second
 	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf, registrationId2)
-	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(route, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -461,13 +390,13 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotEmpty(t, bytes)
 	route = fmt.Sprintf(data.RouteChangesRegistrationServiceIdAcknowledgef, registrationId1)
-	bytes, statusCode, err = r.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
+	bytes, statusCode, err = f.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNoContent, statusCode)
 	assert.Empty(t, bytes)
 	//get changes for registration 1
 	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf, registrationId1)
-	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(route, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -483,12 +412,12 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	assert.NotEmpty(t, bytes)
 	//get changes for registration 2
 	route = fmt.Sprintf(data.RouteChangesRegistrationServiceIdAcknowledgef, registrationId2)
-	bytes, statusCode, err = r.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
+	bytes, statusCode, err = f.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNoContent, statusCode)
 	assert.Empty(t, bytes)
 	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf, registrationId2)
-	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(route, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -500,7 +429,7 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	//validate that initial change has been removed
 	//KIM: this change is removed because of the acknowledgement(s) earlier
 	route = fmt.Sprintf(data.RouteChangesParamf, changes[0].Id)
-	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(route, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNotFound, statusCode)
 
@@ -512,14 +441,14 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	assert.Nil(t, err)
 	route = fmt.Sprintf(data.RouteChangesRegistrationServiceIdAcknowledgef,
 		registrationId1)
-	bytes, statusCode, err = r.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
+	bytes, statusCode, err = f.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNoContent, statusCode)
 	assert.Empty(t, bytes)
 	//read changes for registration 1
 	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf,
 		registrationId1)
-	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(route, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -537,14 +466,14 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	assert.Nil(t, err)
 	route = fmt.Sprintf(data.RouteChangesRegistrationServiceIdAcknowledgef,
 		registrationId2)
-	bytes, statusCode, err = r.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
+	bytes, statusCode, err = f.doRequest(route, data.MethodRegistrationChangeAcknowledge, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNoContent, statusCode)
 	assert.Empty(t, bytes)
 	// read the changes for registration 2
 	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf,
 		registrationId2)
-	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(route, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -556,13 +485,13 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 
 	//validate that second change has been removed
 	route = fmt.Sprintf(data.RouteChangesParamf, changes[1].Id)
-	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(route, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNotFound, statusCode)
 
 	//delete the initial registration,
 	route = fmt.Sprintf(data.RouteChangesRegistrationParamf, registrationId1)
-	bytes, statusCode, err = r.doRequest(route, data.MethodRegistrationDelete, bytes)
+	bytes, statusCode, err = f.doRequest(route, data.MethodRegistrationDelete, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNoContent, statusCode)
 	assert.Empty(t, bytes)
@@ -572,14 +501,14 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, bytes)
-	bytes, statusCode, err = r.doRequest(data.RouteChangesRegistration, data.MethodRegistrationUpsert, bytes)
+	bytes, statusCode, err = f.doRequest(data.RouteChangesRegistration, data.MethodRegistrationUpsert, bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusNoContent, statusCode)
 	assert.Empty(t, bytes)
 	// read the registration changes
 	route = fmt.Sprintf(data.RouteChangesRegistrationParamChangesf,
 		registrationId1)
-	bytes, statusCode, err = r.doRequest(route, data.MethodChangeRead, nil)
+	bytes, statusCode, err = f.doRequest(route, data.MethodChangeRead, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
 	assert.NotEmpty(t, bytes)
@@ -587,15 +516,4 @@ func (r *restServerTest) testChangeRegistration(t *testing.T) {
 	err = json.Unmarshal(bytes, changeDigest)
 	assert.Nil(t, err)
 	assert.Empty(t, changeDigest.Changes)
-}
-
-func TestChangesRestService(t *testing.T) {
-	r := newRestServerTest()
-
-	r.initialize(t)
-	defer r.shutdown(t)
-
-	t.Run("Change Operations", r.testChangeOperations)
-	t.Run("Change Streaming", r.testChangeStreaming)
-	t.Run("Change Registration", r.testChangeRegistration)
 }
