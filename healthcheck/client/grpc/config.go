@@ -3,11 +3,11 @@ package grpc
 import (
 	"strconv"
 
-	internal_grpc "github.com/antonio-alexander/go-bludgeon/internal/grpc/client"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	pkg_grpc "github.com/antonio-alexander/go-bludgeon/pkg/grpc/client"
 
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // environmental variables
@@ -23,12 +23,12 @@ const (
 )
 
 type Configuration struct {
-	*internal_grpc.Configuration
+	*pkg_grpc.Configuration
 }
 
 func NewConfiguration() *Configuration {
 	return &Configuration{
-		Configuration: new(internal_grpc.Configuration),
+		Configuration: new(pkg_grpc.Configuration),
 	}
 }
 
@@ -55,13 +55,13 @@ func (r *Configuration) Validate() error {
 	// that the port is an integer, finally
 	// check if the timeout is gt 0
 	if r.Address == "" {
-		return errors.New(internal_grpc.ErrAddressEmpty)
+		return errors.New(pkg_grpc.ErrAddressEmpty)
 	}
 	if r.Port == "" {
-		return errors.New(internal_grpc.ErrPortEmpty)
+		return errors.New(pkg_grpc.ErrPortEmpty)
 	}
 	if _, e := strconv.Atoi(r.Port); e != nil {
-		return errors.Errorf(internal_grpc.ErrPortBadf, r.Port)
+		return errors.Errorf(pkg_grpc.ErrPortBadf, r.Port)
 	}
 	return nil
 }

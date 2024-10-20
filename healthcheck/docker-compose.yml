@@ -1,10 +1,10 @@
-version: "3"
 services:
 
   healthcheck:
     container_name: "healthcheck"
     hostname: "healthcheck"
     image: ghcr.io/antonio-alexander/go-bludgeon-healthcheck:latest
+    profiles: ["application"]
     restart: "always"
     ports:
       - "9030:8080"
@@ -13,9 +13,9 @@ services:
       context: ./
       dockerfile: ./cmd/healthcheck-service/Dockerfile
       args:
-        - PLATFORM=${PLATFORM:-linux/amd64}
-        - GO_ARCH=${GO_ARCH:-amd64}
-        - GO_ARM=${GO_ARM:-7}
+        PLATFORM: ${PLATFORM:-linux/amd64}
+        GO_ARCH: ${GO_ARCH:-amd64}
+        GO_ARM: ${GO_ARM:-7}
     environment:
       BLUDGEON_LOG_PREFIX: healthcheck
       BLUDGEON_LOG_LEVEL: ${BLUDGEON_LOG_LEVEL:-trace}

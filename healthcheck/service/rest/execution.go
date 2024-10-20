@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 
-	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
+	pkg_errors "github.com/antonio-alexander/go-bludgeon/pkg/errors"
 )
 
 func handleResponse(writer http.ResponseWriter, err error, bytes []byte) error {
 	if err != nil {
-		var e internal_errors.Error
+		var e pkg_errors.Error
 
 		switch {
 		default:
@@ -17,8 +17,8 @@ func handleResponse(writer http.ResponseWriter, err error, bytes []byte) error {
 		}
 		switch v := err.(type) {
 		default:
-			e = internal_errors.New(err.Error())
-		case internal_errors.Error:
+			e = pkg_errors.New(err.Error())
+		case pkg_errors.Error:
 			e = v
 		}
 		bytes, err = json.Marshal(e)
