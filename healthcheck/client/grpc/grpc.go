@@ -7,10 +7,10 @@ import (
 	data "github.com/antonio-alexander/go-bludgeon/healthcheck/data"
 	pb "github.com/antonio-alexander/go-bludgeon/healthcheck/data/pb"
 
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
-	config "github.com/antonio-alexander/go-bludgeon/internal/config"
-	grpcclient "github.com/antonio-alexander/go-bludgeon/internal/grpc/client"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	config "github.com/antonio-alexander/go-bludgeon/pkg/config"
+	grpcclient "github.com/antonio-alexander/go-bludgeon/pkg/grpc/client"
+	logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
 
 	"google.golang.org/grpc"
 )
@@ -19,9 +19,9 @@ type grpcClient struct {
 	logger.Logger
 	pb.HealthChecksClient
 	client interface {
-		internal.Configurer
-		internal.Initializer
-		internal.Parameterizer
+		common.Configurer
+		common.Initializer
+		common.Parameterizer
 		grpc.ClientConnInterface
 	}
 }
@@ -30,9 +30,9 @@ type grpcClient struct {
 // that implements the interfaces of logic.Logic and Owner
 func New() interface {
 	client.Client
-	internal.Initializer
-	internal.Configurer
-	internal.Parameterizer
+	common.Initializer
+	common.Configurer
+	common.Parameterizer
 } {
 	return &grpcClient{
 		Logger: logger.NewNullLogger(),

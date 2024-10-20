@@ -5,8 +5,8 @@ import (
 	grpcclient "github.com/antonio-alexander/go-bludgeon/healthcheck/client/grpc"
 	restclient "github.com/antonio-alexander/go-bludgeon/healthcheck/client/rest"
 
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
-	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	pkg_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
 )
 
 func getConfig(pwd string, args []string, envs map[string]string) *Configuration {
@@ -22,13 +22,13 @@ func getConfig(pwd string, args []string, envs map[string]string) *Configuration
 }
 
 func parameterize(config *Configuration) (interface {
-	internal_logger.Logger
-	internal_logger.Printer
+	pkg_logger.Logger
+	pkg_logger.Printer
 }, interface {
-	internal.Initializer
+	common.Initializer
 	client.Client
 }, error) {
-	logger := internal_logger.New()
+	logger := pkg_logger.New()
 	logger.Configure(config.Logger)
 	switch config.ClientType {
 	default:
@@ -50,7 +50,7 @@ func parameterize(config *Configuration) (interface {
 
 func initialize(parameters ...interface{}) error {
 	for _, p := range parameters {
-		if p, ok := p.(internal.Initializer); ok {
+		if p, ok := p.(common.Initializer); ok {
 			if err := p.Initialize(); err != nil {
 				return err
 			}
@@ -61,7 +61,7 @@ func initialize(parameters ...interface{}) error {
 
 func shutdown(parameters ...interface{}) {
 	for _, p := range parameters {
-		if p, ok := p.(internal.Initializer); ok {
+		if p, ok := p.(common.Initializer); ok {
 			p.Shutdown()
 		}
 	}

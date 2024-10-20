@@ -7,9 +7,9 @@ import (
 	data "github.com/antonio-alexander/go-bludgeon/healthcheck/data"
 	logic "github.com/antonio-alexander/go-bludgeon/healthcheck/logic"
 
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	server "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
+	server "github.com/antonio-alexander/go-bludgeon/pkg/rest/server"
 )
 
 type restServer struct {
@@ -18,7 +18,7 @@ type restServer struct {
 }
 
 func New() interface {
-	internal.Parameterizer
+	common.Parameterizer
 	server.RouteBuilder
 } {
 	return &restServer{

@@ -9,19 +9,19 @@ import (
 	client "github.com/antonio-alexander/go-bludgeon/healthcheck/client"
 	data "github.com/antonio-alexander/go-bludgeon/healthcheck/data"
 
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
-	internal_config "github.com/antonio-alexander/go-bludgeon/internal/config"
-	internal_errors "github.com/antonio-alexander/go-bludgeon/internal/errors"
-	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_rest "github.com/antonio-alexander/go-bludgeon/internal/rest/client"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	pkg_config "github.com/antonio-alexander/go-bludgeon/pkg/config"
+	pkg_errors "github.com/antonio-alexander/go-bludgeon/pkg/errors"
+	pkg_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
+	pkg_rest "github.com/antonio-alexander/go-bludgeon/pkg/rest/client"
 )
 
 type restClient struct {
-	internal_logger.Logger
+	pkg_logger.Logger
 	client interface {
-		internal.Configurer
-		internal.Parameterizer
-		internal_rest.Client
+		common.Configurer
+		common.Parameterizer
+		pkg_rest.Client
 	}
 	config *Configuration
 }
@@ -29,14 +29,14 @@ type restClient struct {
 // New can be used to create a concrete instance of the rest client
 // that implements the interfaces of logic.Logic and Owner
 func New() interface {
-	internal.Configurer
-	internal.Parameterizer
-	internal.Initializer
+	common.Configurer
+	common.Parameterizer
+	common.Initializer
 	client.Client
 } {
 	return &restClient{
-		Logger: internal_logger.NewNullLogger(),
-		client: internal_rest.New(),
+		Logger: pkg_logger.NewNullLogger(),
+		client: pkg_rest.New(),
 	}
 }
 
@@ -47,7 +47,7 @@ func (r *restClient) doRequest(ctx context.Context, uri, method string, data []b
 	}
 	switch statusCode {
 	case http.StatusInternalServerError, http.StatusNotFound, http.StatusNotModified, http.StatusConflict:
-		return nil, internal_errors.New(bytes)
+		return nil, pkg_errors.New(bytes)
 	default:
 		return bytes, nil
 	}
@@ -61,7 +61,7 @@ func (r *restClient) SetUtilities(parameters ...interface{}) {
 	r.client.SetUtilities(parameters...)
 	for _, p := range parameters {
 		switch p := p.(type) {
-		case internal_logger.Logger:
+		case pkg_logger.Logger:
 			r.Logger = p
 		}
 	}
@@ -73,7 +73,7 @@ func (r *restClient) Configure(items ...interface{}) error {
 
 	for _, item := range items {
 		switch v := item.(type) {
-		case internal_config.Envs:
+		case pkg_config.Envs:
 			envs = v
 		case *Configuration:
 			configuration = v

@@ -7,8 +7,8 @@ import (
 
 	data "github.com/antonio-alexander/go-bludgeon/healthcheck/data"
 
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
 )
 
 type logic struct {
@@ -19,8 +19,8 @@ type logic struct {
 
 func New() interface {
 	Logic
-	internal.Parameterizer
-	internal.Shutdowner
+	common.Parameterizer
+	common.Shutdowner
 } {
 	return &logic{
 		Logger: logger.NewNullLogger(),

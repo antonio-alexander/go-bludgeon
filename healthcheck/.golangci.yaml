@@ -9,6 +9,6 @@ linters:
     - unused
     - whitespace
 
-run:
-  skip-dirs:
+issues:
+  exclude-dirs:
     - internal/swagger
