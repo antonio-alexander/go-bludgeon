@@ -1,0 +1,46 @@
+name: "Version Validate"
+description: |
+  Executes a series of commands to validate that operations that have to do with versioning are modified
+  Example usage:
+    - uses: antonio-alexander/go-bludegon/.github/actions/version_validate@v1
+        with:
+          folder-name: healthcheck
+          version-source: v1.0.2
+          version-target: v1.0.1
+          default-branch: main
+inputs:
+  folder-name:
+    description: "folder name to execute commands from"
+    required: true
+  version-source:
+    description: "the source version"
+    required: true
+  version-target:
+    description: "the target version"
+    required: true
+  default-branch:
+    description: "the default branch for the repository"
+    default: ${{ github.event.repository.default_branch }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+    - shell: bash
+      run: |
+        git fetch origin ${{ inputs.default-branch}}:refs/remotes/origin/${{ inputs.default-branch}}
+        git_diff_output=`git diff origin/${{ inputs.default-branch}} --name-only | grep ${{ inputs.folder-name }}/version.json`
+        if [ "$git_diff_output" != "${{ inputs.folder-name }}/version.json" ]; then
+             echo "version.json has not been updated, version.json must be updated for a pull request"
+             exit 1
+        fi
+        git fetch origin ${{ inputs.default-branch}}:refs/remotes/origin/${{ inputs.default-branch}}
+        git_diff_output=`git diff origin/${{ inputs.default-branch}} --name-only | grep ${{ inputs.folder-name }}/CHANGELOG.md`
+        if [ "$git_diff_output" != "${{ inputs.folder-name }}/CHANGELOG.md" ]; then
+             echo "CHANGELOG.md has not been updated, CHANGELOG.md must be updated for a pull request"
+             exit 1
+        fi
+        if [ "${{ inputs.version-source }}" = "${{ inputs.version-target }}" ]; then
+             echo "versions are the same, versions must be different"
+             exit 1
+        fi

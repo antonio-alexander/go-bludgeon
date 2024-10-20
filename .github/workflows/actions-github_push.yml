@@ -1,0 +1,116 @@
+name: actions-github_push
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/actions/**"
+
+env:
+  FOLDER_NAME: .github/actions
+  DEFAULT_BRANCH: master
+
+jobs:
+  environment:
+    runs-on: ubuntu-20.04
+    outputs:
+      git_target: ${{ steps.git_information.outputs.git_target }}
+      git_source: ${{ steps.git_information.outputs.git_source }}
+      git_sha: ${{ steps.git_information.outputs.git_sha }}
+      version_source: ${{ steps.source_information.outputs.version_source }}
+      version_source_major: ${{ steps.source_information.outputs.version_source_major }}
+      version_source_minor: ${{ steps.source_information.outputs.version_source_minor }}
+      version_target: ${{ steps.target_information.outputs.version_target }}
+      version_target_major: ${{ steps.source_information.outputs.version_target_major }}
+      version_target_minor: ${{ steps.source_information.outputs.version_target_minor }}
+    steps:
+      - name: get git information
+        id: git_information
+        run: |
+          git_target=`echo $GITHUB_BASE_REF | sed 's/refs\/heads\///'`
+          git_target=`echo $git_target | sed 's/refs\/tags\///'`
+          git_target=`echo $git_target| sed 's/refs\\///'`
+          echo Git target: $git_target
+          echo "git_target=$git_target" >> $GITHUB_OUTPUT
+          git_source=`echo $GITHUB_HEAD_REF | sed 's/refs\/heads\///'`
+          git_source=`echo $git_source | sed 's/refs\/tags\///'`
+          git_source=`echo $git_source | sed 's/refs\\///'`
+          echo Git source: $git_source
+          echo "git_source=$git_source" >> $GITHUB_OUTPUT
+          git_sha=`echo $GITHUB_SHA`
+          echo Git SHA: $git_sha
+          echo "git_sha=$git_sha" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+      - name: get source information
+        id: source_information
+        working-directory: ${{ env.FOLDER_NAME }}
+        run: |
+          version_source=`cat version.json | jq '.version' | sed 's/"//g'`
+          echo source version: $version_source
+          echo "version_source=$version_source" >> $GITHUB_OUTPUT
+          version_source_major=`cat version.json | jq '.version_major' | sed 's/"//g'`
+          echo source version major: $version_source_major
+          echo "version_source_major=$version_source_major" >> $GITHUB_OUTPUT
+          version_source_minor=`cat version.json | jq '.version_minor' | sed 's/"//g'`
+          echo source version minor: $version_source_minor
+          echo "version_source_minor=$version_source_minor" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+      - name: get target information
+        continue-on-error: true
+        id: target_information
+        run: |
+          if [ -d ${{ env.FOLDER_NAME }} ]; then
+           cd ${{ env.FOLDER_NAME }}
+           version_target=`cat version.json | jq '.version' | sed 's/"//g'`
+           echo target version: $version_target
+           echo "version_target=$version_target" >> $GITHUB_OUTPUT
+           version_target_major=`cat version.json | jq '.version_major' | sed 's/"//g'`
+           echo target version major: $version_target_major
+           echo "version_target_major=$version_target_major" >> $GITHUB_OUTPUT
+           version_target_minor=`cat version.json | jq '.version_target_minor' | sed 's/"//g'`
+           echo target version minor: $version_target_minor
+           echo "version_target_minor=$version_target_minor" >> $GITHUB_OUTPUT
+          else
+           echo "target version doesn't exist"
+          fi
+
+  git_push:
+    needs: [environment]
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+    steps:
+      - name: build_tags
+        id: build_tags
+        run: |
+          tag=v${{ needs.environment.outputs.version_source }}
+          echo tag: $tag
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+          tag_major=v${{ needs.environment.outputs.version_source_major }}
+          echo tag major: $tag_major
+          echo "tag_major=$tag_major" >> $GITHUB_OUTPUT
+          tag_major_minor=v${{ needs.environment.outputs.version_source_major }}.${{ needs.environment.outputs.version_source_minor }}
+          echo tag major minor: $tag_major_minor
+          echo "tag_major_minor=$tag_major_minor" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: "0"
+      - name: tag with major+minor+fix version
+        run: |
+          git tag ${{ steps.build_tags.outputs.tag }}
+          git push origin ${{ steps.build_tags.outputs.tag }}
+      - name: tag with major version
+        run: |
+          git tag --delete ${{ steps.build_tags.outputs.tag_major }} || true
+          git push origin :refs/tags/${{ steps.build_tags.outputs.tag_major }}
+          git tag ${{ steps.build_tags.outputs.tag_major }}
+          git push origin ${{ steps.build_tags.outputs.tag_major }}
+      - name: tag with major+minor version
+        run: |
+          git tag --delete ${{ steps.build_tags.outputs.tag_major_minor }} || true
+          git push origin :refs/tags/${{ steps.build_tags.outputs.tag_major_minor }}
+          git tag ${{ steps.build_tags.outputs.tag_major_minor }}
+          git push origin ${{ steps.build_tags.outputs.tag_major_minor }}

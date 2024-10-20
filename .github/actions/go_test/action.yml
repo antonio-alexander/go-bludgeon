@@ -1,0 +1,61 @@
+name: "Go Test"
+description: |
+  Executes a 'make test' command that utilizes Go
+  Example usage:
+    - uses: nationaloilwellvarco/max-core/.github/actions/go_test@v1
+        with:
+          folder-name: healthcheck
+          golang-version: 1.21
+          golang-cache-dependency-paths: ./healthcheck/go.sum
+inputs:
+  folder-name:
+    description: "folder name to execute commands from"
+    required: true
+  test-folders:
+    description: "folder name to execute commands from"
+    required: true
+  golang-version:
+    description: "the Go version to use for Go related functions"
+    required: true
+  golang-cache-dependency-paths:
+    description: "all of the dependency paths (go.mod) to cache"
+    required: true
+outputs:
+  test_log_file:
+    description: "test_log_file"
+    value: ${{ steps.go_test.outputs.test_log_file }}
+  test_out_file:
+    description: "test_out_file"
+    value: ${{ steps.go_test.outputs.test_out_file }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.golang-version }}
+        cache-dependency-path: ${{ inputs.golang-cache-dependency-paths }}
+    - shell: bash
+      working-directory: ${{ inputs.folder-name }}
+      run: |
+        make dep
+    - shell: bash
+      id: go_test
+      working-directory: ${{ inputs.folder-name }}
+      run: |
+        test_log_file=$PWD/tmp/test_${{ inputs.folder-name }}.log
+        echo test log file: $test_log_file
+        echo "test_log_file=$test_log_file" >> $GITHUB_OUTPUT
+        test_out_file=$PWD/tmp/test_${{ inputs.folder-name }}.out
+        echo test out file: $test_out_file
+        echo "test_out_file=$test_out_file" >> $GITHUB_OUTPUT
+        make dep
+        go test -v -cover -parallel=1 --count=1 ${{ inputs.test-folders }} -coverprofile $test_out_file | tee $test_log_file; test ${PIPESTATUS[0]} -eq 0
+    - shell: bash
+      if: always()
+      working-directory: ${{ inputs.folder-name }}
+      run: |
+        make stop
+        docker image prune -f
+        docker container prune -f
