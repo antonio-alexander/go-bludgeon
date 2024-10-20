@@ -1,0 +1,10 @@
+linters:
+  disable-all: true
+  enable:
+    - gosec
+    - bodyclose
+    - gosimple
+    - govet
+    - staticcheck
+    - unused
+    - whitespace
