@@ -1,0 +1,103 @@
+name: "Environment"
+description: |
+  Executes a set of commands to capture a PR/commit's environment
+  Example usage:
+    - uses: go-bludgeon/.github/actions/environment@v1
+        with:
+          folder-name: healthcheck
+inputs:
+  folder-name:
+    description: "folder name to execute commands from"
+    required: true
+  git-ref:
+    description: "the git reference you want to checkout"
+outputs:
+  git_target:
+    description: "git_target"
+    value: ${{ steps.git_information.outputs.git_target }}
+  git_source:
+    description: "git_source"
+    value: ${{ steps.git_information.outputs.git_source }}
+  git_sha:
+    description: "git_sha"
+    value: ${{ steps.git_information.outputs.git_sha }}
+  version_source:
+    description: "version_source"
+    value: ${{ steps.source_information.outputs.version_source }}
+  version_source_major:
+    description: "version_source_major"
+    value: ${{ steps.source_information.outputs.version_source_major }}
+  version_source_minor:
+    description: "version_source_minor"
+    value: ${{ steps.source_information.outputs.version_source_minor }}
+  version_target:
+    description: "version_target"
+    value: ${{ steps.target_information.outputs.version_target }}
+  version_target_major:
+    description: "version_target_major"
+    value: ${{ steps.source_information.outputs.version_target_major }}
+  version_target_minor:
+    description: "version_target_minor"
+    value: ${{ steps.source_information.outputs.version_target_minor }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get git information
+      id: git_information
+      shell: bash
+      run: |
+        git_target=`echo $GITHUB_BASE_REF | sed 's/refs\/heads\///'`
+        git_target=`echo $git_target | sed 's/refs\/tags\///'`
+        git_target=`echo $git_target| sed 's/refs\\///'`
+        echo Git target: $git_target
+        echo "git_target=$git_target" >> $GITHUB_OUTPUT
+        git_source=`echo $GITHUB_HEAD_REF | sed 's/refs\/heads\///'`
+        git_source=`echo $git_source | sed 's/refs\/tags\///'`
+        git_source=`echo $git_source | sed 's/refs\\///'`
+        echo Git source: $git_source
+        echo "git_source=$git_source" >> $GITHUB_OUTPUT
+        git_sha=`echo $GITHUB_SHA`
+        echo Git SHA: $git_sha
+        echo "git_sha=$git_sha" >> $GITHUB_OUTPUT
+    - name: Checkout repository code (source)
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.git-ref }}
+    - name: Get source information
+      id: source_information
+      shell: bash
+      working-directory: ${{ inputs.folder-name }}
+      run: |
+        version_source=`cat version.json | jq '.version' | sed 's/"//g'`
+        echo source version: $version_source
+        echo "version_source=$version_source" >> $GITHUB_OUTPUT
+        version_source_major=`cat version.json | jq '.version_major' | sed 's/"//g'`
+        echo source version major: $version_source_major
+        echo "version_source_major=$version_source_major" >> $GITHUB_OUTPUT
+        version_source_minor=`cat version.json | jq '.version_minor' | sed 's/"//g'`
+        echo source version minor: $version_source_minor
+        echo "version_source_minor=$version_source_minor" >> $GITHUB_OUTPUT
+    - name: Checkout repository code (target)
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.base_ref }}
+    - name: Get target information
+      continue-on-error: true
+      id: target_information
+      shell: bash
+      run: |
+        if [ -d ${{ inputs.folder-name }} ]; then
+         cd ${{ inputs.folder-name }}
+         version_target=`cat version.json | jq '.version' | sed 's/"//g'`
+         echo target version: $version_target
+         echo "version_target=$version_target" >> $GITHUB_OUTPUT
+         version_target_major=`cat version.json | jq '.version_major' | sed 's/"//g'`
+         echo target version major: $version_target_major
+         echo "version_target_major=$version_target_major" >> $GITHUB_OUTPUT
+         version_target_minor=`cat version.json | jq '.version_target_minor' | sed 's/"//g'`
+         echo target version minor: $version_target_minor
+         echo "version_target_minor=$version_target_minor" >> $GITHUB_OUTPUT
+        else
+         echo "target version doesn't exist"
+        fi
