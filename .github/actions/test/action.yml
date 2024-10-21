@@ -1,0 +1,39 @@
+name: "Test"
+description: |
+  Executes a 'make test' command that utilizes Go
+  Example usage:
+    - uses: nationaloilwellvarco/max-core/.github/actions/go_test@v1
+        with:
+          folder-name: healthcheck
+          golang-version: 1.21
+          golang-cache-dependency-paths: ./healthcheck/go.sum
+inputs:
+  folder-name:
+    description: "folder name to execute commands from"
+    required: true
+  golang-version:
+    description: "the Go version to use for Go related functions"
+    required: true
+  golang-cache-dependency-paths:
+    description: "all of the dependency paths (go.mod) to cache"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.golang-version }}
+        cache-dependency-path: ${{ inputs.golang-cache-dependency-paths }}
+    - shell: bash
+      working-directory: ${{ inputs.folder-name }}
+      run: |
+        make test
+    - shell: bash
+      if: always()
+      working-directory: ${{ inputs.folder-name }}
+      run: |
+        make stop
+        docker image prune -f
+        docker container prune -f

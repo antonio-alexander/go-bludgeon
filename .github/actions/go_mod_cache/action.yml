@@ -1,0 +1,26 @@
+name: "Go Mod Cache"
+description: |
+  Executes a go mod tidy for a set of folders for caching purposes
+  Example usage:
+    - uses: antonio-alexander/go-bludegon/.github/actions/go_mod_cache@v1
+        with:
+          folder-name: healthcheck
+          golang-version: 1.20
+          golang-cache-dependency-paths: ./healthcheck/go.sum
+          linter-version: v1.51.2
+inputs:
+  golang-version:
+    description: "the Go version to use for Go related functions"
+    required: true
+  golang-cache-dependency-paths:
+    description: "all of the dependency paths (go.mod) to cache"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.golang-version }}
+        cache-dependency-path: ${{ inputs.golang-cache-dependency-paths }}

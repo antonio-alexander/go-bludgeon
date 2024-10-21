@@ -1,0 +1,46 @@
+name: "Swagger Build"
+description: |
+  Executes a series of commands that prepares a swagger-ui with swagger files
+  Example usage:
+    - uses: antonio-alexander/go-bludegon/.github/actions/swagger_build@v1
+        with:
+          swagger-index-html: ./cmd/swagger/index.html
+          swagger-initializer-js: ./cmd/swagger/initializer.js
+          swagger-repo: https://github.com/swagger-api/swagger-ui
+          swagger-tag: v4.15.5
+inputs:
+  max-devops-token:
+    description: "the max devops token (secret)"
+    required: true
+  swagger-index-html:
+    description: "the swagger index.html file to use"
+    required: true
+  swagger-initializer-js:
+    description: "the swagger initializer.js file to use"
+    required: true
+  swagger-repo:
+    description: "the repo to use to clone the swagger-ui"
+    default: https://github.com/swagger-api/swagger-ui
+  swagger-tag:
+    description: "the tag to use to clone the swagger-ui"
+    default: v4.15.5
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/configure-pages@v4
+    - shell: bash
+      id: generate_static_swagger
+      run: |
+        git -c advice.detachedHead=false clone --depth 1 --branch "${{ inputs.swagger-tag }}" "${{ inputs.swagger-repo }}" ./tmp/swagger-ui
+        mkdir -p ./tmp/swagger
+        cp -r ./tmp/swagger-ui/dist ./tmp/swagger/dist
+        cp -rf ${{ inputs.swagger-index-html }} ./tmp/swagger/index.html
+        cp -rf ${{ inputs.swagger-initializer-js }} ./tmp/swagger/dist/swagger-initializer.js
+        cp /tmp/swagger-*.json ./tmp/swagger
+    - uses: actions/jekyll-build-pages@v1
+      with:
+        source: ./tmp/swagger
+        destination: ./_site
+        verbose: true
+    - uses: actions/upload-pages-artifact@v3

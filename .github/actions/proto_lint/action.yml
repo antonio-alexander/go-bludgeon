@@ -1,0 +1,45 @@
+name: "Proto Lint"
+description: |
+  Executes the proto-lint command
+  Example usage:
+    - uses: nationaloilwellvarco/max-core/.github/actions/proto_lint@v1
+        with:
+          folder-name: healthcheck
+          golang-version: 1.21
+          golang-cache-dependency-paths: ./healthcheck/go.sum
+inputs:
+  folder-name:
+    description: "folder name to execute commands from"
+    required: true
+  golang-version:
+    description: "the Go version to use for Go related functions"
+    required: true
+  golang-cache-dependency-paths:
+    description: "all of the dependency paths (go.mod) to cache"
+    required: true
+  proto-pattern:
+    description: "the pattern for proto files to Lint"
+    default: ./data/pb/*.proto
+  proto-lint-version:
+    description: "the version of protolint to use"
+  proto-lint-logging-level:
+    description: "the logging level for proto lint"
+    default: error
+  github-token:
+    description: "the github token"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.golang-version }}
+        cache-dependency-path: ${{ inputs.golang-cache-dependency-paths }}
+    - uses: yoheimuta/action-protolint@v1
+      with:
+        github_token: ${{ inputs.github-token }}
+        level: ${{ inputs.proto-lint-logging-level }}
+        protolint_version: ${{ inputs.proto-lint-version }}
+        protolint_flags: -config_path=./.protolint.yaml ${{inputs.proto-pattern}}

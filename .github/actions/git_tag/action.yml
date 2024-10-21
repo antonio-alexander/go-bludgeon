@@ -1,0 +1,35 @@
+name: "Git Tag"
+description: |
+  Tags the most recent commit
+  Example usage:
+    - uses: antonio-alexander/go-bludegon/.github/actions/git_tag@v1
+        with:
+          github-token: << secret >>
+          move-tag: false
+          tag: v1.0.0
+inputs:
+  github-token:
+    description: "the repos github token"
+    required: true
+  move-tag:
+    description: "if set to true, the tag will be deleted prior to pushing"
+    default: "false"
+  tag:
+    description: "the git tag to push"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: "0"
+    - shell: bash
+      if: ${{ inputs.move-tag == true }}
+      run: |
+        git tag --delete ${{ inputs.tag }} || true
+        git push origin :refs/tags/${{ inputs.tag }}
+    - shell: bash
+      run: |
+        git tag ${{ inputs.tag }}
+        git push origin ${{ inputs.tag }}
