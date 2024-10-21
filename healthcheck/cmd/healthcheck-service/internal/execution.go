@@ -7,15 +7,15 @@ import (
 	servicegrpc "github.com/antonio-alexander/go-bludgeon/healthcheck/service/grpc"
 	servicerest "github.com/antonio-alexander/go-bludgeon/healthcheck/service/rest"
 
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
-	internal_config "github.com/antonio-alexander/go-bludgeon/internal/config"
-	internal_server_grpc "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
-	internal_logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
-	internal_server_rest "github.com/antonio-alexander/go-bludgeon/internal/rest/server"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	pkg_config "github.com/antonio-alexander/go-bludgeon/pkg/config"
+	pkg_server_grpc "github.com/antonio-alexander/go-bludgeon/pkg/grpc/server"
+	pkg_logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
+	pkg_server_rest "github.com/antonio-alexander/go-bludgeon/pkg/rest/server"
 )
 
 func getConfig(pwd string, envs map[string]string) *Configuration {
-	configFile := filepath.Join(pwd, internal_config.DefaultConfigPath, internal_config.DefaultConfigFile)
+	configFile := filepath.Join(pwd, pkg_config.DefaultConfigPath, pkg_config.DefaultConfigFile)
 	config := new(Configuration)
 	config.Default(pwd)
 	if err := config.Read(configFile); err == nil {
@@ -26,19 +26,19 @@ func getConfig(pwd string, envs map[string]string) *Configuration {
 }
 
 func parameterize(config *Configuration) (interface {
-	internal_logger.Logger
-	internal_logger.Printer
-	internal.Configurer
+	pkg_logger.Logger
+	pkg_logger.Printer
+	common.Configurer
 }, []interface{}) {
 	var parameters []interface{}
 
-	logger := internal_logger.New()
+	logger := pkg_logger.New()
 	healthCheckLogic := logic.New()
 	healthCheckLogic.SetUtilities(logger)
 	healthCheckLogic.SetParameters()
 	parameters = append(parameters, healthCheckLogic)
 	if config.ServiceRestEnabled {
-		restServer := internal_server_rest.New()
+		restServer := pkg_server_rest.New()
 		healthCheckRestService := servicerest.New()
 		healthCheckRestService.SetUtilities(logger)
 		restServer.SetUtilities(logger)
@@ -50,7 +50,7 @@ func parameterize(config *Configuration) (interface {
 		healthCheckGrpcService := servicegrpc.New()
 		healthCheckGrpcService.SetUtilities(logger)
 		healthCheckGrpcService.SetParameters(healthCheckLogic, healthCheckGrpcService)
-		grpcServer := internal_server_grpc.New()
+		grpcServer := pkg_server_grpc.New()
 		grpcServer.SetUtilities(logger)
 		grpcServer.SetParameters(healthCheckGrpcService)
 		parameters = append(parameters, grpcServer, healthCheckGrpcService)
@@ -63,8 +63,8 @@ func configure(pwd string, envs map[string]string, parameters ...interface{}) er
 	// file
 	for _, p := range parameters {
 		switch p := p.(type) {
-		case internal.Configurer:
-			if err := p.Configure(internal_config.Envs(envs)); err != nil {
+		case common.Configurer:
+			if err := p.Configure(pkg_config.Envs(envs)); err != nil {
 				return err
 			}
 		}
@@ -74,7 +74,7 @@ func configure(pwd string, envs map[string]string, parameters ...interface{}) er
 
 func initialize(parameters ...interface{}) error {
 	for _, p := range parameters {
-		if p, ok := p.(internal.Initializer); ok {
+		if p, ok := p.(common.Initializer); ok {
 			if err := p.Initialize(); err != nil {
 				return err
 			}
@@ -85,7 +85,7 @@ func initialize(parameters ...interface{}) error {
 
 func shutdown(parameters ...interface{}) {
 	for _, p := range parameters {
-		if p, ok := p.(internal.Initializer); ok {
+		if p, ok := p.(common.Initializer); ok {
 			p.Shutdown()
 		}
 	}

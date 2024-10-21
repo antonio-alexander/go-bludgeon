@@ -9,7 +9,7 @@ go_lint_version=v1.51.2
 protoc_version=3.20.1
 proto_c_gen_go_version=v1.28.0
 proto_c_gen_go_grpc_version=v1.2
-proto_linter_version=0.38.3
+proto_linter_version=v0.50.5
 swagger_version=v0.29.0
 
 godoc_port=8081
@@ -73,16 +73,18 @@ pull:
 	@docker compose pull
 	@docker image prune -f
 
+dep:
+
 run: ## - run the service and its dependencies (docker)
 	@docker container rm -f healthcheck
 	@docker image prune -f
-	@docker compose up -d --wait
+	@docker compose --profile application up -d --wait
 
 stop:
-	@docker compose down
+	@docker compose --profile application down
 
 clean: stop ## - stop and clean docker resources
-	@docker compose rm -f
+	@docker compose --profile application rm -f
 
 install-client: ## - install the healthcheck client
 	@go install ./cmd/healthcheck-client
