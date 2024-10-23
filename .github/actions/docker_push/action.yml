@@ -1,0 +1,85 @@
+name: "Docker Push"
+description: |
+  Executes a series of commands to push docker images and manifesto
+  Example usage:
+    - uses: antonio-alexander/go-bludgeon/.github/actions/docker_push@v1
+        with:
+          docker-image-name: ghcr.io/antonio-alexander/go-bludgeon/healthcheck
+          version: 1.0.1
+          docker-tag-prefix-amd64: amd64
+          docker-tag-prefix-armv7: armv7
+inputs:
+  docker-image-name:
+    description: "the docker image name/repo to use when tagging"
+    required: true
+  version:
+    description: "the version to use with the tag (e.g. 1.0.1)"
+    required: true
+  docker-tag-prefix-amd64:
+    description: "the docker tag prefix for amd64 images"
+    default: "amd64"
+  docker-tag-prefix-armv7:
+    description: "the docker tag prefix for armv7 images"
+    default: "armv7"
+  push-latest:
+    description: "whether to push latest images"
+    default: "true"
+outputs:
+  docker_image_versioned:
+    description: "the docker image built with the version prefixed"
+    value: ${{ steps.docker_push_versioned.outputs.docker_image_versioned }}
+  docker_image_versioned_amd64:
+    description: "the docker image pushed with amd64 prefix"
+    value: ${{ steps.docker_push_versioned.outputs.docker_image_versioned_amd64 }}
+  docker_image_versioned_armv7:
+    description: "the docker image pushed with amd64 prefix"
+    value: ${{ steps.docker_push_versioned.outputs.docker_image_versioned_armv7 }}
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      id: docker_push_versioned
+      run: |
+        docker_image_versioned_amd64=${{ inputs.docker-image-name }}:${{ inputs.docker-tag-prefix-amd64 }}_${{ inputs.version }}
+        echo docker image versioned amd64: $docker_image_versioned_amd64
+        echo "docker_image_versioned_amd64=$docker_image_versioned_amd64" >> $GITHUB_OUTPUT
+        docker_image_versioned_armv7=${{ inputs.docker-image-name }}:${{ inputs.docker-tag-prefix-armv7 }}_${{ inputs.version }}
+        echo docker image versioned armv7: $docker_image_versioned_armv7
+        echo "docker_image_versioned_armv7=$docker_image_versioned_armv7" >> $GITHUB_OUTPUT
+        docker_image_versioned=${{ inputs.docker-image-name }}:${{ inputs.version }}
+        echo docker image versioned: $docker_image_versioned
+        echo "docker_image_versioned=$docker_image_versioned" >> $GITHUB_OUTPUT
+        docker push $docker_image_versioned_amd64
+        docker push $docker_image_versioned_armv7
+        docker manifest create $docker_image_versioned $docker_image_versioned_amd64 $docker_image_versioned_armv7
+        docker manifest annotate --arch arm --os linux --variant 7 $docker_image_versioned $docker_image_versioned_armv7
+        docker manifest push $docker_image_versioned --purge
+    - shell: bash
+      id: docker_push_latest
+      if: ${{ inputs.push-latest == 'true' }}
+      run: |
+        docker_image_versioned_amd64=${{ inputs.docker-image-name }}:${{ inputs.docker-tag-prefix-amd64 }}_${{ inputs.version }}
+        echo docker image versioned amd64: $docker_image_versioned_amd64
+        echo "docker_image_versioned_amd64=$docker_image_versioned_amd64" >> $GITHUB_OUTPUT
+        docker_image_versioned_armv7=${{ inputs.docker-image-name }}:${{ inputs.docker-tag-prefix-armv7 }}_${{ inputs.version }}
+        echo docker image versioned armv7: $docker_image_versioned_armv7
+        echo "docker_image_versioned_armv7=$docker_image_versioned_armv7" >> $GITHUB_OUTPUT
+        docker_image_latest=${{ inputs.docker-image-name }}:latest
+        echo docker image latest: $docker_image_latest
+        docker_image_latest_amd64=${{ inputs.docker-image-name }}:${{ inputs.docker-tag-prefix-amd64 }}_latest
+        echo docker image latest amd64: $docker_image_latest_amd64
+        docker_image_latest_armv7=${{ inputs.docker-image-name }}:${{ inputs.docker-tag-prefix-armv7 }}_latest
+        echo docker image latest armv7: $docker_image_latest_armv7
+        docker tag $docker_image_versioned_amd64 $docker_image_latest_amd64
+        docker tag $docker_image_versioned_armv7 $docker_image_latest_armv7
+        docker push $docker_image_latest_amd64
+        docker push $docker_image_latest_armv7
+        docker manifest create $docker_image_latest $docker_image_latest_amd64 $docker_image_latest_armv7
+        docker manifest annotate --arch arm --os linux --variant 7 $docker_image_latest $docker_image_latest_armv7
+        docker manifest push $docker_image_latest --purge
+    - shell: bash
+      if: always()
+      run: |
+        docker image prune -f
+        docker container prune -f

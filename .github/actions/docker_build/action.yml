@@ -1,0 +1,94 @@
+name: "Docker Build"
+description: |
+  Executes an opinionated (to Go) Docker build
+  Example usage:
+    - uses: antonio-alexander/go-bludgeon/.github/actions/docker_build@v1
+        with:
+          folder-name: healthcheck
+          docker-platform: linux/amd64
+          docker-image-name: ghcr.io/antonio-alexander/go-bludgeon/healthcheck
+          docker-tag-prefix: amd64
+          version: 1.0.1
+          git-source: feature/MPP-4282
+          go-arch: amd64
+          go-arm: 7
+inputs:
+  folder-name:
+    description: "folder name to execute commands from"
+    required: true
+  docker-platform:
+    description: "the docker platform to build for (e.g., linux/amd64)"
+    default: "linux/amd64"
+    required: true
+  docker-image-name:
+    description: "the docker image name/repo to use when tagging"
+    required: true
+  docker-tag-prefix:
+    description: "the docker prefix to use for the docker tag (e.g., amd64)"
+    required: true
+  docker-build-args:
+    description: "additional build arguments to use in the docker build"
+  docker-file:
+    description: "the Dockerfile location relative to the folder-name"
+    required: true
+  version:
+    description: "the version to use with the tag (e.g. 1.0.1)"
+    required: true
+  git-source:
+    description: "the git branch used to build this image`"
+    required: true
+  git-sha:
+    description: "the git commit SHA from the branch used to build the code`"
+    required: true
+  go-arch:
+    description: "the Go architecture to build (e.g., amd64)"
+    default: "amd64"
+  go-arm:
+    description: "the Go ARM version to build with (e.g., 7)"
+    default: "7"
+  git-ref:
+    description: "the git reference you want to checkout"
+  docker-image-file:
+    description: "the docker image file name without the version/platform suffix (or extension)"
+    required: true
+outputs:
+  docker_build_log:
+    description: "the file showing the log for building"
+    value: ${{ steps.docker_build.outputs.docker_build_log }}
+  docker_image_file:
+    description: "the docker image file output when using docker save"
+    value: ${{ steps.docker_build.outputs.docker_image_file }}
+  docker_image:
+    description: "the docker image (with tag) that was built"
+    value: ${{ steps.docker_build.outputs.docker_image }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.git-ref }}
+    - shell: bash
+      id: docker_build
+      working-directory: ${{ inputs.folder-name }}
+      run: |
+        mkdir -p /tmp
+        docker_build_log=/tmp/${{ inputs.docker-image-file }}_${{ inputs.docker-tag-prefix }}-${{ inputs.version }}.log
+        echo docker build log: $docker_build_log
+        echo "docker_build_log=$docker_build_log" >> $GITHUB_OUTPUT
+        docker_image_file=/tmp/${{ inputs.docker-image-file }}_${{ inputs.docker-tag-prefix }}-${{ inputs.version }}.tar.gz
+        echo docker image file: $docker_image_file
+        echo "docker_image_file=$docker_image_file" >> $GITHUB_OUTPUT
+        docker_image=${{ inputs.docker-image-name }}:${{ inputs.docker-tag-prefix }}_${{ inputs.version }}
+        echo docker image: $docker_image
+        echo "docker_image=$docker_image" >> $GITHUB_OUTPUT
+        docker build -f ${{ inputs.docker-file }} . -t $docker_image \
+        --build-arg GIT_COMMIT=${{ inputs.git-sha }} --build-arg GIT_BRANCH=${{ inputs.git-source }} --build-arg PLATFORM=${{ inputs.docker-platform }} \
+        --build-arg GO_ARCH=${{ inputs.go-arch }} --build-arg GO_ARM=${{ inputs.go-arm }} ${{ inputs.docker-build-args }} > $docker_build_log
+        docker save -o $docker_image_file $docker_image
+    - shell: bash
+      if: always()
+      working-directory: ${{ inputs.folder-name }}
+      run: |
+        docker image prune -f
+        docker container prune -f

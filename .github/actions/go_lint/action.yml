@@ -1,0 +1,40 @@
+name: "Go Lint"
+description: |
+  Executes a golangci-lint
+  Example usage:
+    - uses: antonio-alexander/go-bludegon/.github/actions/go_lint@v1
+        with:
+          folder-name: healthcheck
+          golang-version: 1.21
+          golang-cache-dependency-paths: ./healthcheck/go.sum
+          linter-version: v1.51.2
+inputs:
+  folder-name:
+    description: "folder name to execute commands from"
+    required: true
+  golang-version:
+    description: "the Go version to use for Go related functions"
+    required: true
+  golang-cache-dependency-paths:
+    description: "all of the dependency paths (go.mod) to cache"
+    required: true
+  linter-version:
+    description: "version of golangci-lint to use"
+    required: true
+  max-devops-token:
+    description: "the max devops token (secret)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.golang-version }}
+        cache-dependency-path: ${{ inputs.golang-cache-dependency-paths }}
+    - uses: golangci/golangci-lint-action@v6
+      with:
+        working-directory: ${{ inputs.folder-name }}
+        version: ${{ inputs.linter-version }}
+        args: --verbose --timeout=10m
