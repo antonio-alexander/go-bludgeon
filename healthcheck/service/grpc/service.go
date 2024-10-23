@@ -7,9 +7,9 @@ import (
 	pb "github.com/antonio-alexander/go-bludgeon/healthcheck/data/pb"
 	logic "github.com/antonio-alexander/go-bludgeon/healthcheck/logic"
 
-	internal "github.com/antonio-alexander/go-bludgeon/internal"
-	server "github.com/antonio-alexander/go-bludgeon/internal/grpc/server"
-	logger "github.com/antonio-alexander/go-bludgeon/internal/logger"
+	common "github.com/antonio-alexander/go-bludgeon/common"
+	server "github.com/antonio-alexander/go-bludgeon/pkg/grpc/server"
+	logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
 
 	"google.golang.org/grpc"
 )
@@ -27,7 +27,7 @@ type grpcService struct {
 var _ pb.HealthChecksServer = &grpcService{}
 
 func New() interface {
-	internal.Parameterizer
+	common.Parameterizer
 	server.Registerer
 } {
 	return &grpcService{

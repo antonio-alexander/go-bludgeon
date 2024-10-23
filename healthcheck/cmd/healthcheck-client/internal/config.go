@@ -5,7 +5,7 @@ import (
 
 	grpcclient "github.com/antonio-alexander/go-bludgeon/healthcheck/client/grpc"
 	restclient "github.com/antonio-alexander/go-bludgeon/healthcheck/client/rest"
-	"github.com/antonio-alexander/go-bludgeon/internal/logger"
+	logger "github.com/antonio-alexander/go-bludgeon/pkg/logger"
 )
 
 const (

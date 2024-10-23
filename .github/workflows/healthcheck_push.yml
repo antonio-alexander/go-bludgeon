@@ -6,125 +6,83 @@ on:
       - main
     paths:
       - "healthcheck/**"
-      - ".github/workflows/healthcheck_push.yml"
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  GO_LINT_VERSION: "v1.51.2"
-  GO_VERSION: "1.19"
+  FOLDER_NAME: "healthcheck"
+  DOCKER_IMAGE_NAME: ghcr.io/${{ github.repository }}-healthcheck
+  GO_LINT_VERSION: "v1.59.0"
+  GO_VERSION: "1.21"
+  GO_CACHE_DEPENDENCY_PATHS: |
+    healthcheck/go.sum
   PROTOC_VERSION: "3.20.1"
   PROTOC_GEN_GO_VERSION: "v1.28.0"
   PROTOC_GEN_GO_GRPC_VERSION: "v1.2"
-  PROTO_LINT_VERSION: "0.38.3"
+  PROTO_LINT_VERSION: "0.50.5"
+  LINTER_VERSION: "v1.59.0"
+  PLATFORM_AMD64: linux/amd64
+  PLATFORM_ARMV7: linux/arm/v7
+  RETENTION_DAYS: 7
+  DEFAULT_BRANCH: main
 
 jobs:
   environment:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_SHA: ${{ github.sha }}
-      GITHUB_REF: ${{ github.ref }}
+    outputs:
+      version: ${{ steps.environment.outputs.version_source }}
+      git_source: ${{ steps.environment.outputs.git_source }}
+      git_sha: ${{ steps.environment.outputs.git_sha }}
     steps:
-      - name: Get git source
-        run: |
-          git_source=`echo $GITHUB_REF | sed 's/refs\/heads\///'`
-          git_source=`echo $git_source | sed 's/refs\/tags\///'`
-          git_source=`echo $git_source | sed 's/refs\\///'`
-          echo $git_source
-          echo "git_source=$git_source" >> $GITHUB_ENV
-      - name: Get git SHA
-        run: |
-          git_sha=`echo $GITHUB_SHA`
-          echo $git_sha
-          echo "git_sha=$git_sha" >> $GITHUB_ENV
-      - name: Checkout repository code
-        uses: actions/checkout@v3
-      - name: Get version
-        run: |
-          version_source=`cat /home/runner/work/go-bludgeon/go-bludgeon/healthcheck/version.json | jq '.Version' | sed 's/"//g'`
-          echo $version_source
-          echo "version_source=$version_source" >> $GITHUB_ENV
-      - name: Generate build artifacts
-        run: |
-          mkdir -p /tmp
-          echo ${{ env.version_source }} >> /tmp/version_source
-          echo ${{ env.git_source }} >> /tmp/git_source
-          echo ${{ env.git_sha }} >> /tmp/git_sha
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+      - uses: antonio-alexander/go-bludgeon/.github/actions/environment@v1
+        id: environment
         with:
-          name: artifacts
-          path: |
-            /tmp/version_source
-            /tmp/git_source
-            /tmp/git_sha
+          folder-name: ${{ env.FOLDER_NAME }}
 
   go_lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
-      - uses: actions/setup-go@v3
+      - uses: antonio-alexander/go-bludgeon/.github/actions/go_lint@v1
         with:
-          go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v3
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: ${{ env.GO_LINT_VERSION }}
-          working-directory: ./healthcheck
-          args: --verbose
+          folder-name: ${{ env.FOLDER_NAME }}
+          golang-version: ${{ env.GO_VERSION}}
+          golang-cache-dependency-paths: ${{ env.GO_CACHE_DEPENDENCY_PATHS}}
+          linter-version: ${{ env.LINTER_VERSION}}
 
   proto_lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v3
+      - uses: antonio-alexander/go-bludgeon/.github/actions/proto_lint@v1
         with:
-          go-version: ${{ env.GO_VERSION }}
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-      - name: Lint Protos
-        uses: yoheimuta/action-protolint@v1
+          folder-name: ${{ env.FOLDER_NAME }}
+          golang-version: ${{ env.GO_VERSION}}
+          golang-cache-dependency-paths: ${{ env.GO_CACHE_DEPENDENCY_PATHS}}
+          proto-pattern: ./data/pb/*.proto
+          proto-lint-version: ${{ env.PROTO_LINT_VERSION }}
+          proto-lint-logging-level: error
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          level: error
-          protolint_version: ${{ env.PROTO_LINT_VERSION }}
-          protolint_flags: -config_path=./healthcheck/.protolint.yaml ./healthcheck/data/pb/*.proto
+          name: proto_lint
+          path: |
+            ${{ steps.proto_lint.outputs.proto_lint_log_file }}
 
   proto_validate:
     needs: [proto_lint]
     runs-on: ubuntu-latest
     steps:
-      - name: Setup go
-        uses: actions/setup-go@v3
+      - uses: antonio-alexander/go-bludgeon/.github/actions/proto_validate@v1
         with:
-          go-version: ${{ env.GO_VERSION }}
-      - name: Install Protoc
-        run: |
-          PROTOC_ZIP=protoc-${{ env.PROTOC_VERSION }}-linux-x86_64.zip
-          curl -OL --silent https://github.com/protocolbuffers/protobuf/releases/download/v${{ env.PROTOC_VERSION }}/$PROTOC_ZIP
-          sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
-          sudo unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
-          rm -f $PROTOC_ZIP
-      - name: Install protoc-gen-go
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@${{ env.PROTOC_GEN_GO_VERSION }}
-      - name: Install protoc-gen-go-grpc
-        run: |
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@${{ env.PROTOC_GEN_GO_GRPC_VERSION }}
-      - name: Checkout repository code
-        uses: actions/checkout@v3
-      - name: Build protos
-        working-directory: /home/runner/work/go-bludgeon/go-bludgeon/healthcheck/data/
-        run: |
-          protoc -I="./pb" --go_opt=paths=source_relative --go_out="/tmp" --go-grpc_opt=paths=source_relative --go-grpc_out="/tmp" ./pb/*.proto
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: artifacts
-          path: |
-            /tmp/healthcheck.pb.go
-            /tmp/healthcheck_grpc.pb.go
-            /tmp/timeslices.pb.go
-            /tmp/timeslices_grpc.pb.go
+          folder-name: ${{ env.FOLDER_NAME }}
+          golang-version: ${{ env.GO_VERSION}}
+          golang-cache-dependency-paths: ${{ env.GO_CACHE_DEPENDENCY_PATHS}}
+          protoc-version: ${{ env.PROTOC_VERSION }}
+          protoc-gen-go-version: ${{ env.PROTOC_GEN_GO_VERSION }}
+          protoc-gen-go-grpc-version: ${{ env.PROTOC_GEN_GO_GRPC_VERSION }}
+          proto-folder: ./data
+
       - name: Compare healthcheck.pb.go
         if: always()
         working-directory: /home/runner/work/go-bludgeon/go-bludgeon/healthcheck/data/pb/
@@ -140,160 +98,140 @@ jobs:
         working-directory: /home/runner/work/go-bludgeon/go-bludgeon/healthcheck/data/pb/
         run: |
           if cmp --silent -- "./healthcheck_grpc.pb.go" "/tmp/healthcheck_grpc.pb.go"; then
-          echo "generated proto files are identical"
+            echo "generated proto files are identical"
           else
-          echo "one or more proto files generated don't match"
-          exit 1
+            echo "one or more proto files generated don't match"
+            exit 1
           fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: proto_validate
+          path: |
+            /tmp/healthcheck.pb.go
+            /tmp/healthcheck_grpc.pb.go
 
   go_test:
-    needs: [go_lint]
+    needs: [go_lint, proto_validate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: read
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
+      - uses: antonio-alexander/go-bludgeon/.github/actions/go_test@v1
         with:
-          go-version: ${{ env.GO_VERSION }}
-      - name: Test healthcheck
-        run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/healthcheck
-          go mod download
-          go test -v -cover -parallel=1 --count=1 $(go list ./... | grep -v /client/) -coverprofile /tmp/go-bludgeon-healthcheck.out | tee /tmp/go-bludgeon-healthcheck.log; test ${PIPESTATUS[0]} -eq 0
-          docker compose logs >> /tmp/go-bludgeon-healthcheck_services.log
-      - name: Docker clean-up
+          folder-name: ${{ env.FOLDER_NAME }}
+          test-folders: ./logic/... ./service/...
+          golang-version: ${{ env.GO_VERSION}}
+          golang-cache-dependency-paths: ${{ env.GO_CACHE_DEPENDENCY_PATHS}}
+      - uses: actions/upload-artifact@v4
         if: always()
-        run: |
-          make stop
-          docker image prune -f
-          docker container prune -f
-      - name: Upload artifacts
-        if: always()
-        uses: actions/upload-artifact@v3
         with:
-          name: artifacts
+          name: go_test
           path: |
-            /tmp/go-bludgeon-healthcheck.log
-            /tmp/go-bludgeon-healthcheck.out
-            /tmp/go-bludgeon-healthcheck_services.log
+            /home/runner/work/go-bludgeon/go-bludgeon/healthcheck/tmp/test_healthcheck.log
+            /home/runner/work/go-bludgeon/go-bludgeon/healthcheck/tmp/test_healthcheck.out
 
-  docker_build_images:
+  docker_build_amd64:
     needs: [environment, go_test, proto_validate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      PLATFORM_AMD64: linux/amd64
-      PLATFORM_ARMV7: linux/arm/v7
+      packages: read
+    outputs:
+      docker_image: ${{ steps.docker_build.outputs.docker_image }}
+      docker_image_file: ${{ steps.docker_build.outputs.docker_image_file }}
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
+      - uses: antonio-alexander/go-bludgeon/.github/actions/docker_build@v1
+        id: docker_build
         with:
-          name: artifacts
-          path: /tmp
-      - name: Get environment
-        run: |
-          version=`cat /tmp/version_source`
-          echo "version=$version" >> $GITHUB_ENV
-          git_source=`cat /tmp/git_source`
-          echo "git_source=$git_source" >> $GITHUB_ENV
-      - name: Check out repository code
-        uses: actions/checkout@v3
-      - name: Build docker healthcheck
-        run: |
-          cd healthcheck
-          docker build -f ./cmd/healthcheck-service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-healthcheck:amd64_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_source }}  --build-arg PLATFORM=$PLATFORM_AMD64 --build-arg GO_ARCH=amd64
-          docker build -f ./cmd/healthcheck-service/Dockerfile . -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-healthcheck:armv7_${{ env.version }} --build-arg GIT_COMMIT=$GITHUB_SHA --build-arg GIT_BRANCH=${{ env.git_source }}  --build-arg PLATFORM=$PLATFORM_ARMV7 --build-arg GO_ARCH=arm --build-arg GO_ARM=7
-      - name: Generate build artifacts
-        run: |
-          mkdir -p /tmp
-          docker save -o /tmp/go-bludgeon-healthcheck_amd64-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-healthcheck:amd64_${{ env.version }}
-          docker save -o /tmp/go-bludgeon-healthcheck_armv7-${{ env.version }}.tar.gz ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-healthcheck:armv7_${{ env.version }}
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+          folder-name: ${{ env.FOLDER_NAME }}
+          docker-file: ./cmd/healthcheck-service/Dockerfile
+          docker-platform: ${{ env.PLATFORM_AMD64 }}
+          docker-image-name: ${{ env.DOCKER_IMAGE_NAME }}
+          docker-image-file: healthcheck
+          docker-tag-prefix: amd64
+          version: ${{ needs.environment.outputs.version }}
+          git-source: ${{ needs.environment.outputs.git_source }}
+          git-sha: ${{ needs.environment.outputs.git_sha }}
+          go-arch: amd64
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: artifacts
+          name: docker_build_amd64
           path: |
-            /tmp/go-bludgeon-healthcheck_amd64-${{ env.version }}.tar.gz
-            /tmp/go-bludgeon-healthcheck_armv7-${{ env.version }}.tar.gz
-          retention-days: 1
-      - name: Docker clean-up
-        run: |
-          docker image prune -f
-          docker container prune -f
+            ${{ steps.docker_build.outputs.docker_build_log }}
+            ${{ steps.docker_build.outputs.docker_image_file }}
+          retention-days: ${{ env.RETENTION_DAYS }}
+
+  docker_build_armv7:
+    needs: [environment, go_test, proto_validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      docker_image: ${{ steps.docker_build.outputs.docker_image }}
+      docker_image_file: ${{ steps.docker_build.outputs.docker_image_file }}
+    steps:
+      - uses: antonio-alexander/go-bludgeon/.github/actions/docker_build@v1
+        id: docker_build
+        with:
+          folder-name: ${{ env.FOLDER_NAME }}
+          docker-file: ./cmd/healthcheck-service/Dockerfile
+          docker-platform: ${{ env.PLATFORM_ARMV7 }}
+          docker-image-name: ${{ env.DOCKER_IMAGE_NAME }}
+          docker-image-file: healthcheck
+          docker-tag-prefix: armv7
+          version: ${{ needs.environment.outputs.version }}
+          git-source: ${{ needs.environment.outputs.git_source }}
+          git-sha: ${{ needs.environment.outputs.git_sha }}
+          go-arch: arm
+          go-arm: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docker_build_armv7
+          path: |
+            ${{ steps.docker_build.outputs.docker_build_log }}
+            ${{ steps.docker_build.outputs.docker_image_file }}
+          retention-days: ${{ env.RETENTION_DAYS }}
 
   go_test_client:
-    needs: [docker_build_images]
+    needs: [docker_build_amd64, docker_build_armv7]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: artifacts
+          name: docker_build_amd64
           path: /tmp
-      - name: Get environment
-        run: |
-          version=`cat /tmp/version_source`
-          echo "version=$version" >> $GITHUB_ENV
       - name: Load Docker Images
         run: |
-          docker load -i /tmp/go-bludgeon-healthcheck_amd64-${{ env.version }}.tar.gz
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-healthcheck:amd64_${{ env.version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-healthcheck:latest
-      - name: Check out repository code
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
+          docker load -i ${{ needs.docker_build_amd64.outputs.docker_image_file }}
+          docker tag ${{ needs.docker_build_amd64.outputs.docker_image }} ${{ env.DOCKER_IMAGE_NAME }}:latest
+      - uses: antonio-alexander/go-bludgeon/.github/actions/go_test@v1
         with:
-          go-version: ${{ env.GO_VERSION }}
-      - name: Test healthcheck client
-        run: |
-          cd /home/runner/work/go-bludgeon/go-bludgeon/healthcheck
-          go mod download
-          make run
-          go test -v ./client/... -coverprofile /tmp/go-bludgeon-healthcheck-client.out | tee /tmp/go-bludgeon-healthcheck-client.log
-          docker compose logs >> /tmp/go-bludgeon-healthcheck-client_services.log
-      - name: Docker clean-up
+          folder-name: ${{ env.FOLDER_NAME }}
+          test-folders: ./client/...
+          golang-version: ${{ env.GO_VERSION}}
+          golang-cache-dependency-paths: ${{ env.GO_CACHE_DEPENDENCY_PATHS}}
+      - uses: actions/upload-artifact@v4
         if: always()
-        run: |
-          make stop
-          docker image prune -f
-          docker container prune -f
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
         with:
-          name: artifacts
+          name: go_test_client
           path: |
-            /tmp/go-bludgeon-healthcheck_client.log
-            /tmp/go-bludgeon-healthcheck_client.out
-            /tmp/go-bludgeon-healthcheck-client_services.log
+            /home/runner/work/go-bludgeon/go-bludgeon/healthcheck/tmp/test_healthcheck.log
+            /home/runner/work/go-bludgeon/go-bludgeon/healthcheck/tmp/test_healthcheck.out
 
   git_push_tag:
-    needs: [go_lint, go_test_client]
+    needs: [environment, go_test_client]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
+      - uses: antonio-alexander/go-bludgeon/.github/actions/git_tag@v1
         with:
-          name: artifacts
-          path: /tmp
-      - name: Get environment
-        run: |
-          version=`cat /tmp/version_source`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Check out repository code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: "0"
-      - name: Push/Update version
-        uses: anothrNick/github-tag-action@1.36.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: true
-          CUSTOM_TAG: healthcheck/v${{ env.version }}
+          tag: healthcheck/v${{ needs.environment.outputs.version }}
